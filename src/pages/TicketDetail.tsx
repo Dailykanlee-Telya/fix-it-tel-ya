@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import {
   ArrowLeft,
   User,
@@ -28,6 +30,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import {
   STATUS_LABELS,
@@ -59,6 +63,9 @@ export default function TicketDetail() {
   const { toast } = useToast();
   const [statusNote, setStatusNote] = useState('');
   const [internalNote, setInternalNote] = useState('');
+  const [partDialogOpen, setPartDialogOpen] = useState(false);
+  const [selectedPartId, setSelectedPartId] = useState('');
+  const [partQuantity, setPartQuantity] = useState(1);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', id],
@@ -110,6 +117,104 @@ export default function TicketDetail() {
 
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: availableParts } = useQuery({
+    queryKey: ['available-parts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('parts')
+        .select('*')
+        .gt('stock_quantity', 0)
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const addPartMutation = useMutation({
+    mutationFn: async () => {
+      const selectedPart = availableParts?.find(p => p.id === selectedPartId);
+      if (!selectedPart) throw new Error('Teil nicht gefunden');
+
+      // Add part usage
+      const { error: usageError } = await supabase
+        .from('ticket_part_usage')
+        .insert({
+          repair_ticket_id: id,
+          part_id: selectedPartId,
+          quantity: partQuantity,
+          unit_purchase_price: selectedPart.purchase_price,
+          unit_sales_price: selectedPart.sales_price,
+        });
+
+      if (usageError) throw usageError;
+
+      // Decrease stock
+      const { error: stockError } = await supabase
+        .from('parts')
+        .update({ stock_quantity: selectedPart.stock_quantity - partQuantity })
+        .eq('id', selectedPartId);
+
+      if (stockError) throw stockError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-parts', id] });
+      queryClient.invalidateQueries({ queryKey: ['available-parts'] });
+      setPartDialogOpen(false);
+      setSelectedPartId('');
+      setPartQuantity(1);
+      toast({
+        title: 'Teil zugeordnet',
+        description: 'Das Teil wurde erfolgreich zum Ticket hinzugefügt.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error.message,
+      });
+    },
+  });
+
+  const removePartMutation = useMutation({
+    mutationFn: async (usageId: string) => {
+      const usage = partUsage?.find((u: any) => u.id === usageId);
+      if (!usage) throw new Error('Verwendung nicht gefunden');
+
+      // Restore stock
+      const { error: stockError } = await supabase
+        .from('parts')
+        .update({ stock_quantity: (usage.part?.stock_quantity || 0) + usage.quantity })
+        .eq('id', usage.part_id);
+
+      if (stockError) throw stockError;
+
+      // Remove usage
+      const { error: usageError } = await supabase
+        .from('ticket_part_usage')
+        .delete()
+        .eq('id', usageId);
+
+      if (usageError) throw usageError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-parts', id] });
+      queryClient.invalidateQueries({ queryKey: ['available-parts'] });
+      toast({
+        title: 'Teil entfernt',
+        description: 'Das Teil wurde vom Ticket entfernt.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error.message,
+      });
     },
   });
 
@@ -447,11 +552,63 @@ export default function TicketDetail() {
 
         <TabsContent value="parts" className="space-y-4">
           <Card className="card-elevated">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Package className="h-5 w-5 text-primary" />
                 Verwendete Teile
               </CardTitle>
+              <Dialog open={partDialogOpen} onOpenChange={setPartDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Teil hinzufügen
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Teil zum Ticket hinzufügen</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Teil auswählen</label>
+                      <Select value={selectedPartId} onValueChange={setSelectedPartId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Teil wählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableParts?.map((part: any) => (
+                            <SelectItem key={part.id} value={part.id}>
+                              {part.name} ({part.stock_quantity} verfügbar) - {part.sales_price.toFixed(2)} €
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Anzahl</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={availableParts?.find(p => p.id === selectedPartId)?.stock_quantity || 1}
+                        value={partQuantity}
+                        onChange={(e) => setPartQuantity(parseInt(e.target.value) || 1)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setPartDialogOpen(false)}>
+                      Abbrechen
+                    </Button>
+                    <Button 
+                      onClick={() => addPartMutation.mutate()}
+                      disabled={!selectedPartId || addPartMutation.isPending}
+                    >
+                      {addPartMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      Hinzufügen
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent>
               {partUsage?.length === 0 ? (
@@ -471,11 +628,22 @@ export default function TicketDetail() {
                           {usage.part?.brand} {usage.part?.model}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium">{usage.quantity}x</p>
-                        <p className="text-sm text-muted-foreground">
-                          {((usage.unit_sales_price || 0) * usage.quantity).toFixed(2)} €
-                        </p>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-medium">{usage.quantity}x</p>
+                          <p className="text-sm text-muted-foreground">
+                            {((usage.unit_sales_price || 0) * usage.quantity).toFixed(2)} €
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => removePartMutation.mutate(usage.id)}
+                          disabled={removePartMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
