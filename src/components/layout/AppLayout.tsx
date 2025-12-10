@@ -82,10 +82,7 @@ export default function AppLayout() {
           {/* Logo */}
           <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg gradient-primary flex items-center justify-center">
-                <Wrench className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-bold text-sidebar-foreground">Telya</span>
+              <img src="/telya-logo.png" alt="Telya" className="h-8" />
             </div>
             <Button
               variant="ghost"

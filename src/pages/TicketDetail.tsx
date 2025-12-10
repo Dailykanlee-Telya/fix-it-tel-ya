@@ -44,6 +44,7 @@ import {
 } from '@/types/database';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import TicketDocuments from '@/components/documents/TicketDocuments';
 
 const STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   NEU_EINGEGANGEN: ['IN_DIAGNOSE', 'STORNIERT'],
@@ -400,6 +401,7 @@ export default function TicketDetail() {
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger value="repair">Reparatur</TabsTrigger>
           <TabsTrigger value="parts">Teile</TabsTrigger>
+          <TabsTrigger value="documents">Dokumente</TabsTrigger>
           <TabsTrigger value="history">Verlauf</TabsTrigger>
         </TabsList>
 
@@ -656,6 +658,10 @@ export default function TicketDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <TicketDocuments ticket={ticket} partUsage={partUsage} />
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
