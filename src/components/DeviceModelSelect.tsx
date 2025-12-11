@@ -4,6 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Popover,
@@ -54,6 +61,7 @@ export default function DeviceModelSelect({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
+  const [newDeviceType, setNewDeviceType] = useState<DeviceType>(deviceType);
   const [brandSearch, setBrandSearch] = useState('');
   const [modelSearch, setModelSearch] = useState('');
 
@@ -150,7 +158,7 @@ export default function DeviceModelSelect({
       .insert({ 
         brand: newBrand.trim(), 
         model: newModel.trim(), 
-        device_type: catalogDeviceType 
+        device_type: DEVICE_TYPE_MAP[newDeviceType] 
       });
 
     if (error) {
@@ -179,6 +187,7 @@ export default function DeviceModelSelect({
     onModelChange(newModel.trim());
     setNewBrand('');
     setNewModel('');
+    setNewDeviceType(deviceType);
     setAddDialogOpen(false);
     refetchBrands();
     refetchModels();
@@ -375,11 +384,18 @@ export default function DeviceModelSelect({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Gerätetyp</Label>
-              <Input
-                value={DEVICE_TYPE_LABELS[deviceType]}
-                disabled
-                className="bg-muted"
-              />
+              <Select value={newDeviceType} onValueChange={(value) => setNewDeviceType(value as DeviceType)}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {(Object.keys(DEVICE_TYPE_LABELS) as DeviceType[]).filter(t => t !== 'OTHER').map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {DEVICE_TYPE_LABELS[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Marke</Label>
