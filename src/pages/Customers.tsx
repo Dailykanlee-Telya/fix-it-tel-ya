@@ -21,13 +21,26 @@ import {
   MapPin,
   Ticket,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import CustomerEditDialog from '@/components/CustomerEditDialog';
+
+interface Customer {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  created_at: string;
+}
 
 export default function Customers() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
 
   const { data: customers, isLoading } = useQuery({
     queryKey: ['customers'],
@@ -150,15 +163,22 @@ export default function Customers() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate(`/tickets?customer=${customer.id}`)}
-                        className="gap-2"
-                      >
-                        <Ticket className="h-4 w-4" />
-                        Tickets
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditCustomer(customer)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate(`/tickets?customer=${customer.id}`)}
+                        >
+                          <Ticket className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -167,6 +187,12 @@ export default function Customers() {
           </div>
         </CardContent>
       </Card>
+
+      <CustomerEditDialog
+        customer={editCustomer}
+        open={!!editCustomer}
+        onOpenChange={(open) => !open && setEditCustomer(null)}
+      />
     </div>
   );
 }
