@@ -145,6 +145,7 @@ export type Database = {
           device_type: string
           id: string
           model: string
+          sort_order: number | null
         }
         Insert: {
           brand: string
@@ -152,6 +153,7 @@ export type Database = {
           device_type?: string
           id?: string
           model: string
+          sort_order?: number | null
         }
         Update: {
           brand?: string
@@ -159,6 +161,7 @@ export type Database = {
           device_type?: string
           id?: string
           model?: string
+          sort_order?: number | null
         }
         Relationships: []
       }
