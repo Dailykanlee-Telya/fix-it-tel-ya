@@ -37,6 +37,7 @@ import {
   Customer,
 } from '@/types/database';
 import DeviceModelSelect from '@/components/DeviceModelSelect';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { validateIMEI } from '@/lib/imei-validation';
 
 const ACCESSORIES = [
@@ -450,9 +451,10 @@ export default function Intake() {
 
                 <div className="space-y-2">
                   <Label>Adresse</Label>
-                  <Input
+                  <AddressAutocomplete
                     value={newCustomer.address}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                    onChange={(address) => setNewCustomer({ ...newCustomer, address })}
+                    placeholder="Straße, PLZ Ort eingeben..."
                   />
                 </div>
               </div>
