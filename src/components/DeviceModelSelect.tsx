@@ -191,7 +191,6 @@ export default function DeviceModelSelect({
                         className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
                         onClick={() => {
                           onBrandChange(b);
-                          onModelChange('');
                           setBrandOpen(false);
                           setBrandSearch('');
                         }}
