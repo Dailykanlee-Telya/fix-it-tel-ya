@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   ChevronDown,
+  UserCog,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,10 +42,15 @@ const navigation = [
   { name: 'Einstellungen', href: '/settings', icon: Settings },
 ];
 
+const adminNavigation = [
+  { name: 'Benutzerverwaltung', href: '/users', icon: UserCog },
+];
+
 export default function AppLayout() {
-  const { profile, roles, signOut } = useAuth();
+  const { profile, roles, signOut, hasRole } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isAdmin = hasRole('ADMIN');
 
   const handleSignOut = async () => {
     await signOut();
@@ -115,6 +121,36 @@ export default function AppLayout() {
                   </NavLink>
                 </li>
               ))}
+              
+              {/* Admin Navigation */}
+              {isAdmin && (
+                <>
+                  <li className="pt-4 pb-2">
+                    <span className="px-3 text-xs font-semibold uppercase text-sidebar-foreground/50">
+                      Administration
+                    </span>
+                  </li>
+                  {adminNavigation.map((item) => (
+                    <li key={item.name}>
+                      <NavLink
+                        to={item.href}
+                        className={({ isActive }) =>
+                          cn(
+                            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          )
+                        }
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        {item.name}
+                      </NavLink>
+                    </li>
+                  ))}
+                </>
+              )}
             </ul>
           </nav>
 
