@@ -85,14 +85,14 @@ export default function Tickets() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Alle Tickets</h1>
+          <h1 className="text-2xl font-bold text-foreground">Alle Aufträge</h1>
           <p className="text-muted-foreground">
-            {filteredTickets?.length || 0} Tickets gefunden
+            {filteredTickets?.length || 0} Aufträge gefunden
           </p>
         </div>
         <Button onClick={() => navigate('/intake')} className="gap-2">
           <Plus className="h-4 w-4" />
-          Neues Ticket
+          Neuer Auftrag
         </Button>
       </div>
 
@@ -103,7 +103,7 @@ export default function Tickets() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Suchen (Ticket, Kunde, Telefon, Gerät, IMEI)..."
+                placeholder="Suchen (Auftrag, Kunde, Telefon, Gerät, IMEI)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -132,7 +132,7 @@ export default function Tickets() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ticket</TableHead>
+                  <TableHead>Auftrag</TableHead>
                   <TableHead>Kunde</TableHead>
                   <TableHead>Gerät</TableHead>
                   <TableHead>Status</TableHead>
@@ -145,7 +145,7 @@ export default function Tickets() {
                 {filteredTickets?.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                      Keine Tickets gefunden
+                      Keine Aufträge gefunden
                     </TableCell>
                   </TableRow>
                 )}

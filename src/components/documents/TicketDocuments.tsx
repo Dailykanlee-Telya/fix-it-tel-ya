@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Printer, Download } from 'lucide-react';
+import { FileText, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import telyaLogo from '@/assets/telya-logo.png';
@@ -15,6 +15,18 @@ import {
   ErrorCode
 } from '@/types/database';
 
+// Company Information
+const COMPANY_INFO = {
+  name: 'Telya GmbH',
+  address: 'Musterstraße 123, 12345 Musterstadt',
+  phone: '+49 (0) 123 456 789',
+  email: 'info@telya.de',
+  website: 'www.telya.de',
+  hrb: 'HRB 12345, Amtsgericht Musterstadt',
+  ust_id: 'DE123456789',
+  geschaeftsfuehrer: 'Max Mustermann',
+};
+
 interface TicketDocumentsProps {
   ticket: any;
   partUsage?: any[];
@@ -23,6 +35,7 @@ interface TicketDocumentsProps {
 export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsProps) {
   const intakeRef = useRef<HTMLDivElement>(null);
   const deliveryRef = useRef<HTMLDivElement>(null);
+  const kvaRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = (ref: React.RefObject<HTMLDivElement>, title: string) => {
     if (!ref.current) return;
@@ -62,6 +75,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
             .signature-line { border-top: 1px solid #333; padding-top: 8px; font-size: 12px; color: #666; }
             .legal-notes { font-size: 11px; color: #666; margin-top: 20px; line-height: 1.5; }
             .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #dbeafe; color: #1e40af; }
+            .company-info { font-size: 10px; color: #666; line-height: 1.4; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
             @media print { body { padding: 0; } .document { max-width: none; } }
           </style>
         </head>
@@ -81,6 +95,39 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
     0
   ) || 0;
 
+  const CompanyFooter = () => (
+    <div className="company-info mt-6 pt-4 border-t text-center text-[10px] text-muted-foreground">
+      <p className="font-semibold">{COMPANY_INFO.name}</p>
+      <p>{COMPANY_INFO.address}</p>
+      <p>Tel: {COMPANY_INFO.phone} | E-Mail: {COMPANY_INFO.email} | Web: {COMPANY_INFO.website}</p>
+      <p>Geschäftsführer: {COMPANY_INFO.geschaeftsfuehrer} | {COMPANY_INFO.hrb} | USt-IdNr.: {COMPANY_INFO.ust_id}</p>
+    </div>
+  );
+
+  const LegalNotes = ({ type }: { type: 'intake' | 'delivery' | 'kva' }) => (
+    <div className="mt-4 text-xs text-muted-foreground space-y-2">
+      {type === 'intake' && (
+        <>
+          <p><strong>Haftungshinweis:</strong> Die Telya GmbH haftet nicht für Datenverlust. Bitte sichern Sie Ihre Daten vor der Reparatur. Bei Geräten mit Wasserschaden oder vorherigen Fremdreparaturen kann keine Garantie auf die Reparatur gegeben werden.</p>
+          <p><strong>Datenschutz:</strong> Ihre Daten werden gemäß DSGVO verarbeitet und nur für die Durchführung der Reparatur verwendet.</p>
+          <p>Mit meiner Unterschrift bestätige ich die Abgabe des oben genannten Geräts zur Reparatur und erkenne die allgemeinen Geschäftsbedingungen der {COMPANY_INFO.name} an.</p>
+        </>
+      )}
+      {type === 'delivery' && (
+        <>
+          <p><strong>Garantie:</strong> Auf die durchgeführte Reparatur gewähren wir 6 Monate Garantie (ausgenommen Wasserschäden und mechanische Beschädigungen nach der Reparatur).</p>
+          <p>Mit meiner Unterschrift bestätige ich den Erhalt des reparierten Geräts und des oben aufgeführten Zubehörs in ordnungsgemäßem Zustand.</p>
+        </>
+      )}
+      {type === 'kva' && (
+        <>
+          <p><strong>Gültigkeit:</strong> Dieser Kostenvoranschlag ist 14 Tage gültig. Die angegebenen Preise verstehen sich inkl. MwSt.</p>
+          <p><strong>Hinweis:</strong> Nach Diagnose können sich die tatsächlichen Kosten ändern. Bei einer Abweichung von mehr als 15% werden wir Sie kontaktieren.</p>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Eingangsbeleg (Intake Receipt) */}
@@ -98,7 +145,10 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
         <CardContent>
           <div ref={intakeRef} className="document bg-white p-6 rounded-lg border">
             <div className="header flex justify-between items-start mb-6 pb-4 border-b-2 border-primary">
-              <img src={telyaLogo} alt="Telya Logo" className="h-12" />
+              <div>
+                <img src={telyaLogo} alt="Telya Logo" className="h-12" />
+                <p className="text-xs text-muted-foreground mt-1">{COMPANY_INFO.address}</p>
+              </div>
               <div className="text-right">
                 <div className="text-xl font-bold text-primary">Eingangsbeleg</div>
                 <div className="text-lg font-semibold">{ticket.ticket_number}</div>
@@ -217,11 +267,161 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                   </div>
                 </div>
               </div>
-              <div className="mt-4 text-xs text-muted-foreground">
-                Mit meiner Unterschrift bestätige ich die Abgabe des oben genannten Geräts zur Reparatur 
-                und erkenne die allgemeinen Geschäftsbedingungen der Telya GmbH an.
+              <LegalNotes type="intake" />
+            </div>
+            <CompanyFooter />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Kostenvoranschlag (KVA) */}
+      <Card className="card-elevated">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            Kostenvoranschlag (KVA)
+          </CardTitle>
+          <Button size="sm" variant="outline" onClick={() => handlePrint(kvaRef, 'Kostenvoranschlag')}>
+            <Printer className="h-4 w-4 mr-2" />
+            Drucken
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div ref={kvaRef} className="document bg-white p-6 rounded-lg border">
+            <div className="header flex justify-between items-start mb-6 pb-4 border-b-2 border-primary">
+              <div>
+                <img src={telyaLogo} alt="Telya Logo" className="h-12" />
+                <p className="text-xs text-muted-foreground mt-1">{COMPANY_INFO.address}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-bold text-primary">Kostenvoranschlag</div>
+                <div className="text-lg font-semibold">{ticket.ticket_number}</div>
+                <div className="text-sm text-muted-foreground">
+                  {format(new Date(), 'dd.MM.yyyy', { locale: de })}
+                </div>
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="section">
+                <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
+                  Kunde
+                </div>
+                <div className="space-y-1">
+                  <div className="font-medium">{ticket.customer?.first_name} {ticket.customer?.last_name}</div>
+                  <div className="text-sm text-muted-foreground">{ticket.customer?.phone}</div>
+                  {ticket.customer?.email && <div className="text-sm text-muted-foreground">{ticket.customer?.email}</div>}
+                  {ticket.customer?.address && <div className="text-sm text-muted-foreground">{ticket.customer?.address}</div>}
+                </div>
+              </div>
+
+              <div className="section">
+                <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
+                  Gerät
+                </div>
+                <div className="space-y-1">
+                  <div className="font-medium">{ticket.device?.brand} {ticket.device?.model}</div>
+                  <div className="text-sm text-muted-foreground">{DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType]}</div>
+                  {ticket.device?.imei_or_serial && (
+                    <div className="text-sm font-mono text-muted-foreground">{ticket.device?.imei_or_serial}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="section mb-6">
+              <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
+                Fehlerbeschreibung / Geplante Arbeiten
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <div className="text-xs text-muted-foreground">Defekt</div>
+                  <div className="font-medium">{ERROR_CODE_LABELS[ticket.error_code as ErrorCode]}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Beschreibung</div>
+                  <div className="font-medium">{ticket.error_description_text || 'Keine Beschreibung'}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="section mb-6">
+              <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
+                Kostenaufstellung
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 font-semibold">Position</th>
+                    <th className="text-center py-2 font-semibold">Menge</th>
+                    <th className="text-right py-2 font-semibold">Einzelpreis</th>
+                    <th className="text-right py-2 font-semibold">Gesamt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b">
+                    <td className="py-2">Reparaturarbeiten ({ERROR_CODE_LABELS[ticket.error_code as ErrorCode]})</td>
+                    <td className="py-2 text-center">1</td>
+                    <td className="py-2 text-right">{(ticket.estimated_price || 0).toFixed(2)} €</td>
+                    <td className="py-2 text-right">{(ticket.estimated_price || 0).toFixed(2)} €</td>
+                  </tr>
+                  {partUsage && partUsage.length > 0 && partUsage.map((usage: any) => (
+                    <tr key={usage.id} className="border-b">
+                      <td className="py-2">{usage.part?.name}</td>
+                      <td className="py-2 text-center">{usage.quantity}</td>
+                      <td className="py-2 text-right">{(usage.unit_sales_price || 0).toFixed(2)} €</td>
+                      <td className="py-2 text-right">{((usage.unit_sales_price || 0) * usage.quantity).toFixed(2)} €</td>
+                    </tr>
+                  ))}
+                  <tr className="font-semibold bg-muted/30">
+                    <td colSpan={3} className="py-2 text-right">Gesamtbetrag (inkl. MwSt.):</td>
+                    <td className="py-2 text-right">{((ticket.estimated_price || 0) + totalPartsPrice).toFixed(2)} €</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="section mb-6 p-4 bg-muted/30 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">KVA Status</div>
+                  <div className="text-xs text-muted-foreground">
+                    {ticket.kva_approved === true ? 'Vom Kunden angenommen' : 
+                     ticket.kva_approved === false ? 'Vom Kunden abgelehnt' : 'Ausstehend'}
+                  </div>
+                </div>
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                  ticket.kva_approved === true ? 'bg-success/10 text-success' :
+                  ticket.kva_approved === false ? 'bg-destructive/10 text-destructive' :
+                  'bg-warning/10 text-warning'
+                }`}>
+                  {ticket.kva_approved === true ? 'Angenommen' : 
+                   ticket.kva_approved === false ? 'Abgelehnt' : 'Offen'}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4 border-t">
+              <div className="grid grid-cols-2 gap-8">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-6">
+                    [ ] KVA angenommen<br />
+                    [ ] KVA abgelehnt
+                  </div>
+                  <div className="border-t border-foreground pt-2 text-xs text-muted-foreground">
+                    Unterschrift Kunde
+                  </div>
+                </div>
+                <div>
+                  <div className="h-6" />
+                  <div className="border-t border-foreground pt-2 text-xs text-muted-foreground">
+                    Datum
+                  </div>
+                </div>
+              </div>
+              <LegalNotes type="kva" />
+            </div>
+            <CompanyFooter />
           </div>
         </CardContent>
       </Card>
@@ -241,7 +441,10 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
         <CardContent>
           <div ref={deliveryRef} className="document bg-white p-6 rounded-lg border">
             <div className="header flex justify-between items-start mb-6 pb-4 border-b-2 border-primary">
-              <img src={telyaLogo} alt="Telya Logo" className="h-12" />
+              <div>
+                <img src={telyaLogo} alt="Telya Logo" className="h-12" />
+                <p className="text-xs text-muted-foreground mt-1">{COMPANY_INFO.address}</p>
+              </div>
               <div className="text-right">
                 <div className="text-xl font-bold text-primary">Lieferschein</div>
                 <div className="text-lg font-semibold">{ticket.ticket_number}</div>
@@ -333,7 +536,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
               <div className="space-y-2">
                 {ticket.estimated_price && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Reparaturkosten (geschätzt)</span>
+                    <span className="text-muted-foreground">Reparaturkosten</span>
                     <span className="font-medium">{ticket.estimated_price.toFixed(2)} €</span>
                   </div>
                 )}
@@ -384,11 +587,9 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                   </div>
                 </div>
               </div>
-              <div className="mt-4 text-xs text-muted-foreground">
-                Mit meiner Unterschrift bestätige ich den Erhalt des reparierten Geräts und des oben 
-                aufgeführten Zubehörs in ordnungsgemäßem Zustand.
-              </div>
+              <LegalNotes type="delivery" />
             </div>
+            <CompanyFooter />
           </div>
         </CardContent>
       </Card>

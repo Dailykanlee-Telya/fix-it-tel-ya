@@ -36,6 +36,7 @@ import {
   Customer,
 } from '@/types/database';
 import DeviceModelSelect from '@/components/DeviceModelSelect';
+import { validateIMEI } from '@/lib/imei-validation';
 
 const ACCESSORIES = [
   { id: 'case', label: 'Hülle' },
@@ -70,6 +71,7 @@ export default function Intake() {
     imei_or_serial: '',
     color: '',
   });
+  const [imeiError, setImeiError] = useState<string | null>(null);
 
   // Repair state
   const [repair, setRepair] = useState({
@@ -209,15 +211,15 @@ export default function Intake() {
         repair_ticket_id: ticketData.id,
         new_status: 'NEU_EINGEGANGEN',
         changed_by_user_id: profile?.id,
-        note: 'Ticket erstellt',
+        note: 'Auftrag erstellt',
       });
 
       return ticketData;
     },
     onSuccess: (data) => {
       toast({
-        title: 'Ticket erstellt',
-        description: `Ticketnummer: ${data.ticket_number}`,
+        title: 'Auftrag erstellt',
+        description: `Auftragsnummer: ${data.ticket_number}`,
       });
       navigate(`/tickets/${data.id}`);
     },
@@ -225,7 +227,7 @@ export default function Intake() {
       toast({
         variant: 'destructive',
         title: 'Fehler',
-        description: error.message || 'Ticket konnte nicht erstellt werden',
+        description: error.message || 'Auftrag konnte nicht erstellt werden',
       });
     },
   });
@@ -260,6 +262,20 @@ export default function Intake() {
       return;
     }
 
+    // IMEI Validation
+    if (device.imei_or_serial) {
+      const imeiResult = validateIMEI(device.imei_or_serial);
+      if (!imeiResult.isValid) {
+        toast({
+          variant: 'destructive',
+          title: 'Ungültige IMEI',
+          description: imeiResult.error,
+        });
+        setImeiError(imeiResult.error || null);
+        return;
+      }
+    }
+
     if (!legalAck) {
       toast({
         variant: 'destructive',
@@ -276,7 +292,7 @@ export default function Intake() {
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Geräteannahme</h1>
-        <p className="text-muted-foreground">Neues Reparaturticket erstellen</p>
+        <p className="text-muted-foreground">Neuen Reparaturauftrag erstellen</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -472,9 +488,22 @@ export default function Intake() {
                 <Label>IMEI / Seriennummer</Label>
                 <Input
                   value={device.imei_or_serial}
-                  onChange={(e) => setDevice({ ...device, imei_or_serial: e.target.value })}
+                  onChange={(e) => {
+                    setDevice({ ...device, imei_or_serial: e.target.value });
+                    // Live validation
+                    if (e.target.value) {
+                      const result = validateIMEI(e.target.value);
+                      setImeiError(result.isValid ? null : (result.error || null));
+                    } else {
+                      setImeiError(null);
+                    }
+                  }}
                   placeholder="Optional"
+                  className={imeiError ? 'border-destructive' : ''}
                 />
+                {imeiError && (
+                  <p className="text-sm text-destructive">{imeiError}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Farbe</Label>
