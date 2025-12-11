@@ -129,9 +129,14 @@ export default function Auth() {
       } else {
         toast({
           title: 'Registrierung erfolgreich!',
-          description: 'Ihr Konto wurde erstellt. Sie können sich jetzt anmelden.',
+          description: 'Ihr Konto wurde erstellt. Ein Administrator muss Ihr Konto freischalten, bevor Sie sich anmelden können.',
+          duration: 10000,
         });
-        navigate('/dashboard');
+        // Don't auto-navigate, let user know they need approval
+        setSignupName('');
+        setSignupEmail('');
+        setSignupPassword('');
+        setSignupConfirmPassword('');
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
