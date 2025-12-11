@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Wrench, Mail, Lock, User, Loader2, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -335,6 +336,25 @@ export default function Auth() {
             </CardContent>
           </Tabs>
         </Card>
+
+        {/* Customer Tracking Link */}
+        <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Search className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">Reparatur-Status prüfen?</p>
+              <p className="text-xs text-muted-foreground">Verfolgen Sie Ihren Auftrag als Kunde</p>
+            </div>
+            <Link 
+              to="/track" 
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4"
+            >
+              Tracking
+            </Link>
+          </div>
+        </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           © 2024 Telya GmbH. Alle Rechte vorbehalten.
