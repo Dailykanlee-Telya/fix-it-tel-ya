@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { toast } from 'sonner';
 import { Loader2, Save } from 'lucide-react';
@@ -21,6 +22,8 @@ interface Customer {
   phone: string;
   email: string | null;
   address: string | null;
+  marketing_consent?: boolean;
+  marketing_consent_at?: string | null;
 }
 
 interface CustomerEditDialogProps {
@@ -41,6 +44,7 @@ export default function CustomerEditDialog({
     phone: '',
     email: '',
     address: '',
+    marketing_consent: false,
   });
 
   useEffect(() => {
@@ -51,6 +55,7 @@ export default function CustomerEditDialog({
         phone: customer.phone || '',
         email: customer.email || '',
         address: customer.address || '',
+        marketing_consent: customer.marketing_consent || false,
       });
     }
   }, [customer]);
@@ -58,6 +63,9 @@ export default function CustomerEditDialog({
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       if (!customer) return;
+      const previousConsent = customer.marketing_consent || false;
+      const newConsent = data.marketing_consent;
+      
       const { error } = await supabase
         .from('customers')
         .update({
@@ -66,6 +74,9 @@ export default function CustomerEditDialog({
           phone: data.phone,
           email: data.email || null,
           address: data.address || null,
+          marketing_consent: data.marketing_consent,
+          // Update timestamp only if consent changed from false to true
+          ...(newConsent && !previousConsent ? { marketing_consent_at: new Date().toISOString() } : {}),
         })
         .eq('id', customer.id);
 
@@ -155,6 +166,19 @@ export default function CustomerEditDialog({
               onChange={(value) => setFormData({ ...formData, address: value })}
               placeholder="Adresse eingeben..."
             />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="edit_marketing_consent"
+              checked={formData.marketing_consent}
+              onCheckedChange={(checked) => 
+                setFormData({ ...formData, marketing_consent: checked === true })
+              }
+            />
+            <Label htmlFor="edit_marketing_consent" className="text-sm font-normal cursor-pointer">
+              Kunde stimmt Marketing- und Werbemitteilungen zu
+            </Label>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
