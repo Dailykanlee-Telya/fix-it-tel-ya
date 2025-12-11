@@ -202,107 +202,90 @@ export default function Workshop() {
       </div>
 
       {/* Kanban Board */}
-      <div className="grid gap-4 lg:grid-cols-5 overflow-x-auto pb-4">
+      <div className="grid gap-3 lg:grid-cols-5 overflow-x-auto pb-4">
         {STATUS_ORDER.map((status) => (
-          <Card key={status} className="min-w-[280px] bg-muted/30">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center justify-between">
-                <div className="flex items-center gap-2">
+          <Card key={status} className="min-w-[240px] bg-muted/30">
+            <CardHeader className="py-2 px-3">
+              <CardTitle className="text-xs font-medium flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
                   <div className={`h-2 w-2 rounded-full ${getStatusColor(status)}`} />
-                  {STATUS_LABELS[status]}
+                  <span className="truncate">{STATUS_LABELS[status]}</span>
                 </div>
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 min-w-5 flex items-center justify-center">
                   {ticketsByStatus[status]?.length || 0}
                 </Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="px-2 pb-2 space-y-1.5 max-h-[calc(100vh-280px)] overflow-y-auto">
               {ticketsByStatus[status]?.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Keine Tickets
+                <p className="text-xs text-muted-foreground text-center py-6">
+                  Keine Aufträge
                 </p>
               )}
-              {ticketsByStatus[status]?.map((ticket: any) => (
-                <div
-                  key={ticket.id}
-                  onClick={() => navigate(`/tickets/${ticket.id}`)}
-                  className="bg-card rounded-lg border shadow-sm p-3 cursor-pointer hover:shadow-md transition-all hover:border-primary/50"
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-mono font-medium text-primary">
-                      {ticket.ticket_number}
-                    </span>
-                    {ticket.priority === 'express' && (
-                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                        EXPRESS
-                      </Badge>
-                    )}
-                  </div>
+              {ticketsByStatus[status]?.map((ticket: any) => {
+                const isOverdue = new Date(ticket.created_at) < sevenDaysAgo;
+                return (
+                  <div
+                    key={ticket.id}
+                    onClick={() => navigate(`/tickets/${ticket.id}`)}
+                    className={`bg-card rounded-md border p-2 cursor-pointer hover:shadow-sm transition-all hover:border-primary/50 ${
+                      isOverdue ? 'border-destructive/50' : ''
+                    } ${ticket.priority === 'express' ? 'border-l-2 border-l-destructive' : ''}`}
+                  >
+                    {/* Compact Header: Ticket Number + Priority + Overdue */}
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[11px] font-mono font-semibold text-primary truncate">
+                        {ticket.ticket_number.replace('TELYA-', '')}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {ticket.priority === 'express' && (
+                          <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4">
+                            EXP
+                          </Badge>
+                        )}
+                        {isOverdue && (
+                          <AlertTriangle className="h-3 w-3 text-destructive" />
+                        )}
+                      </div>
+                    </div>
 
-                  {/* Device Info */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <Smartphone className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium truncate">
-                      {ticket.device?.brand} {ticket.device?.model}
-                    </span>
-                  </div>
-
-                  {/* Customer */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground truncate">
-                      {ticket.customer?.first_name} {ticket.customer?.last_name}
-                    </span>
-                  </div>
-
-                  {/* Error badge */}
-                  <div className="mb-2">
-                    <Badge variant="outline" className="text-xs">
-                      {ticket.error_code?.replace('_', ' ')}
-                    </Badge>
-                  </div>
-
-                  {/* KVA indicator */}
-                  {ticket.kva_required && (
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <AlertTriangle className={`h-3.5 w-3.5 ${
-                        ticket.kva_approved ? 'text-success' : 'text-warning'
-                      }`} />
-                      <span className={`text-xs ${
-                        ticket.kva_approved ? 'text-success' : 'text-warning'
-                      }`}>
-                        KVA {ticket.kva_approved ? 'genehmigt' : 'ausstehend'}
+                    {/* Device: Brand + Model in one line */}
+                    <div className="flex items-center gap-1.5 text-xs mb-1">
+                      <Smartphone className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="font-medium truncate">
+                        {ticket.device?.brand} {ticket.device?.model}
                       </span>
                     </div>
-                  )}
 
-                  {/* Overdue Badge */}
-                  {new Date(ticket.created_at) < sevenDaysAgo && (
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                      <span className="text-xs text-destructive font-medium">
-                        Überfällig
+                    {/* Bottom Row: Customer + KVA Status + Time */}
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                      <span className="truncate max-w-[80px]">
+                        {ticket.customer?.last_name}
                       </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {ticket.kva_required && (
+                          <Badge 
+                            variant={ticket.kva_approved ? "default" : "outline"} 
+                            className={`text-[9px] px-1 py-0 h-4 ${
+                              ticket.kva_approved 
+                                ? 'bg-success text-success-foreground' 
+                                : 'border-warning text-warning'
+                            }`}
+                          >
+                            KVA
+                          </Badge>
+                        )}
+                        <span className="text-[10px]">
+                          {formatDistanceToNow(new Date(ticket.created_at), { 
+                            addSuffix: false, 
+                            locale: de 
+                          })}
+                        </span>
+                      </div>
                     </div>
-                  )}
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                    <span>
-                      {formatDistanceToNow(new Date(ticket.created_at), { 
-                        addSuffix: true, 
-                        locale: de 
-                      })}
-                    </span>
-                    {ticket.assigned_technician && (
-                      <span className="truncate max-w-[100px]">
-                        {ticket.assigned_technician.name}
-                      </span>
-                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         ))}
