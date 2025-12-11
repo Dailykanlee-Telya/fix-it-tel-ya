@@ -22,7 +22,7 @@ import {
 import { Plus, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { DeviceType } from '@/types/database';
+import { DeviceType, DEVICE_TYPE_LABELS } from '@/types/database';
 
 interface DeviceModelSelectProps {
   deviceType: DeviceType;
@@ -373,6 +373,14 @@ export default function DeviceModelSelect({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Gerätetyp</Label>
+              <Input
+                value={DEVICE_TYPE_LABELS[deviceType]}
+                disabled
+                className="bg-muted"
+              />
+            </div>
             <div className="space-y-2">
               <Label>Marke</Label>
               <Input
