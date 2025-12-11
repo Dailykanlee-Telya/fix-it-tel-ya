@@ -463,8 +463,8 @@ export default function Intake() {
             <DeviceModelSelect
               brand={device.brand}
               model={device.model}
-              onBrandChange={(brand) => setDevice({ ...device, brand, model: '' })}
-              onModelChange={(model) => setDevice({ ...device, model })}
+              onBrandChange={(brand) => setDevice(prev => ({ ...prev, brand, model: '' }))}
+              onModelChange={(model) => setDevice(prev => ({ ...prev, model }))}
             />
 
             <div className="grid gap-4 sm:grid-cols-2">
