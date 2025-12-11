@@ -2,155 +2,117 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import {
-  LayoutDashboard,
-  Ticket,
-  Wrench,
-  Package,
-  Users,
-  MapPin,
-  BarChart3,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  ChevronDown,
-  UserCog,
-} from 'lucide-react';
+import { LayoutDashboard, Ticket, Wrench, Package, Users, MapPin, BarChart3, Settings, LogOut, Menu, X, ChevronDown, UserCog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ROLE_LABELS } from '@/types/database';
 import GlobalSearch from '@/components/GlobalSearch';
 import NotificationBell from '@/components/NotificationBell';
-
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Neue Annahme', href: '/intake', icon: Ticket },
-  { name: 'Werkstatt', href: '/workshop', icon: Wrench },
-  { name: 'Aufträge', href: '/tickets', icon: Ticket },
-  { name: 'Ersatzteile', href: '/parts', icon: Package },
-  { name: 'Kunden', href: '/customers', icon: Users },
-  { name: 'Standorte', href: '/locations', icon: MapPin },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'Einstellungen', href: '/settings', icon: Settings },
-];
-
-const adminNavigation = [
-  { name: 'Benutzerverwaltung', href: '/users', icon: UserCog },
-];
-
+const navigation = [{
+  name: 'Dashboard',
+  href: '/dashboard',
+  icon: LayoutDashboard
+}, {
+  name: 'Neue Annahme',
+  href: '/intake',
+  icon: Ticket
+}, {
+  name: 'Werkstatt',
+  href: '/workshop',
+  icon: Wrench
+}, {
+  name: 'Aufträge',
+  href: '/tickets',
+  icon: Ticket
+}, {
+  name: 'Ersatzteile',
+  href: '/parts',
+  icon: Package
+}, {
+  name: 'Kunden',
+  href: '/customers',
+  icon: Users
+}, {
+  name: 'Standorte',
+  href: '/locations',
+  icon: MapPin
+}, {
+  name: 'Reports',
+  href: '/reports',
+  icon: BarChart3
+}, {
+  name: 'Einstellungen',
+  href: '/settings',
+  icon: Settings
+}];
+const adminNavigation = [{
+  name: 'Benutzerverwaltung',
+  href: '/users',
+  icon: UserCog
+}];
 export default function AppLayout() {
-  const { profile, roles, signOut, hasRole } = useAuth();
+  const {
+    profile,
+    roles,
+    signOut,
+    hasRole
+  } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isAdmin = hasRole('ADMIN');
-
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
   };
-
   const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 transform bg-sidebar transition-transform duration-200 ease-in-out lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
+      <aside className={cn('fixed inset-y-0 left-0 z-50 w-64 transform bg-sidebar transition-transform duration-200 ease-in-out lg:translate-x-0', sidebarOpen ? 'translate-x-0' : '-translate-x-full')}>
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
             <div className="flex items-center gap-3">
               <img src="/telya-logo.png" alt="Telya" className="h-8" />
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden text-sidebar-foreground"
-              onClick={() => setSidebarOpen(false)}
-            >
+            <Button variant="ghost" size="icon" className="lg:hidden text-sidebar-foreground" onClick={() => setSidebarOpen(false)}>
               <X className="h-5 w-5" />
             </Button>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto py-4">
+          <nav className="flex-1 overflow-y-auto py-4 bg-primary-foreground">
             <ul className="space-y-1 px-3">
-              {navigation.map((item) => (
-                <li key={item.name}>
-                  <NavLink
-                    to={item.href}
-                    className={({ isActive }) =>
-                      cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                      )
-                    }
-                    onClick={() => setSidebarOpen(false)}
-                  >
+              {navigation.map(item => <li key={item.name}>
+                  <NavLink to={item.href} className={({
+                isActive
+              }) => cn('flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors', isActive ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground')} onClick={() => setSidebarOpen(false)}>
                     <item.icon className="h-5 w-5" />
                     {item.name}
                   </NavLink>
-                </li>
-              ))}
+                </li>)}
               
               {/* Admin Navigation */}
-              {isAdmin && (
-                <>
+              {isAdmin && <>
                   <li className="pt-4 pb-2">
                     <span className="px-3 text-xs font-semibold uppercase text-sidebar-foreground/50">
                       Administration
                     </span>
                   </li>
-                  {adminNavigation.map((item) => (
-                    <li key={item.name}>
-                      <NavLink
-                        to={item.href}
-                        className={({ isActive }) =>
-                          cn(
-                            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                            isActive
-                              ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                          )
-                        }
-                        onClick={() => setSidebarOpen(false)}
-                      >
+                  {adminNavigation.map(item => <li key={item.name}>
+                      <NavLink to={item.href} className={({
+                  isActive
+                }) => cn('flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors', isActive ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground')} onClick={() => setSidebarOpen(false)}>
                         <item.icon className="h-5 w-5" />
                         {item.name}
                       </NavLink>
-                    </li>
-                  ))}
-                </>
-              )}
+                    </li>)}
+                </>}
             </ul>
           </nav>
 
@@ -179,12 +141,7 @@ export default function AppLayout() {
       <div className="lg:pl-64">
         {/* Top header */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 lg:px-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setSidebarOpen(true)}
-          >
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
 
@@ -232,6 +189,5 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
-    </div>
-  );
+    </div>;
 }
