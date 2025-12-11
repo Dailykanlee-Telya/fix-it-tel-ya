@@ -783,6 +783,7 @@ export type Database = {
     }
     Functions: {
       generate_ticket_number: { Args: never; Returns: string }
+      generate_tracking_token: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

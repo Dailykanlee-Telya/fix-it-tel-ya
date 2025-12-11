@@ -9,6 +9,7 @@ interface AuthContextType {
   profile: Profile | null;
   roles: AppRole[];
   loading: boolean;
+  isApproved: boolean | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isApproved, setIsApproved] = useState<boolean | null>(null);
 
   const fetchUserData = async (userId: string) => {
     try {
@@ -36,6 +38,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profileData) {
         setProfile(profileData as Profile);
+        setIsApproved(profileData.is_active);
+      } else {
+        setIsApproved(false);
       }
 
       // Fetch roles
@@ -49,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+      setIsApproved(false);
     }
   };
 
@@ -113,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setIsApproved(null);
   };
 
   const hasRole = (role: AppRole) => roles.includes(role);
@@ -127,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       roles,
       loading,
+      isApproved,
       signIn,
       signUp,
       signOut,

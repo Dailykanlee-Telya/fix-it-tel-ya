@@ -176,13 +176,24 @@ export default function Intake() {
       
       const ticketNumber = `TELYA-${dateStr}-${String((count || 0) + 1).padStart(4, '0')}`;
 
+      // Generate tracking token (kva_token)
+      const generateToken = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let token = '';
+        for (let i = 0; i < 8; i++) {
+          token += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return token;
+      };
+      const kvaToken = generateToken();
+
       // Build accessories string
       const accessoriesStr = [
         ...selectedAccessories.map(id => ACCESSORIES.find(a => a.id === id)?.label),
         accessoriesNote,
       ].filter(Boolean).join(', ');
 
-      // Create ticket
+      // Create ticket with tracking token
       const { data: ticketData, error: ticketError } = await supabase
         .from('repair_tickets')
         .insert({
@@ -200,6 +211,7 @@ export default function Intake() {
           accessories: accessoriesStr || null,
           legal_notes_ack: legalAck,
           kva_required: repair.price_mode === 'KVA',
+          kva_token: kvaToken,
         })
         .select()
         .single();
@@ -213,6 +225,19 @@ export default function Intake() {
         changed_by_user_id: profile?.id,
         note: 'Auftrag erstellt',
       });
+
+      // Send confirmation email to customer (if email available)
+      try {
+        await supabase.functions.invoke('send-email', {
+          body: {
+            type: 'ticket_created',
+            ticket_id: ticketData.id,
+          },
+        });
+      } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+        // Don't fail the ticket creation if email fails
+      }
 
       return ticketData;
     },
