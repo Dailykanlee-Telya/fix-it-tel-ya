@@ -63,6 +63,7 @@ export default function Intake() {
     phone: '',
     email: '',
     address: '',
+    marketing_consent: false,
   });
 
   // Device state
@@ -143,6 +144,8 @@ export default function Intake() {
             phone: newCustomer.phone,
             email: newCustomer.email || null,
             address: newCustomer.address || null,
+            marketing_consent: newCustomer.marketing_consent,
+            marketing_consent_at: newCustomer.marketing_consent ? new Date().toISOString() : null,
           })
           .select()
           .single();
@@ -456,6 +459,19 @@ export default function Intake() {
                     onChange={(address) => setNewCustomer({ ...newCustomer, address })}
                     placeholder="Straße, PLZ Ort eingeben..."
                   />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="marketing_consent"
+                    checked={newCustomer.marketing_consent}
+                    onCheckedChange={(checked) => 
+                      setNewCustomer({ ...newCustomer, marketing_consent: checked === true })
+                    }
+                  />
+                  <Label htmlFor="marketing_consent" className="text-sm font-normal cursor-pointer">
+                    Kunde stimmt zu, Marketing- und Werbemitteilungen per E-Mail/SMS zu erhalten
+                  </Label>
                 </div>
               </div>
             )}
