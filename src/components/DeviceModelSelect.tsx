@@ -164,10 +164,11 @@ export default function DeviceModelSelect({
                   <CommandEmpty>Keine Marke gefunden</CommandEmpty>
                   <CommandGroup>
                     {sortedBrands.map((b) => (
-                      <CommandItem
+                      <div
                         key={b}
-                        value={b}
-                        onSelect={() => {
+                        className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        onClick={() => {
+                          console.log('Brand clicked:', b);
                           onBrandChange(b);
                           onModelChange('');
                           setBrandOpen(false);
@@ -180,7 +181,7 @@ export default function DeviceModelSelect({
                           )}
                         />
                         {b}
-                      </CommandItem>
+                      </div>
                     ))}
                   </CommandGroup>
                 </CommandList>
@@ -228,10 +229,11 @@ export default function DeviceModelSelect({
                   </CommandEmpty>
                   <CommandGroup>
                     {models?.map((m) => (
-                      <CommandItem
+                      <div
                         key={m}
-                        value={m}
-                        onSelect={() => {
+                        className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        onClick={() => {
+                          console.log('Model clicked:', m);
                           onModelChange(m);
                           setModelOpen(false);
                         }}
@@ -243,7 +245,7 @@ export default function DeviceModelSelect({
                           )}
                         />
                         {m}
-                      </CommandItem>
+                      </div>
                     ))}
                   </CommandGroup>
                 </CommandList>
