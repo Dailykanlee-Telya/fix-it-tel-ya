@@ -15,7 +15,6 @@ import {
   Menu,
   X,
   ChevronDown,
-  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,12 +27,13 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ROLE_LABELS } from '@/types/database';
 import GlobalSearch from '@/components/GlobalSearch';
+import NotificationBell from '@/components/NotificationBell';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Annahme', href: '/intake', icon: Ticket },
+  { name: 'Neue Annahme', href: '/intake', icon: Ticket },
   { name: 'Werkstatt', href: '/workshop', icon: Wrench },
-  { name: 'Tickets', href: '/tickets', icon: Ticket },
+  { name: 'Aufträge', href: '/tickets', icon: Ticket },
   { name: 'Ersatzteile', href: '/parts', icon: Package },
   { name: 'Kunden', href: '/customers', icon: Users },
   { name: 'Standorte', href: '/locations', icon: MapPin },
@@ -157,12 +157,7 @@ export default function AppLayout() {
 
           <div className="flex items-center gap-2">
             {/* Notifications */}
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
-                3
-              </span>
-            </Button>
+            <NotificationBell />
 
             {/* User menu */}
             <DropdownMenu>

@@ -412,7 +412,7 @@ export default function Dashboard() {
             <CardDescription>Sortiert nach Erstelldatum (älteste zuerst)</CardDescription>
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate('/tickets')} className="gap-1">
-            Alle Tickets
+            Alle Aufträge
             <ArrowRight className="h-4 w-4" />
           </Button>
         </CardHeader>

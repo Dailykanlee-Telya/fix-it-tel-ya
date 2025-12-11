@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Search,
@@ -20,7 +22,7 @@ import {
   Package,
 } from 'lucide-react';
 import { STATUS_LABELS, STATUS_COLORS, TicketStatus, RepairTicket } from '@/types/database';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, subDays } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 const STATUS_ORDER: TicketStatus[] = [
@@ -33,9 +35,14 @@ const STATUS_ORDER: TicketStatus[] = [
 
 export default function Workshop() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [brandFilter, setBrandFilter] = useState<string>('all');
+  const [showOverdueOnly, setShowOverdueOnly] = useState<boolean>(searchParams.get('filter') === 'overdue');
+  
+  const sevenDaysAgo = useMemo(() => subDays(new Date(), 7), []);
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ['workshop-tickets'],
@@ -67,9 +74,19 @@ export default function Workshop() {
 
     const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
     const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
+    const matchesBrand = brandFilter === 'all' || ticket.device?.brand === brandFilter;
+    const isOverdue = new Date(ticket.created_at) < sevenDaysAgo;
+    const matchesOverdue = !showOverdueOnly || isOverdue;
 
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus && matchesPriority && matchesBrand && matchesOverdue;
   });
+  
+  // Get unique brands from tickets for filter
+  const uniqueBrands = useMemo(() => {
+    if (!tickets) return [];
+    const brands = tickets.map((t: any) => t.device?.brand).filter(Boolean);
+    return [...new Set(brands)].sort();
+  }, [tickets]);
 
   const ticketsByStatus = STATUS_ORDER.reduce((acc, status) => {
     acc[status] = filteredTickets?.filter((t: any) => t.status === status) || [];
@@ -120,43 +137,68 @@ export default function Workshop() {
         </div>
         <Button onClick={() => navigate('/intake')} className="gap-2">
           <Wrench className="h-4 w-4" />
-          Neues Ticket
+          Neuer Auftrag
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Suchen (Ticket, Kunde, Gerät)..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Suchen (Auftrag, Kunde, Gerät)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Status</SelectItem>
+              {STATUS_ORDER.map((status) => (
+                <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={brandFilter} onValueChange={setBrandFilter}>
+            <SelectTrigger className="w-[150px]">
+              <Smartphone className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Marke" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Marken</SelectItem>
+              {uniqueBrands.map((brand: string) => (
+                <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Priorität" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="express">Express</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle Status</SelectItem>
-            {STATUS_ORDER.map((status) => (
-              <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Priorität" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle</SelectItem>
-            <SelectItem value="normal">Normal</SelectItem>
-            <SelectItem value="express">Express</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="overdue"
+            checked={showOverdueOnly}
+            onCheckedChange={(checked) => setShowOverdueOnly(checked as boolean)}
+          />
+          <Label htmlFor="overdue" className="text-sm text-muted-foreground cursor-pointer flex items-center gap-1">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            Nur überfällige Aufträge anzeigen (&gt;7 Tage)
+          </Label>
+        </div>
       </div>
 
       {/* Kanban Board */}
