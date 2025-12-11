@@ -13,10 +13,61 @@ interface TrackRequest {
   message?: string;
 }
 
+// Simple in-memory rate limiting (per instance)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 10; // 10 requests per minute per IP
+
+function isRateLimited(clientIP: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(clientIP);
+  
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(clientIP, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return true;
+  }
+  
+  entry.count++;
+  return false;
+}
+
+// Clean up old entries periodically
+function cleanupRateLimitMap() {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap.entries()) {
+    if (now > entry.resetTime) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Get client IP for rate limiting
+  const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
+    || req.headers.get('x-real-ip') 
+    || 'unknown';
+
+  // Check rate limit
+  if (isRateLimited(clientIP)) {
+    console.log('Rate limit exceeded for IP:', clientIP);
+    return new Response(
+      JSON.stringify({ error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' } }
+    );
+  }
+
+  // Cleanup old entries occasionally
+  if (Math.random() < 0.1) {
+    cleanupRateLimitMap();
   }
 
   try {
@@ -31,7 +82,7 @@ Deno.serve(async (req) => {
 
     // Validate required fields
     if (!ticket_number || !tracking_token) {
-      console.log('Missing required fields:', { ticket_number: !!ticket_number, tracking_token: !!tracking_token });
+      console.log('Missing required fields:', { ticket_number: !!ticket_number, tracking_token: !!tracking_token, ip: clientIP });
       return new Response(
         JSON.stringify({ error: 'Auftragsnummer und Tracking-Token sind erforderlich.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -58,7 +109,7 @@ Deno.serve(async (req) => {
     }
 
     if (!ticket) {
-      console.log('Ticket not found:', cleanTicketNumber);
+      console.log('Ticket not found:', cleanTicketNumber, 'IP:', clientIP);
       return new Response(
         JSON.stringify({ error: 'Auftrag nicht gefunden.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -67,7 +118,7 @@ Deno.serve(async (req) => {
 
     // Verify tracking token (kva_token field)
     if (!ticket.kva_token || ticket.kva_token !== cleanToken) {
-      console.log('Invalid tracking token for ticket:', cleanTicketNumber);
+      console.log('Invalid tracking token for ticket:', cleanTicketNumber, 'IP:', clientIP);
       return new Response(
         JSON.stringify({ error: 'Ungültiger Tracking-Token.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
