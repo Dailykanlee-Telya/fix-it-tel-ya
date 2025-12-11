@@ -1,0 +1,236 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface TrackRequest {
+  action: 'lookup' | 'kva_decision' | 'send_message';
+  ticket_number: string;
+  tracking_token: string;
+  kva_approved?: boolean;
+  message?: string;
+}
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    // Use service role key to bypass RLS for this specific public endpoint
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const body: TrackRequest = await req.json();
+    const { action, ticket_number, tracking_token, kva_approved, message } = body;
+
+    // Validate required fields
+    if (!ticket_number || !tracking_token) {
+      console.log('Missing required fields:', { ticket_number: !!ticket_number, tracking_token: !!tracking_token });
+      return new Response(
+        JSON.stringify({ error: 'Auftragsnummer und Tracking-Token sind erforderlich.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Clean inputs
+    const cleanTicketNumber = ticket_number.toUpperCase().trim();
+    const cleanToken = tracking_token.trim();
+
+    // Verify ticket exists and token matches
+    const { data: ticket, error: ticketError } = await supabase
+      .from('repair_tickets')
+      .select('id, ticket_number, status, kva_token, kva_required, kva_approved, kva_approved_at, estimated_price, created_at, updated_at, error_description_text, device_id, location_id')
+      .eq('ticket_number', cleanTicketNumber)
+      .maybeSingle();
+
+    if (ticketError) {
+      console.error('Database error looking up ticket:', ticketError);
+      return new Response(
+        JSON.stringify({ error: 'Datenbankfehler. Bitte versuchen Sie es später erneut.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!ticket) {
+      console.log('Ticket not found:', cleanTicketNumber);
+      return new Response(
+        JSON.stringify({ error: 'Auftrag nicht gefunden.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify tracking token (kva_token field)
+    if (!ticket.kva_token || ticket.kva_token !== cleanToken) {
+      console.log('Invalid tracking token for ticket:', cleanTicketNumber);
+      return new Response(
+        JSON.stringify({ error: 'Ungültiger Tracking-Token.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Handle different actions
+    if (action === 'lookup') {
+      // Get device info (only brand/model, no IMEI)
+      const { data: device } = await supabase
+        .from('devices')
+        .select('brand, model, device_type')
+        .eq('id', ticket.device_id)
+        .single();
+
+      // Get location info (only name)
+      const { data: location } = await supabase
+        .from('locations')
+        .select('name')
+        .eq('id', ticket.location_id)
+        .single();
+
+      // Get status history (only status changes, no internal notes)
+      const { data: statusHistory } = await supabase
+        .from('status_history')
+        .select('id, new_status, created_at, note')
+        .eq('repair_ticket_id', ticket.id)
+        .order('created_at', { ascending: true });
+
+      // Filter out internal notes - only show customer-relevant notes
+      const filteredHistory = (statusHistory || []).map(entry => ({
+        id: entry.id,
+        new_status: entry.new_status,
+        created_at: entry.created_at,
+        note: entry.note?.startsWith('[Kundennachricht]') ? entry.note : 
+              (entry.note?.includes('KVA') ? entry.note : null)
+      }));
+
+      // Return only minimal, non-sensitive information
+      return new Response(
+        JSON.stringify({
+          ticket_number: ticket.ticket_number,
+          status: ticket.status,
+          created_at: ticket.created_at,
+          updated_at: ticket.updated_at,
+          error_description_text: ticket.error_description_text,
+          kva_required: ticket.kva_required,
+          kva_approved: ticket.kva_approved,
+          kva_approved_at: ticket.kva_approved_at,
+          estimated_price: ticket.estimated_price,
+          device: device ? { brand: device.brand, model: device.model, device_type: device.device_type } : null,
+          location: location ? { name: location.name } : null,
+          status_history: filteredHistory
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'kva_decision') {
+      if (typeof kva_approved !== 'boolean') {
+        return new Response(
+          JSON.stringify({ error: 'KVA-Entscheidung fehlt.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check if KVA is required and not already decided
+      if (!ticket.kva_required) {
+        return new Response(
+          JSON.stringify({ error: 'Kein KVA für diesen Auftrag erforderlich.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (ticket.kva_approved !== null) {
+        return new Response(
+          JSON.stringify({ error: 'KVA wurde bereits entschieden.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Update ticket with KVA decision
+      const { error: updateError } = await supabase
+        .from('repair_tickets')
+        .update({
+          kva_approved: kva_approved,
+          kva_approved_at: new Date().toISOString(),
+        })
+        .eq('id', ticket.id);
+
+      if (updateError) {
+        console.error('Error updating KVA decision:', updateError);
+        return new Response(
+          JSON.stringify({ error: 'Fehler beim Speichern der Entscheidung.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Add status history entry
+      await supabase.from('status_history').insert({
+        repair_ticket_id: ticket.id,
+        old_status: ticket.status,
+        new_status: ticket.status,
+        note: kva_approved ? 'KVA vom Kunden angenommen' : 'KVA vom Kunden abgelehnt',
+      });
+
+      console.log('KVA decision recorded:', { ticket_number: cleanTicketNumber, approved: kva_approved });
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          kva_approved: kva_approved,
+          kva_approved_at: new Date().toISOString()
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'send_message') {
+      if (!message || message.trim().length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'Nachricht darf nicht leer sein.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Limit message length
+      const cleanMessage = message.trim().slice(0, 1000);
+
+      // Add customer message to status history
+      const { error: insertError } = await supabase.from('status_history').insert({
+        repair_ticket_id: ticket.id,
+        old_status: ticket.status,
+        new_status: ticket.status,
+        note: `[Kundennachricht] ${cleanMessage}`,
+      });
+
+      if (insertError) {
+        console.error('Error inserting customer message:', insertError);
+        return new Response(
+          JSON.stringify({ error: 'Fehler beim Senden der Nachricht.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Customer message sent:', { ticket_number: cleanTicketNumber, message_length: cleanMessage.length });
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ error: 'Ungültige Aktion.' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error in track-ticket function:', error);
+    return new Response(
+      JSON.stringify({ error: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

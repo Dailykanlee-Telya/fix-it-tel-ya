@@ -26,77 +26,64 @@ import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
+interface TicketData {
+  ticket_number: string;
+  status: TicketStatus;
+  created_at: string;
+  updated_at: string;
+  error_description_text: string | null;
+  kva_required: boolean;
+  kva_approved: boolean | null;
+  kva_approved_at: string | null;
+  estimated_price: number | null;
+  device: { brand: string; model: string; device_type: string } | null;
+  location: { name: string } | null;
+  status_history: Array<{
+    id: string;
+    new_status: TicketStatus;
+    created_at: string;
+    note: string | null;
+  }>;
+}
+
 export default function TrackTicket() {
   const { toast } = useToast();
   const [ticketNumber, setTicketNumber] = useState('');
-  const [phone, setPhone] = useState('');
+  const [trackingToken, setTrackingToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [ticket, setTicket] = useState<any>(null);
-  const [statusHistory, setStatusHistory] = useState<any[]>([]);
+  const [ticket, setTicket] = useState<TicketData | null>(null);
   const [customerMessage, setCustomerMessage] = useState('');
+
+  const callTrackingApi = async (action: string, extraData: Record<string, any> = {}) => {
+    const response = await supabase.functions.invoke('track-ticket', {
+      body: {
+        action,
+        ticket_number: ticketNumber,
+        tracking_token: trackingToken,
+        ...extraData
+      }
+    });
+    
+    if (response.error) {
+      throw new Error(response.error.message || 'Ein Fehler ist aufgetreten.');
+    }
+    
+    if (response.data?.error) {
+      throw new Error(response.data.error);
+    }
+    
+    return response.data;
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setTicket(null);
-    setStatusHistory([]);
 
     try {
-      const { data, error } = await supabase
-        .from('repair_tickets')
-        .select(`
-          id,
-          ticket_number,
-          status,
-          created_at,
-          updated_at,
-          error_description_text,
-          error_code,
-          estimated_price,
-          kva_required,
-          kva_approved,
-          kva_approved_at,
-          device:devices(brand, model, device_type),
-          location:locations(name, address, phone),
-          customer:customers(phone, first_name, last_name)
-        `)
-        .eq('ticket_number', ticketNumber.toUpperCase())
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!data) {
-        toast({
-          variant: 'destructive',
-          title: 'Nicht gefunden',
-          description: 'Kein Auftrag mit dieser Nummer gefunden.',
-        });
-        return;
-      }
-
-      // Verify phone number for security
-      if (data.customer?.phone !== phone) {
-        toast({
-          variant: 'destructive',
-          title: 'Verifizierung fehlgeschlagen',
-          description: 'Die Telefonnummer stimmt nicht mit dem Auftrag überein.',
-        });
-        return;
-      }
-
+      const data = await callTrackingApi('lookup');
       setTicket(data);
-
-      // Fetch status history
-      const { data: historyData } = await supabase
-        .from('status_history')
-        .select('*')
-        .eq('repair_ticket_id', data.id)
-        .order('created_at', { ascending: true });
-
-      if (historyData) {
-        setStatusHistory(historyData);
-      }
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -113,27 +100,13 @@ export default function TrackTicket() {
     setSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('repair_tickets')
-        .update({
-          kva_approved: approved,
-          kva_approved_at: new Date().toISOString(),
-        })
-        .eq('id', ticket.id);
-
-      if (error) throw error;
-
-      // Add status history entry
-      await supabase.from('status_history').insert({
-        repair_ticket_id: ticket.id,
-        old_status: ticket.status,
-        new_status: ticket.status,
-        note: approved 
-          ? 'KVA vom Kunden angenommen' 
-          : 'KVA vom Kunden abgelehnt',
+      const result = await callTrackingApi('kva_decision', { kva_approved: approved });
+      
+      setTicket({ 
+        ...ticket, 
+        kva_approved: result.kva_approved, 
+        kva_approved_at: result.kva_approved_at 
       });
-
-      setTicket({ ...ticket, kva_approved: approved, kva_approved_at: new Date().toISOString() });
       
       toast({
         title: approved ? 'KVA angenommen' : 'KVA abgelehnt',
@@ -157,26 +130,11 @@ export default function TrackTicket() {
     setSubmitting(true);
 
     try {
-      // Add as status history note (customer message)
-      const { error } = await supabase.from('status_history').insert({
-        repair_ticket_id: ticket.id,
-        old_status: ticket.status,
-        new_status: ticket.status,
-        note: `[Kundennachricht] ${customerMessage.trim()}`,
-      });
+      await callTrackingApi('send_message', { message: customerMessage.trim() });
 
-      if (error) throw error;
-
-      // Refresh history
-      const { data: historyData } = await supabase
-        .from('status_history')
-        .select('*')
-        .eq('repair_ticket_id', ticket.id)
-        .order('created_at', { ascending: true });
-
-      if (historyData) {
-        setStatusHistory(historyData);
-      }
+      // Refresh ticket data to get updated history
+      const data = await callTrackingApi('lookup');
+      setTicket(data);
 
       setCustomerMessage('');
       toast({
@@ -253,7 +211,7 @@ export default function TrackTicket() {
           <CardHeader>
             <CardTitle>Auftrag suchen</CardTitle>
             <CardDescription>
-              Geben Sie Ihre Auftragsnummer und Telefonnummer ein, um den Status zu prüfen.
+              Geben Sie Ihre Auftragsnummer und den Tracking-Code aus Ihrer Bestätigungs-E-Mail ein.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -269,12 +227,12 @@ export default function TrackTicket() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Telefonnummer</Label>
+                <Label htmlFor="token">Tracking-Code</Label>
                 <Input
-                  id="phone"
-                  placeholder="Ihre Telefonnummer"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  id="token"
+                  placeholder="Ihr Tracking-Code aus der E-Mail"
+                  value={trackingToken}
+                  onChange={(e) => setTrackingToken(e.target.value)}
                   required
                 />
               </div>
@@ -309,13 +267,13 @@ export default function TrackTicket() {
                 {/* Status */}
                 <div className="text-center py-6 rounded-lg bg-muted/50">
                   {(() => {
-                    const statusInfo = getStatusInfo(ticket.status as TicketStatus);
+                    const statusInfo = getStatusInfo(ticket.status);
                     const StatusIcon = statusInfo.icon;
                     return (
                       <>
                         <StatusIcon className={`h-12 w-12 mx-auto mb-3 ${statusInfo.color}`} />
                         <h3 className="text-xl font-semibold mb-2">
-                          {STATUS_LABELS[ticket.status as TicketStatus]}
+                          {STATUS_LABELS[ticket.status]}
                         </h3>
                         <p className="text-sm text-muted-foreground max-w-xs mx-auto">
                           {statusInfo.description}
@@ -326,24 +284,28 @@ export default function TrackTicket() {
                 </div>
 
                 {/* Device Info */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                  <Smartphone className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">{ticket.device?.brand} {ticket.device?.model}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {ticket.error_description_text || 'Keine Beschreibung'}
-                    </p>
+                {ticket.device && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                    <Smartphone className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{ticket.device.brand} {ticket.device.model}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {ticket.error_description_text || 'Keine Beschreibung'}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Location */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">{ticket.location?.name}</p>
-                    <p className="text-sm text-muted-foreground">Abholstandort</p>
+                {ticket.location && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                    <MapPin className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{ticket.location.name}</p>
+                      <p className="text-sm text-muted-foreground">Abholstandort</p>
+                    </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -416,7 +378,7 @@ export default function TrackTicket() {
             )}
 
             {/* Status History */}
-            {statusHistory.length > 0 && (
+            {ticket.status_history && ticket.status_history.length > 0 && (
               <Card className="shadow-xl border-0">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -426,17 +388,17 @@ export default function TrackTicket() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {statusHistory.map((entry, index) => (
+                    {ticket.status_history.map((entry, index) => (
                       <div key={entry.id} className="flex gap-3">
                         <div className="flex flex-col items-center">
-                          <div className={`h-2 w-2 rounded-full ${index === statusHistory.length - 1 ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
-                          {index < statusHistory.length - 1 && (
+                          <div className={`h-2 w-2 rounded-full ${index === ticket.status_history.length - 1 ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                          {index < ticket.status_history.length - 1 && (
                             <div className="w-px h-full bg-muted-foreground/20 my-1" />
                           )}
                         </div>
                         <div className="flex-1 pb-3">
                           <p className="text-sm font-medium">
-                            {STATUS_LABELS[entry.new_status as TicketStatus]}
+                            {STATUS_LABELS[entry.new_status]}
                           </p>
                           {entry.note && (
                             <p className="text-sm text-muted-foreground mt-0.5">{entry.note}</p>
@@ -469,6 +431,7 @@ export default function TrackTicket() {
                   value={customerMessage}
                   onChange={(e) => setCustomerMessage(e.target.value)}
                   rows={3}
+                  maxLength={1000}
                 />
                 <Button
                   onClick={handleSendMessage}
@@ -476,21 +439,33 @@ export default function TrackTicket() {
                   className="w-full"
                 >
                   {submitting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Senden...
+                    </>
                   ) : (
-                    <MessageSquare className="mr-2 h-4 w-4" />
+                    <>
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      Nachricht senden
+                    </>
                   )}
-                  Nachricht senden
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Footer */}
+            <p className="text-center text-sm text-muted-foreground">
+              © {new Date().getFullYear()} Telya GmbH · Alle Rechte vorbehalten
+            </p>
           </div>
         )}
 
-        {/* Footer */}
-        <p className="text-center text-sm text-muted-foreground mt-8">
-          © 2024 Telya GmbH. Alle Rechte vorbehalten.
-        </p>
+        {/* Footer when no ticket */}
+        {!ticket && (
+          <p className="text-center text-sm text-muted-foreground mt-8">
+            © {new Date().getFullYear()} Telya GmbH · Alle Rechte vorbehalten
+          </p>
+        )}
       </div>
     </div>
   );
