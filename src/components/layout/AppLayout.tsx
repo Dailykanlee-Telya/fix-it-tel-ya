@@ -16,7 +16,6 @@ import {
   X,
   ChevronDown,
   Bell,
-  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,8 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
 import { ROLE_LABELS } from '@/types/database';
+import GlobalSearch from '@/components/GlobalSearch';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -153,17 +152,8 @@ export default function AppLayout() {
             <Menu className="h-5 w-5" />
           </Button>
 
-          {/* Search */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Suchen... (Ticket, Kunde, IMEI)"
-                className="pl-9 bg-muted/50 border-0 focus-visible:ring-1"
-              />
-            </div>
-          </div>
+          {/* Global Search */}
+          <GlobalSearch />
 
           <div className="flex items-center gap-2">
             {/* Notifications */}

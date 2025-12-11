@@ -35,6 +35,7 @@ import {
   ERROR_CODE_LABELS,
   Customer,
 } from '@/types/database';
+import DeviceModelSelect from '@/components/DeviceModelSelect';
 
 const ACCESSORIES = [
   { id: 'case', label: 'Hülle' },
@@ -458,26 +459,13 @@ export default function Intake() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Marke *</Label>
-                <Input
-                  value={device.brand}
-                  onChange={(e) => setDevice({ ...device, brand: e.target.value })}
-                  placeholder="z.B. Apple, Samsung"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Modell *</Label>
-                <Input
-                  value={device.model}
-                  onChange={(e) => setDevice({ ...device, model: e.target.value })}
-                  placeholder="z.B. iPhone 14 Pro"
-                  required
-                />
-              </div>
-            </div>
+            {/* Device Catalog Selection */}
+            <DeviceModelSelect
+              brand={device.brand}
+              model={device.model}
+              onBrandChange={(brand) => setDevice({ ...device, brand, model: '' })}
+              onModelChange={(model) => setDevice({ ...device, model })}
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

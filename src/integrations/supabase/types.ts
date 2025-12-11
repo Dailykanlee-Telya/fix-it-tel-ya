@@ -138,6 +138,30 @@ export type Database = {
         }
         Relationships: []
       }
+      device_catalog: {
+        Row: {
+          brand: string
+          created_at: string
+          device_type: string
+          id: string
+          model: string
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          device_type?: string
+          id?: string
+          model: string
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          device_type?: string
+          id?: string
+          model?: string
+        }
+        Relationships: []
+      }
       devices: {
         Row: {
           brand: string
