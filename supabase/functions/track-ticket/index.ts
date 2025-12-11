@@ -174,6 +174,18 @@ Deno.serve(async (req) => {
         note: kva_approved ? 'KVA vom Kunden angenommen' : 'KVA vom Kunden abgelehnt',
       });
 
+      // Create notification for employees
+      await supabase.from('notification_logs').insert({
+        channel: 'EMAIL',
+        trigger: kva_approved ? 'KVA_APPROVED' : 'KVA_REJECTED',
+        repair_ticket_id: ticket.id,
+        related_ticket_id: ticket.id,
+        type: 'KVA_DECISION',
+        title: kva_approved ? 'KVA angenommen' : 'KVA abgelehnt',
+        message: `Kunde hat KVA für ${cleanTicketNumber} ${kva_approved ? 'angenommen' : 'abgelehnt'}.`,
+        is_read: false,
+      });
+
       console.log('KVA decision recorded:', { ticket_number: cleanTicketNumber, approved: kva_approved });
 
       return new Response(
@@ -197,21 +209,35 @@ Deno.serve(async (req) => {
       // Limit message length
       const cleanMessage = message.trim().slice(0, 1000);
 
-      // Add customer message to status history
-      const { error: insertError } = await supabase.from('status_history').insert({
+      // Insert into ticket_messages table
+      const { error: messageError } = await supabase.from('ticket_messages').insert({
         repair_ticket_id: ticket.id,
-        old_status: ticket.status,
-        new_status: ticket.status,
-        note: `[Kundennachricht] ${cleanMessage}`,
+        sender_type: 'customer',
+        message_text: cleanMessage,
       });
 
-      if (insertError) {
-        console.error('Error inserting customer message:', insertError);
-        return new Response(
-          JSON.stringify({ error: 'Fehler beim Senden der Nachricht.' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (messageError) {
+        console.error('Error inserting customer message:', messageError);
+        // Fallback to status_history
+        await supabase.from('status_history').insert({
+          repair_ticket_id: ticket.id,
+          old_status: ticket.status,
+          new_status: ticket.status,
+          note: `[Kundennachricht] ${cleanMessage}`,
+        });
       }
+
+      // Create notification for employees
+      await supabase.from('notification_logs').insert({
+        channel: 'EMAIL',
+        trigger: 'TICKET_CREATED',
+        repair_ticket_id: ticket.id,
+        related_ticket_id: ticket.id,
+        type: 'NEW_CUSTOMER_MESSAGE',
+        title: 'Neue Kundennachricht',
+        message: `Neue Nachricht vom Kunden für ${cleanTicketNumber}: ${cleanMessage.substring(0, 100)}...`,
+        is_read: false,
+      });
 
       console.log('Customer message sent:', { ticket_number: cleanTicketNumber, message_length: cleanMessage.length });
 

@@ -277,6 +277,16 @@ export default function Workshop() {
                     </div>
                   )}
 
+                  {/* Overdue Badge */}
+                  {new Date(ticket.created_at) < sevenDaysAgo && (
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                      <span className="text-xs text-destructive font-medium">
+                        Überfällig
+                      </span>
+                    </div>
+                  )}
+
                   {/* Footer */}
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
                     <span>

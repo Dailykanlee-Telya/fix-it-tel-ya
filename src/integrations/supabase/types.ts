@@ -284,30 +284,48 @@ export type Database = {
           created_at: string
           customer_id: string | null
           id: string
+          is_read: boolean | null
+          message: string | null
           payload: Json | null
+          related_ticket_id: string | null
           repair_ticket_id: string | null
           status: string
+          title: string | null
           trigger: Database["public"]["Enums"]["notification_trigger"]
+          type: string | null
+          user_id: string | null
         }
         Insert: {
           channel: Database["public"]["Enums"]["notification_channel"]
           created_at?: string
           customer_id?: string | null
           id?: string
+          is_read?: boolean | null
+          message?: string | null
           payload?: Json | null
+          related_ticket_id?: string | null
           repair_ticket_id?: string | null
           status?: string
+          title?: string | null
           trigger: Database["public"]["Enums"]["notification_trigger"]
+          type?: string | null
+          user_id?: string | null
         }
         Update: {
           channel?: Database["public"]["Enums"]["notification_channel"]
           created_at?: string
           customer_id?: string | null
           id?: string
+          is_read?: boolean | null
+          message?: string | null
           payload?: Json | null
+          related_ticket_id?: string | null
           repair_ticket_id?: string | null
           status?: string
+          title?: string | null
           trigger?: Database["public"]["Enums"]["notification_trigger"]
+          type?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -315,6 +333,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_logs_related_ticket_id_fkey"
+            columns: ["related_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "repair_tickets"
             referencedColumns: ["id"]
           },
           {
@@ -669,6 +694,41 @@ export type Database = {
           },
           {
             foreignKeyName: "ticket_checklist_items_repair_ticket_id_fkey"
+            columns: ["repair_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "repair_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message_text: string
+          repair_ticket_id: string
+          sender_type: string
+          sender_user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_text: string
+          repair_ticket_id: string
+          sender_type: string
+          sender_user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_text?: string
+          repair_ticket_id?: string
+          sender_type?: string
+          sender_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_repair_ticket_id_fkey"
             columns: ["repair_ticket_id"]
             isOneToOne: false
             referencedRelation: "repair_tickets"

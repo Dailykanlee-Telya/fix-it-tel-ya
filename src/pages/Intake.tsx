@@ -475,7 +475,12 @@ export default function Intake() {
                 <Label>Gerätetyp *</Label>
                 <Select
                   value={device.device_type}
-                  onValueChange={(value) => setDevice({ ...device, device_type: value as DeviceType })}
+                  onValueChange={(value) => setDevice({ 
+                    ...device, 
+                    device_type: value as DeviceType,
+                    brand: '',
+                    model: ''
+                  })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -504,6 +509,7 @@ export default function Intake() {
 
             {/* Device Catalog Selection */}
             <DeviceModelSelect
+              deviceType={device.device_type}
               brand={device.brand}
               model={device.model}
               onBrandChange={(brand) => setDevice(prev => ({ ...prev, brand, model: '' }))}

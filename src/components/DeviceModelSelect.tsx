@@ -22,15 +22,27 @@ import {
 import { Plus, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { DeviceType } from '@/types/database';
 
 interface DeviceModelSelectProps {
+  deviceType: DeviceType;
   brand: string;
   model: string;
   onBrandChange: (brand: string) => void;
   onModelChange: (model: string) => void;
 }
 
+// Map enum values to device_catalog values
+const DEVICE_TYPE_MAP: Record<DeviceType, string> = {
+  'HANDY': 'HANDY',
+  'TABLET': 'TABLET',
+  'LAPTOP': 'LAPTOP',
+  'SMARTWATCH': 'SMARTWATCH',
+  'OTHER': 'OTHER',
+};
+
 export default function DeviceModelSelect({
+  deviceType,
   brand,
   model,
   onBrandChange,
@@ -45,16 +57,55 @@ export default function DeviceModelSelect({
   const [brandSearch, setBrandSearch] = useState('');
   const [modelSearch, setModelSearch] = useState('');
 
-  // Common brands that should always be shown first
-  const commonBrands = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Sony', 'Motorola', 'Google', 'OnePlus'];
+  // Common brands per device type
+  const commonBrandsByType: Record<string, string[]> = {
+    'HANDY': ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Sony', 'Motorola', 'Google', 'OnePlus'],
+    'TABLET': ['Apple', 'Samsung', 'Lenovo', 'Microsoft', 'Huawei'],
+    'LAPTOP': ['Apple', 'Lenovo', 'Dell', 'HP', 'ASUS', 'Acer', 'Microsoft'],
+    'SMARTWATCH': ['Apple', 'Samsung', 'Garmin', 'Huawei', 'Google', 'Xiaomi'],
+    'OTHER': [],
+  };
 
-  // Fetch all brands from catalog
+  const catalogDeviceType = DEVICE_TYPE_MAP[deviceType] || 'HANDY';
+  const commonBrands = commonBrandsByType[catalogDeviceType] || commonBrandsByType['HANDY'];
+
+  // For OTHER device type, show free text input
+  if (deviceType === 'OTHER') {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Marke *</Label>
+            <Input
+              value={brand}
+              onChange={(e) => onBrandChange(e.target.value)}
+              placeholder="Marke eingeben..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Gerätemodell / Bezeichnung *</Label>
+            <Input
+              value={model}
+              onChange={(e) => onModelChange(e.target.value)}
+              placeholder="Modell oder Bezeichnung eingeben..."
+            />
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Für sonstige Geräte geben Sie bitte Marke und Modell manuell ein.
+        </p>
+      </div>
+    );
+  }
+
+  // Fetch brands filtered by device type
   const { data: brands, refetch: refetchBrands } = useQuery({
-    queryKey: ['device-catalog-brands'],
+    queryKey: ['device-catalog-brands', catalogDeviceType],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('device_catalog')
         .select('brand')
+        .eq('device_type', catalogDeviceType)
         .order('brand');
       
       if (error) throw error;
@@ -64,14 +115,15 @@ export default function DeviceModelSelect({
     staleTime: 1000 * 60 * 5,
   });
 
-  // Fetch models for selected brand
+  // Fetch models filtered by device type AND brand
   const { data: models, refetch: refetchModels } = useQuery({
-    queryKey: ['device-catalog-models', brand],
+    queryKey: ['device-catalog-models', catalogDeviceType, brand],
     queryFn: async () => {
       if (!brand) return [];
       const { data, error } = await supabase
         .from('device_catalog')
         .select('model')
+        .eq('device_type', catalogDeviceType)
         .eq('brand', brand)
         .order('model');
       
@@ -87,7 +139,7 @@ export default function DeviceModelSelect({
     const common = commonBrands.filter(b => brands.includes(b));
     const others = brands.filter(b => !commonBrands.includes(b));
     return [...common, ...others];
-  }, [brands]);
+  }, [brands, commonBrands]);
 
   const filteredBrands = useMemo(() => {
     if (!brandSearch) return sortedBrands;
@@ -116,7 +168,11 @@ export default function DeviceModelSelect({
 
     const { error } = await supabase
       .from('device_catalog')
-      .insert({ brand: newBrand.trim(), model: newModel.trim(), device_type: 'HANDY' });
+      .insert({ 
+        brand: newBrand.trim(), 
+        model: newModel.trim(), 
+        device_type: catalogDeviceType 
+      });
 
     if (error) {
       if (error.code === '23505') {
@@ -148,6 +204,8 @@ export default function DeviceModelSelect({
     refetchBrands();
     refetchModels();
   };
+
+  const hasNoCatalogModels = brand && models && models.length === 0;
 
   return (
     <div className="space-y-4">
@@ -206,75 +264,88 @@ export default function DeviceModelSelect({
           </Popover>
         </div>
 
-        {/* Model Select with Search */}
+        {/* Model Select with Search or Manual Input */}
         <div className="space-y-2">
           <Label>Modell *</Label>
-          <Popover open={modelOpen} onOpenChange={(open) => {
-            setModelOpen(open);
-            if (!open) setModelSearch('');
-          }}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={modelOpen}
-                className="w-full justify-between font-normal"
-                disabled={!brand}
-              >
-                {model || (brand ? "Modell wählen..." : "Zuerst Marke wählen")}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0 bg-popover" align="start">
-              <div className="p-2 border-b border-border">
-                <Input 
-                  placeholder="Modell suchen..." 
-                  value={modelSearch}
-                  onChange={(e) => setModelSearch(e.target.value)}
-                  className="h-8"
-                />
-              </div>
-              <ScrollArea className="h-[200px]">
-                <div className="p-1">
-                  {filteredModels.length === 0 ? (
-                    <div className="p-2 text-center">
-                      <p className="text-sm text-muted-foreground mb-2">Modell nicht gefunden</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        type="button"
-                        onClick={() => {
-                          setModelOpen(false);
-                          setModelSearch('');
-                          setNewBrand(brand);
-                          setAddDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Neues Modell hinzufügen
-                      </Button>
-                    </div>
-                  ) : (
-                    filteredModels.map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
-                        onClick={() => {
-                          onModelChange(m);
-                          setModelOpen(false);
-                          setModelSearch('');
-                        }}
-                      >
-                        <Check className={cn("mr-2 h-4 w-4 flex-shrink-0", model === m ? "opacity-100" : "opacity-0")} />
-                        {m}
-                      </button>
-                    ))
-                  )}
+          {hasNoCatalogModels ? (
+            <div className="space-y-2">
+              <Input
+                value={model}
+                onChange={(e) => onModelChange(e.target.value)}
+                placeholder="Modell manuell eingeben..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Keine Modelle im Katalog. Bitte manuell eingeben.
+              </p>
+            </div>
+          ) : (
+            <Popover open={modelOpen} onOpenChange={(open) => {
+              setModelOpen(open);
+              if (!open) setModelSearch('');
+            }}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={modelOpen}
+                  className="w-full justify-between font-normal"
+                  disabled={!brand}
+                >
+                  {model || (brand ? "Modell wählen..." : "Zuerst Marke wählen")}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0 bg-popover" align="start">
+                <div className="p-2 border-b border-border">
+                  <Input 
+                    placeholder="Modell suchen..." 
+                    value={modelSearch}
+                    onChange={(e) => setModelSearch(e.target.value)}
+                    className="h-8"
+                  />
                 </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
+                <ScrollArea className="h-[200px]">
+                  <div className="p-1">
+                    {filteredModels.length === 0 ? (
+                      <div className="p-2 text-center">
+                        <p className="text-sm text-muted-foreground mb-2">Modell nicht gefunden</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          onClick={() => {
+                            setModelOpen(false);
+                            setModelSearch('');
+                            setNewBrand(brand);
+                            setAddDialogOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Neues Modell hinzufügen
+                        </Button>
+                      </div>
+                    ) : (
+                      filteredModels.map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
+                          onClick={() => {
+                            onModelChange(m);
+                            setModelOpen(false);
+                            setModelSearch('');
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4 flex-shrink-0", model === m ? "opacity-100" : "opacity-0")} />
+                          {m}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </div>
 
