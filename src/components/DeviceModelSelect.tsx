@@ -5,13 +5,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -51,6 +44,7 @@ export default function DeviceModelSelect({
   onModelChange,
 }: DeviceModelSelectProps) {
   const { toast } = useToast();
+  const [brandOpen, setBrandOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newBrand, setNewBrand] = useState('');
@@ -60,7 +54,7 @@ export default function DeviceModelSelect({
   const commonBrands = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Sony', 'Motorola', 'Google', 'OnePlus'];
 
   // Fetch all brands from catalog
-  const { data: brands, isLoading: brandsLoading } = useQuery({
+  const { data: brands, refetch: refetchBrands } = useQuery({
     queryKey: ['device-catalog-brands'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -72,7 +66,7 @@ export default function DeviceModelSelect({
       const uniqueBrands = [...new Set(data.map(d => d.brand))];
       return uniqueBrands;
     },
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes to prevent refetching
+    staleTime: 1000 * 60 * 5,
   });
 
   // Fetch models for selected brand
@@ -90,7 +84,7 @@ export default function DeviceModelSelect({
       return data.map(d => d.model);
     },
     enabled: !!brand,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 1000 * 60 * 5,
   });
   
   const sortedBrands = useMemo(() => {
@@ -141,39 +135,63 @@ export default function DeviceModelSelect({
     setNewBrand('');
     setNewModel('');
     setAddDialogOpen(false);
+    refetchBrands();
     refetchModels();
   };
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* Brand Select */}
+        {/* Brand Select with Search */}
         <div className="space-y-2">
           <Label>Marke *</Label>
-          <Select
-            value={brand || ""}
-            onValueChange={(value) => {
-              if (value) {
-                onBrandChange(value);
-                onModelChange(''); // Reset model when brand changes
-              }
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Marke wählen" />
-            </SelectTrigger>
-            <SelectContent 
-              position="popper" 
-              sideOffset={4}
-              className="max-h-[300px] overflow-y-auto"
-            >
-              {sortedBrands.map((b) => (
-                <SelectItem key={b} value={b}>
-                  {b}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={brandOpen} onOpenChange={setBrandOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={brandOpen}
+                className="w-full justify-between font-normal"
+              >
+                {brand || "Marke wählen..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Marke suchen..." />
+                <CommandList>
+                  <CommandEmpty>Keine Marke gefunden</CommandEmpty>
+                  <CommandGroup>
+                    {sortedBrands.map((b) => (
+                      <CommandItem
+                        key={b}
+                        value={b}
+                        onSelect={(currentValue) => {
+                          const selectedBrand = sortedBrands.find(
+                            (brand) => brand.toLowerCase() === currentValue.toLowerCase()
+                          );
+                          if (selectedBrand) {
+                            onBrandChange(selectedBrand);
+                            onModelChange(''); // Reset model when brand changes
+                          }
+                          setBrandOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            brand === b ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {b}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Model Select with Search */}
@@ -192,7 +210,7 @@ export default function DeviceModelSelect({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
+            <PopoverContent className="w-[200px] p-0" align="start">
               <Command>
                 <CommandInput placeholder="Modell suchen..." />
                 <CommandList>
@@ -218,8 +236,13 @@ export default function DeviceModelSelect({
                       <CommandItem
                         key={m}
                         value={m}
-                        onSelect={() => {
-                          onModelChange(m);
+                        onSelect={(currentValue) => {
+                          const selectedModel = models.find(
+                            (model) => model.toLowerCase() === currentValue.toLowerCase()
+                          );
+                          if (selectedModel) {
+                            onModelChange(selectedModel);
+                          }
                           setModelOpen(false);
                         }}
                       >
