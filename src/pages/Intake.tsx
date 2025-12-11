@@ -226,18 +226,18 @@ export default function Intake() {
         note: 'Auftrag erstellt',
       });
 
-      // Send confirmation email to customer (if email available)
-      try {
-        await supabase.functions.invoke('send-email', {
-          body: {
-            type: 'ticket_created',
-            ticket_id: ticketData.id,
-          },
-        });
-      } catch (emailError) {
-        console.error('Failed to send confirmation email:', emailError);
-        // Don't fail the ticket creation if email fails
-      }
+      // TODO: Email-Versand vorübergehend deaktiviert bis Domain bei Resend verifiziert ist
+      // Reaktivieren nach Domain-Verifizierung unter resend.com/domains
+      // try {
+      //   await supabase.functions.invoke('send-email', {
+      //     body: {
+      //       type: 'ticket_created',
+      //       ticket_id: ticketData.id,
+      //     },
+      //   });
+      // } catch (emailError) {
+      //   console.error('Failed to send confirmation email:', emailError);
+      // }
 
       return ticketData;
     },
