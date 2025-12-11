@@ -90,16 +90,21 @@ export default function DeviceModelSelect({
   });
 
   // Fetch models filtered by device type AND brand
+  // Sorting logic:
+  // - Apple: sort by sort_order ASC (newest iPhones first, oldest last)
+  // - Other brands: sort by sort_order ASC (alphabetical order by model name)
+  // - Fallback to model name if sort_order is null
   const { data: models, refetch: refetchModels } = useQuery({
     queryKey: ['device-catalog-models', catalogDeviceType, brand],
     queryFn: async () => {
       if (!brand) return [];
       const { data, error } = await supabase
         .from('device_catalog')
-        .select('model')
+        .select('model, sort_order')
         .eq('device_type', catalogDeviceType)
         .eq('brand', brand)
-        .order('model');
+        .order('sort_order', { ascending: true, nullsFirst: false })
+        .order('model', { ascending: true });
       
       if (error) throw error;
       return data.map(d => d.model);
