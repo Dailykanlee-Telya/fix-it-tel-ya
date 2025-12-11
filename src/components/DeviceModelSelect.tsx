@@ -56,8 +56,11 @@ export default function DeviceModelSelect({
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
 
+  // Common brands that should always be shown first
+  const commonBrands = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Sony', 'Motorola', 'Google', 'OnePlus'];
+
   // Fetch all brands from catalog
-  const { data: brands } = useQuery({
+  const { data: brands, isLoading: brandsLoading } = useQuery({
     queryKey: ['device-catalog-brands'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -69,6 +72,7 @@ export default function DeviceModelSelect({
       const uniqueBrands = [...new Set(data.map(d => d.brand))];
       return uniqueBrands;
     },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes to prevent refetching
   });
 
   // Fetch models for selected brand
@@ -86,13 +90,11 @@ export default function DeviceModelSelect({
       return data.map(d => d.model);
     },
     enabled: !!brand,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
-
-  // Common brands that should always be shown first
-  const commonBrands = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Sony', 'Motorola', 'Google', 'OnePlus'];
   
   const sortedBrands = useMemo(() => {
-    if (!brands) return commonBrands;
+    if (!brands || brands.length === 0) return commonBrands;
     const common = commonBrands.filter(b => brands.includes(b));
     const others = brands.filter(b => !commonBrands.includes(b));
     return [...common, ...others];
@@ -149,16 +151,22 @@ export default function DeviceModelSelect({
         <div className="space-y-2">
           <Label>Marke *</Label>
           <Select
-            value={brand}
+            value={brand || ""}
             onValueChange={(value) => {
-              onBrandChange(value);
-              onModelChange(''); // Reset model when brand changes
+              if (value) {
+                onBrandChange(value);
+                onModelChange(''); // Reset model when brand changes
+              }
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Marke wählen" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent 
+              position="popper" 
+              sideOffset={4}
+              className="max-h-[300px] overflow-y-auto"
+            >
               {sortedBrands.map((b) => (
                 <SelectItem key={b} value={b}>
                   {b}
