@@ -100,7 +100,7 @@ export default function TicketDetail() {
           changed_by:profiles(name)
         `)
         .eq('repair_ticket_id', id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true }); // Chronological order (oldest first)
 
       if (error) throw error;
       return data;
@@ -506,6 +506,10 @@ export default function TicketDetail() {
             )}
           </TabsTrigger>
           <TabsTrigger value="parts">Teile</TabsTrigger>
+          <TabsTrigger value="communication" className="gap-1">
+            <MessageSquare className="h-4 w-4" />
+            Kommunikation
+          </TabsTrigger>
           <TabsTrigger value="documents">Dokumente</TabsTrigger>
           <TabsTrigger value="history">Verlauf</TabsTrigger>
         </TabsList>
@@ -864,6 +868,81 @@ export default function TicketDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="communication" className="space-y-4">
+          <Card className="card-elevated">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Kundenkommunikation
+              </CardTitle>
+              <CardDescription>
+                Nachrichten vom Kunden und wichtige Kommunikation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const customerMessages = statusHistory?.filter((entry: any) => 
+                  entry.note?.startsWith('[Kundennachricht]')
+                ) || [];
+                
+                if (customerMessages.length === 0) {
+                  return (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Keine Kundennachrichten vorhanden
+                    </p>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-4">
+                    {customerMessages.map((entry: any) => (
+                      <div key={entry.id} className="p-4 rounded-lg bg-muted/50 border border-border">
+                        <div className="flex items-start gap-3">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium">Kundenanfrage</span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(entry.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                              </span>
+                            </div>
+                            <p className="text-sm">
+                              {entry.note?.replace('[Kundennachricht] ', '')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+          
+          {/* Customer Email Info */}
+          {ticket.customer?.email && (
+            <Card className="card-elevated">
+              <CardHeader>
+                <CardTitle className="text-lg">Tracking-Informationen</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <span className="text-sm text-muted-foreground">Kunden-E-Mail</span>
+                  <span className="text-sm font-medium">{ticket.customer.email}</span>
+                </div>
+                {ticket.kva_token && (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                    <span className="text-sm text-muted-foreground">Tracking-Code</span>
+                    <code className="text-sm font-mono bg-background px-2 py-1 rounded">{ticket.kva_token}</code>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="documents">
