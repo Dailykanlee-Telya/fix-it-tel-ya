@@ -117,7 +117,7 @@ export default function AppLayout() {
           </nav>
 
           {/* User section */}
-          <div className="border-t border-sidebar-border p-4">
+          <div className="border-t border-sidebar-border p-4 bg-primary-foreground">
             <div className="flex items-center gap-3">
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-sm">
