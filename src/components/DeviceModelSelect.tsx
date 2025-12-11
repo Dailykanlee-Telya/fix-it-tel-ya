@@ -167,14 +167,9 @@ export default function DeviceModelSelect({
                       <CommandItem
                         key={b}
                         value={b}
-                        onSelect={(currentValue) => {
-                          const selectedBrand = sortedBrands.find(
-                            (brand) => brand.toLowerCase() === currentValue.toLowerCase()
-                          );
-                          if (selectedBrand) {
-                            onBrandChange(selectedBrand);
-                            onModelChange(''); // Reset model when brand changes
-                          }
+                        onSelect={() => {
+                          onBrandChange(b);
+                          onModelChange('');
                           setBrandOpen(false);
                         }}
                       >
@@ -236,13 +231,8 @@ export default function DeviceModelSelect({
                       <CommandItem
                         key={m}
                         value={m}
-                        onSelect={(currentValue) => {
-                          const selectedModel = models.find(
-                            (model) => model.toLowerCase() === currentValue.toLowerCase()
-                          );
-                          if (selectedModel) {
-                            onModelChange(selectedModel);
-                          }
+                        onSelect={() => {
+                          onModelChange(m);
                           setModelOpen(false);
                         }}
                       >
