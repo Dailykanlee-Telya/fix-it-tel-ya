@@ -68,36 +68,9 @@ export default function DeviceModelSelect({
 
   const catalogDeviceType = DEVICE_TYPE_MAP[deviceType] || 'HANDY';
   const commonBrands = commonBrandsByType[catalogDeviceType] || commonBrandsByType['HANDY'];
+  const isOtherType = deviceType === 'OTHER';
 
-  // For OTHER device type, show free text input
-  if (deviceType === 'OTHER') {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Marke *</Label>
-            <Input
-              value={brand}
-              onChange={(e) => onBrandChange(e.target.value)}
-              placeholder="Marke eingeben..."
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Gerätemodell / Bezeichnung *</Label>
-            <Input
-              value={model}
-              onChange={(e) => onModelChange(e.target.value)}
-              placeholder="Modell oder Bezeichnung eingeben..."
-            />
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Für sonstige Geräte geben Sie bitte Marke und Modell manuell ein.
-        </p>
-      </div>
-    );
-  }
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Fetch brands filtered by device type
   const { data: brands, refetch: refetchBrands } = useQuery({
     queryKey: ['device-catalog-brands', catalogDeviceType],
@@ -113,6 +86,7 @@ export default function DeviceModelSelect({
       return uniqueBrands;
     },
     staleTime: 1000 * 60 * 5,
+    enabled: !isOtherType, // Don't fetch for OTHER type
   });
 
   // Fetch models filtered by device type AND brand
@@ -130,7 +104,7 @@ export default function DeviceModelSelect({
       if (error) throw error;
       return data.map(d => d.model);
     },
-    enabled: !!brand,
+    enabled: !!brand && !isOtherType,
     staleTime: 1000 * 60 * 5,
   });
   
@@ -206,6 +180,35 @@ export default function DeviceModelSelect({
   };
 
   const hasNoCatalogModels = brand && models && models.length === 0;
+
+  // For OTHER device type, show free text input
+  if (isOtherType) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Marke *</Label>
+            <Input
+              value={brand}
+              onChange={(e) => onBrandChange(e.target.value)}
+              placeholder="Marke eingeben..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Gerätemodell / Bezeichnung *</Label>
+            <Input
+              value={model}
+              onChange={(e) => onModelChange(e.target.value)}
+              placeholder="Modell oder Bezeichnung eingeben..."
+            />
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Für sonstige Geräte geben Sie bitte Marke und Modell manuell ein.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
