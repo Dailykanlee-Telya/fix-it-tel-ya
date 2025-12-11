@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   ArrowLeft,
   User,
@@ -32,6 +33,7 @@ import {
   Loader2,
   Plus,
   Trash2,
+  ClipboardCheck,
 } from 'lucide-react';
 import {
   STATUS_LABELS,
@@ -135,6 +137,89 @@ export default function TicketDetail() {
     },
   });
 
+  // Fetch checklist templates and items
+  const { data: checklistTemplates } = useQuery({
+    queryKey: ['checklist-templates', ticket?.device?.device_type],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checklist_templates')
+        .select(`
+          *,
+          items:checklist_items(*)
+        `)
+        .eq('active', true)
+        .or(`device_type.eq.${ticket?.device?.device_type},device_type.is.null`)
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!ticket?.device?.device_type,
+  });
+
+  // Fetch ticket checklist items
+  const { data: ticketChecklistItems } = useQuery({
+    queryKey: ['ticket-checklist', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ticket_checklist_items')
+        .select(`
+          *,
+          checklist_item:checklist_items(*)
+        `)
+        .eq('repair_ticket_id', id);
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Initialize checklist items for this ticket
+  const initChecklistMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      const template = checklistTemplates?.find(t => t.id === templateId);
+      if (!template?.items) return;
+
+      const items = template.items.map((item: any) => ({
+        repair_ticket_id: id,
+        checklist_item_id: item.id,
+        checked: false,
+      }));
+
+      const { error } = await supabase
+        .from('ticket_checklist_items')
+        .insert(items);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-checklist', id] });
+      toast({
+        title: 'Checkliste hinzugefügt',
+        description: 'Die Qualitätscheckliste wurde zum Auftrag hinzugefügt.',
+      });
+    },
+  });
+
+  // Toggle checklist item
+  const toggleChecklistItemMutation = useMutation({
+    mutationFn: async ({ itemId, checked }: { itemId: string; checked: boolean }) => {
+      const { error } = await supabase
+        .from('ticket_checklist_items')
+        .update({
+          checked,
+          checked_at: checked ? new Date().toISOString() : null,
+          checked_by_user_id: checked ? profile?.id : null,
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-checklist', id] });
+    },
+  });
+
   const addPartMutation = useMutation({
     mutationFn: async () => {
       const selectedPart = availableParts?.find(p => p.id === selectedPartId);
@@ -169,7 +254,7 @@ export default function TicketDetail() {
       setPartQuantity(1);
       toast({
         title: 'Teil zugeordnet',
-        description: 'Das Teil wurde erfolgreich zum Ticket hinzugefügt.',
+        description: 'Das Teil wurde erfolgreich zum Auftrag hinzugefügt.',
       });
     },
     onError: (error: any) => {
@@ -207,7 +292,7 @@ export default function TicketDetail() {
       queryClient.invalidateQueries({ queryKey: ['available-parts'] });
       toast({
         title: 'Teil entfernt',
-        description: 'Das Teil wurde vom Ticket entfernt.',
+        description: 'Das Teil wurde vom Auftrag entfernt.',
       });
     },
     onError: (error: any) => {
@@ -221,6 +306,14 @@ export default function TicketDetail() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: TicketStatus) => {
+      // Check if checklist is complete before allowing FERTIG_ZUR_ABHOLUNG
+      if (newStatus === 'FERTIG_ZUR_ABHOLUNG' && ticketChecklistItems && ticketChecklistItems.length > 0) {
+        const allChecked = ticketChecklistItems.every((item: any) => item.checked);
+        if (!allChecked) {
+          throw new Error('Bitte schließen Sie zuerst die Qualitätscheckliste ab, bevor Sie den Status auf "Fertig zur Abholung" setzen.');
+        }
+      }
+
       // Update ticket status
       const { error: ticketError } = await supabase
         .from('repair_tickets')
@@ -248,7 +341,7 @@ export default function TicketDetail() {
       setStatusNote('');
       toast({
         title: 'Status aktualisiert',
-        description: 'Der Ticketstatus wurde erfolgreich geändert.',
+        description: 'Der Auftragsstatus wurde erfolgreich geändert.',
       });
     },
     onError: (error: any) => {
@@ -289,7 +382,7 @@ export default function TicketDetail() {
   if (!ticket) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Ticket nicht gefunden</p>
+        <p className="text-muted-foreground">Auftrag nicht gefunden</p>
         <Button variant="link" onClick={() => navigate('/tickets')}>
           Zurück zur Übersicht
         </Button>
@@ -302,6 +395,9 @@ export default function TicketDetail() {
     (sum: number, p: any) => sum + (p.unit_sales_price || 0) * p.quantity,
     0
   ) || 0;
+  const checklistComplete = ticketChecklistItems && ticketChecklistItems.length > 0 
+    ? ticketChecklistItems.every((item: any) => item.checked) 
+    : true;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -397,9 +493,18 @@ export default function TicketDetail() {
 
       {/* Main Content */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="overview">Übersicht</TabsTrigger>
           <TabsTrigger value="repair">Reparatur</TabsTrigger>
+          <TabsTrigger value="checklist" className="gap-1">
+            <ClipboardCheck className="h-4 w-4" />
+            Qualitätsprüfung
+            {ticketChecklistItems && ticketChecklistItems.length > 0 && (
+              <Badge variant={checklistComplete ? 'default' : 'secondary'} className="ml-1 text-xs">
+                {ticketChecklistItems.filter((i: any) => i.checked).length}/{ticketChecklistItems.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="parts">Teile</TabsTrigger>
           <TabsTrigger value="documents">Dokumente</TabsTrigger>
           <TabsTrigger value="history">Verlauf</TabsTrigger>
@@ -552,6 +657,107 @@ export default function TicketDetail() {
           </Card>
         </TabsContent>
 
+        {/* Quality Checklist Tab */}
+        <TabsContent value="checklist" className="space-y-4">
+          <Card className="card-elevated">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ClipboardCheck className="h-5 w-5 text-primary" />
+                Qualitätscheckliste
+              </CardTitle>
+              <CardDescription>
+                Alle Punkte müssen vor Abschluss der Reparatur geprüft werden
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Add checklist template if none exists */}
+              {(!ticketChecklistItems || ticketChecklistItems.length === 0) && (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Noch keine Checkliste für diesen Auftrag. Wählen Sie eine Vorlage:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {checklistTemplates?.map((template: any) => (
+                      <Button
+                        key={template.id}
+                        variant="outline"
+                        onClick={() => initChecklistMutation.mutate(template.id)}
+                        disabled={initChecklistMutation.isPending}
+                      >
+                        {initChecklistMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                        {template.name}
+                      </Button>
+                    ))}
+                  </div>
+                  {(!checklistTemplates || checklistTemplates.length === 0) && (
+                    <p className="text-sm text-muted-foreground italic">
+                      Keine Checklisten-Vorlagen für diesen Gerätetyp verfügbar.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Display checklist items */}
+              {ticketChecklistItems && ticketChecklistItems.length > 0 && (
+                <div className="space-y-3">
+                  {ticketChecklistItems.map((item: any) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        item.checked ? 'bg-success/5 border-success/30' : 'bg-muted/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id={item.id}
+                          checked={item.checked}
+                          onCheckedChange={(checked) => 
+                            toggleChecklistItemMutation.mutate({ itemId: item.id, checked: !!checked })
+                          }
+                        />
+                        <label
+                          htmlFor={item.id}
+                          className={`text-sm font-medium cursor-pointer ${
+                            item.checked ? 'text-success line-through' : ''
+                          }`}
+                        >
+                          {item.checklist_item?.label}
+                        </label>
+                      </div>
+                      {item.checked && item.checked_at && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(item.checked_at), 'dd.MM. HH:mm', { locale: de })}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                  
+                  <Separator className="my-4" />
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">
+                        Fortschritt: {ticketChecklistItems.filter((i: any) => i.checked).length} von {ticketChecklistItems.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {checklistComplete 
+                          ? 'Alle Prüfungen abgeschlossen' 
+                          : 'Offene Prüfungen vorhanden'}
+                      </p>
+                    </div>
+                    {checklistComplete && (
+                      <Badge className="bg-success text-success-foreground">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Komplett
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="parts" className="space-y-4">
           <Card className="card-elevated">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -568,7 +774,7 @@ export default function TicketDetail() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Teil zum Ticket hinzufügen</DialogTitle>
+                    <DialogTitle>Teil zum Auftrag hinzufügen</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
