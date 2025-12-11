@@ -1,1 +1,4 @@
 project_id = "ymxnrnaptbwecjeqrdxp"
+
+[functions.track-ticket]
+verify_jwt = false
