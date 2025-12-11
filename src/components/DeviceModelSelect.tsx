@@ -4,14 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Popover,
   PopoverContent,
@@ -49,6 +42,8 @@ export default function DeviceModelSelect({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
+  const [brandSearch, setBrandSearch] = useState('');
+  const [modelSearch, setModelSearch] = useState('');
 
   // Common brands that should always be shown first
   const commonBrands = ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Sony', 'Motorola', 'Google', 'OnePlus'];
@@ -93,6 +88,21 @@ export default function DeviceModelSelect({
     const others = brands.filter(b => !commonBrands.includes(b));
     return [...common, ...others];
   }, [brands]);
+
+  const filteredBrands = useMemo(() => {
+    if (!brandSearch) return sortedBrands;
+    return sortedBrands.filter(b => 
+      b.toLowerCase().includes(brandSearch.toLowerCase())
+    );
+  }, [sortedBrands, brandSearch]);
+
+  const filteredModels = useMemo(() => {
+    if (!models) return [];
+    if (!modelSearch) return models;
+    return models.filter(m => 
+      m.toLowerCase().includes(modelSearch.toLowerCase())
+    );
+  }, [models, modelSearch]);
 
   const handleAddDevice = async () => {
     if (!newBrand.trim() || !newModel.trim()) {
@@ -145,7 +155,10 @@ export default function DeviceModelSelect({
         {/* Brand Select with Search */}
         <div className="space-y-2">
           <Label>Marke *</Label>
-          <Popover open={brandOpen} onOpenChange={setBrandOpen}>
+          <Popover open={brandOpen} onOpenChange={(open) => {
+            setBrandOpen(open);
+            if (!open) setBrandSearch('');
+          }}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -157,35 +170,39 @@ export default function DeviceModelSelect({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Marke suchen..." />
-                <CommandList>
-                  <CommandEmpty>Keine Marke gefunden</CommandEmpty>
-                  <CommandGroup>
-                    {sortedBrands.map((b) => (
-                      <div
+            <PopoverContent className="w-[200px] p-0 bg-popover" align="start">
+              <div className="p-2 border-b border-border">
+                <Input 
+                  placeholder="Marke suchen..." 
+                  value={brandSearch}
+                  onChange={(e) => setBrandSearch(e.target.value)}
+                  className="h-8"
+                />
+              </div>
+              <ScrollArea className="h-[200px]">
+                <div className="p-1">
+                  {filteredBrands.length === 0 ? (
+                    <p className="py-2 px-2 text-sm text-muted-foreground">Keine Marke gefunden</p>
+                  ) : (
+                    filteredBrands.map((b) => (
+                      <button
                         key={b}
-                        className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        type="button"
+                        className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
                         onClick={() => {
-                          console.log('Brand clicked:', b);
                           onBrandChange(b);
                           onModelChange('');
                           setBrandOpen(false);
+                          setBrandSearch('');
                         }}
                       >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            brand === b ? "opacity-100" : "opacity-0"
-                          )}
-                        />
+                        <Check className={cn("mr-2 h-4 w-4 flex-shrink-0", brand === b ? "opacity-100" : "opacity-0")} />
                         {b}
-                      </div>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
             </PopoverContent>
           </Popover>
         </div>
@@ -193,7 +210,10 @@ export default function DeviceModelSelect({
         {/* Model Select with Search */}
         <div className="space-y-2">
           <Label>Modell *</Label>
-          <Popover open={modelOpen} onOpenChange={setModelOpen}>
+          <Popover open={modelOpen} onOpenChange={(open) => {
+            setModelOpen(open);
+            if (!open) setModelSearch('');
+          }}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
@@ -206,18 +226,27 @@ export default function DeviceModelSelect({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Modell suchen..." />
-                <CommandList>
-                  <CommandEmpty>
+            <PopoverContent className="w-[200px] p-0 bg-popover" align="start">
+              <div className="p-2 border-b border-border">
+                <Input 
+                  placeholder="Modell suchen..." 
+                  value={modelSearch}
+                  onChange={(e) => setModelSearch(e.target.value)}
+                  className="h-8"
+                />
+              </div>
+              <ScrollArea className="h-[200px]">
+                <div className="p-1">
+                  {filteredModels.length === 0 ? (
                     <div className="p-2 text-center">
                       <p className="text-sm text-muted-foreground mb-2">Modell nicht gefunden</p>
                       <Button
                         variant="outline"
                         size="sm"
+                        type="button"
                         onClick={() => {
                           setModelOpen(false);
+                          setModelSearch('');
                           setNewBrand(brand);
                           setAddDialogOpen(true);
                         }}
@@ -226,30 +255,25 @@ export default function DeviceModelSelect({
                         Neues Modell hinzufügen
                       </Button>
                     </div>
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {models?.map((m) => (
-                      <div
+                  ) : (
+                    filteredModels.map((m) => (
+                      <button
                         key={m}
-                        className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        type="button"
+                        className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
                         onClick={() => {
-                          console.log('Model clicked:', m);
                           onModelChange(m);
                           setModelOpen(false);
+                          setModelSearch('');
                         }}
                       >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            model === m ? "opacity-100" : "opacity-0"
-                          )}
-                        />
+                        <Check className={cn("mr-2 h-4 w-4 flex-shrink-0", model === m ? "opacity-100" : "opacity-0")} />
                         {m}
-                      </div>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
             </PopoverContent>
           </Popover>
         </div>
