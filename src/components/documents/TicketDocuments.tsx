@@ -6,14 +6,7 @@ import { FileText, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import telyaLogo from '@/assets/telya-logo.png';
-import { 
-  STATUS_LABELS, 
-  TicketStatus, 
-  DEVICE_TYPE_LABELS, 
-  DeviceType,
-  ERROR_CODE_LABELS,
-  ErrorCode
-} from '@/types/database';
+import { STATUS_LABELS, TicketStatus, DEVICE_TYPE_LABELS, DeviceType, ERROR_CODE_LABELS, ErrorCode } from '@/types/database';
 
 // Company Information
 const COMPANY_INFO = {
@@ -24,25 +17,23 @@ const COMPANY_INFO = {
   website: 'www.telya.de',
   hrb: 'HRB 12345, Amtsgericht Musterstadt',
   ust_id: 'DE123456789',
-  geschaeftsfuehrer: 'Max Mustermann',
+  geschaeftsfuehrer: 'Max Mustermann'
 };
-
 interface TicketDocumentsProps {
   ticket: any;
   partUsage?: any[];
 }
-
-export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsProps) {
+export default function TicketDocuments({
+  ticket,
+  partUsage
+}: TicketDocumentsProps) {
   const intakeRef = useRef<HTMLDivElement>(null);
   const deliveryRef = useRef<HTMLDivElement>(null);
   const kvaRef = useRef<HTMLDivElement>(null);
-
   const handlePrint = (ref: React.RefObject<HTMLDivElement>, title: string) => {
     if (!ref.current) return;
-    
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-    
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -89,47 +80,33 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
     printWindow.print();
     printWindow.close();
   };
-
-  const totalPartsPrice = partUsage?.reduce(
-    (sum: number, p: any) => sum + (p.unit_sales_price || 0) * p.quantity,
-    0
-  ) || 0;
-
-  const CompanyFooter = () => (
-    <div className="company-info mt-6 pt-4 border-t text-center text-[10px] text-muted-foreground">
+  const totalPartsPrice = partUsage?.reduce((sum: number, p: any) => sum + (p.unit_sales_price || 0) * p.quantity, 0) || 0;
+  const CompanyFooter = () => <div className="company-info mt-6 pt-4 border-t text-center text-[10px] text-muted-foreground">
       <p className="font-semibold">{COMPANY_INFO.name}</p>
       <p>{COMPANY_INFO.address}</p>
       <p>Tel: {COMPANY_INFO.phone} | E-Mail: {COMPANY_INFO.email} | Web: {COMPANY_INFO.website}</p>
       <p>Geschäftsführer: {COMPANY_INFO.geschaeftsfuehrer} | {COMPANY_INFO.hrb} | USt-IdNr.: {COMPANY_INFO.ust_id}</p>
-    </div>
-  );
-
-  const LegalNotes = ({ type }: { type: 'intake' | 'delivery' | 'kva' }) => (
-    <div className="mt-4 text-xs text-muted-foreground space-y-2">
-      {type === 'intake' && (
-        <>
+    </div>;
+  const LegalNotes = ({
+    type
+  }: {
+    type: 'intake' | 'delivery' | 'kva';
+  }) => <div className="mt-4 text-xs text-muted-foreground space-y-2">
+      {type === 'intake' && <>
           <p><strong>Haftungshinweis:</strong> Die Telya GmbH haftet nicht für Datenverlust. Bitte sichern Sie Ihre Daten vor der Reparatur. Bei Geräten mit Wasserschaden oder vorherigen Fremdreparaturen kann keine Garantie auf die Reparatur gegeben werden.</p>
           <p><strong>Datenschutz:</strong> Ihre Daten werden gemäß DSGVO verarbeitet und nur für die Durchführung der Reparatur verwendet.</p>
           <p>Mit meiner Unterschrift bestätige ich die Abgabe des oben genannten Geräts zur Reparatur und erkenne die allgemeinen Geschäftsbedingungen der {COMPANY_INFO.name} an.</p>
-        </>
-      )}
-      {type === 'delivery' && (
-        <>
+        </>}
+      {type === 'delivery' && <>
           <p><strong>Garantie:</strong> Auf die durchgeführte Reparatur gewähren wir 6 Monate Garantie (ausgenommen Wasserschäden und mechanische Beschädigungen nach der Reparatur).</p>
           <p>Mit meiner Unterschrift bestätige ich den Erhalt des reparierten Geräts und des oben aufgeführten Zubehörs in ordnungsgemäßem Zustand.</p>
-        </>
-      )}
-      {type === 'kva' && (
-        <>
+        </>}
+      {type === 'kva' && <>
           <p><strong>Gültigkeit:</strong> Dieser Kostenvoranschlag ist 14 Tage gültig. Die angegebenen Preise verstehen sich inkl. MwSt.</p>
           <p><strong>Hinweis:</strong> Nach Diagnose können sich die tatsächlichen Kosten ändern. Bei einer Abweichung von mehr als 15% werden wir Sie kontaktieren.</p>
-        </>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="space-y-6">
+        </>}
+    </div>;
+  return <div className="space-y-6">
       {/* Eingangsbeleg (Intake Receipt) */}
       <Card className="card-elevated">
         <CardHeader className="flex flex-row items-center justify-between">
@@ -153,7 +130,9 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                 <div className="text-xl font-bold text-primary">Eingangsbeleg</div>
                 <div className="text-lg font-semibold">{ticket.ticket_number}</div>
                 <div className="text-sm text-muted-foreground">
-                  {format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                  {format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', {
+                  locale: de
+                })}
                 </div>
               </div>
             </div>
@@ -172,12 +151,10 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                     <div className="text-xs text-muted-foreground">Telefon</div>
                     <div className="font-medium">{ticket.customer?.phone}</div>
                   </div>
-                  {ticket.customer?.email && (
-                    <div>
+                  {ticket.customer?.email && <div>
                       <div className="text-xs text-muted-foreground">E-Mail</div>
                       <div className="font-medium">{ticket.customer?.email}</div>
-                    </div>
-                  )}
+                    </div>}
                 </div>
               </div>
 
@@ -194,12 +171,10 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                     <div className="text-xs text-muted-foreground">Gerätetyp</div>
                     <div className="font-medium">{DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType]}</div>
                   </div>
-                  {ticket.device?.imei_or_serial && (
-                    <div>
+                  {ticket.device?.imei_or_serial && <div>
                       <div className="text-xs text-muted-foreground">IMEI/Seriennummer</div>
                       <div className="font-medium font-mono text-sm">{ticket.device?.imei_or_serial}</div>
-                    </div>
-                  )}
+                    </div>}
                 </div>
               </div>
             </div>
@@ -217,12 +192,10 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                   <div className="text-xs text-muted-foreground">Beschreibung</div>
                   <div className="font-medium">{ticket.error_description_text || 'Keine Beschreibung'}</div>
                 </div>
-                {ticket.accessories && (
-                  <div>
+                {ticket.accessories && <div>
                     <div className="text-xs text-muted-foreground">Mitgegebenes Zubehör</div>
                     <div className="font-medium">{ticket.accessories}</div>
-                  </div>
-                )}
+                  </div>}
               </div>
             </div>
 
@@ -241,15 +214,13 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                 </div>
                 <div className="space-y-2">
                   <div>
-                    <div className="text-xs text-muted-foreground">Preismodus</div>
+                    <div className="text-xs text-muted-foreground">Kundenwunsch</div>
                     <div className="font-medium">{ticket.price_mode}</div>
                   </div>
-                  {ticket.estimated_price && (
-                    <div>
+                  {ticket.estimated_price && <div>
                       <div className="text-xs text-muted-foreground">Geschätzter Preis</div>
                       <div className="font-medium">{ticket.estimated_price.toFixed(2)} €</div>
-                    </div>
-                  )}
+                    </div>}
                 </div>
               </div>
             </div>
@@ -297,7 +268,9 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                 <div className="text-xl font-bold text-primary">Kostenvoranschlag</div>
                 <div className="text-lg font-semibold">{ticket.ticket_number}</div>
                 <div className="text-sm text-muted-foreground">
-                  {format(new Date(), 'dd.MM.yyyy', { locale: de })}
+                  {format(new Date(), 'dd.MM.yyyy', {
+                  locale: de
+                })}
                 </div>
               </div>
             </div>
@@ -322,9 +295,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                 <div className="space-y-1">
                   <div className="font-medium">{ticket.device?.brand} {ticket.device?.model}</div>
                   <div className="text-sm text-muted-foreground">{DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType]}</div>
-                  {ticket.device?.imei_or_serial && (
-                    <div className="text-sm font-mono text-muted-foreground">{ticket.device?.imei_or_serial}</div>
-                  )}
+                  {ticket.device?.imei_or_serial && <div className="text-sm font-mono text-muted-foreground">{ticket.device?.imei_or_serial}</div>}
                 </div>
               </div>
             </div>
@@ -365,14 +336,12 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                     <td className="py-2 text-right">{(ticket.estimated_price || 0).toFixed(2)} €</td>
                     <td className="py-2 text-right">{(ticket.estimated_price || 0).toFixed(2)} €</td>
                   </tr>
-                  {partUsage && partUsage.length > 0 && partUsage.map((usage: any) => (
-                    <tr key={usage.id} className="border-b">
+                  {partUsage && partUsage.length > 0 && partUsage.map((usage: any) => <tr key={usage.id} className="border-b">
                       <td className="py-2">{usage.part?.name}</td>
                       <td className="py-2 text-center">{usage.quantity}</td>
                       <td className="py-2 text-right">{(usage.unit_sales_price || 0).toFixed(2)} €</td>
                       <td className="py-2 text-right">{((usage.unit_sales_price || 0) * usage.quantity).toFixed(2)} €</td>
-                    </tr>
-                  ))}
+                    </tr>)}
                   <tr className="font-semibold bg-muted/30">
                     <td colSpan={3} className="py-2 text-right">Gesamtbetrag (inkl. MwSt.):</td>
                     <td className="py-2 text-right">{((ticket.estimated_price || 0) + totalPartsPrice).toFixed(2)} €</td>
@@ -386,17 +355,11 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                 <div>
                   <div className="text-sm font-medium">KVA Status</div>
                   <div className="text-xs text-muted-foreground">
-                    {ticket.kva_approved === true ? 'Vom Kunden angenommen' : 
-                     ticket.kva_approved === false ? 'Vom Kunden abgelehnt' : 'Ausstehend'}
+                    {ticket.kva_approved === true ? 'Vom Kunden angenommen' : ticket.kva_approved === false ? 'Vom Kunden abgelehnt' : 'Ausstehend'}
                   </div>
                 </div>
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                  ticket.kva_approved === true ? 'bg-success/10 text-success' :
-                  ticket.kva_approved === false ? 'bg-destructive/10 text-destructive' :
-                  'bg-warning/10 text-warning'
-                }`}>
-                  {ticket.kva_approved === true ? 'Angenommen' : 
-                   ticket.kva_approved === false ? 'Abgelehnt' : 'Offen'}
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${ticket.kva_approved === true ? 'bg-success/10 text-success' : ticket.kva_approved === false ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}>
+                  {ticket.kva_approved === true ? 'Angenommen' : ticket.kva_approved === false ? 'Abgelehnt' : 'Offen'}
                 </span>
               </div>
             </div>
@@ -449,7 +412,9 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                 <div className="text-xl font-bold text-primary">Lieferschein</div>
                 <div className="text-lg font-semibold">{ticket.ticket_number}</div>
                 <div className="text-sm text-muted-foreground">
-                  {format(new Date(), 'dd.MM.yyyy HH:mm', { locale: de })}
+                  {format(new Date(), 'dd.MM.yyyy HH:mm', {
+                  locale: de
+                })}
                 </div>
               </div>
             </div>
@@ -486,19 +451,16 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                     <div className="text-xs text-muted-foreground">Gerät</div>
                     <div className="font-medium">{ticket.device?.brand} {ticket.device?.model}</div>
                   </div>
-                  {ticket.device?.imei_or_serial && (
-                    <div>
+                  {ticket.device?.imei_or_serial && <div>
                       <div className="text-xs text-muted-foreground">IMEI/Seriennummer</div>
                       <div className="font-medium font-mono text-sm">{ticket.device?.imei_or_serial}</div>
-                    </div>
-                  )}
+                    </div>}
                 </div>
               </div>
             </div>
 
             {/* Parts used */}
-            {partUsage && partUsage.length > 0 && (
-              <div className="section mb-6">
+            {partUsage && partUsage.length > 0 && <div className="section mb-6">
                 <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
                   Verwendete Ersatzteile
                 </div>
@@ -512,40 +474,33 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                     </tr>
                   </thead>
                   <tbody>
-                    {partUsage.map((usage: any) => (
-                      <tr key={usage.id} className="border-b">
+                    {partUsage.map((usage: any) => <tr key={usage.id} className="border-b">
                         <td className="py-2">{usage.part?.name}</td>
                         <td className="py-2 text-center">{usage.quantity}</td>
                         <td className="py-2 text-right">{(usage.unit_sales_price || 0).toFixed(2)} €</td>
                         <td className="py-2 text-right">{((usage.unit_sales_price || 0) * usage.quantity).toFixed(2)} €</td>
-                      </tr>
-                    ))}
+                      </tr>)}
                     <tr className="font-semibold bg-muted/30">
                       <td colSpan={3} className="py-2 text-right">Teile gesamt:</td>
                       <td className="py-2 text-right">{totalPartsPrice.toFixed(2)} €</td>
                     </tr>
                   </tbody>
                 </table>
-              </div>
-            )}
+              </div>}
 
             <div className="section mb-6">
               <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
                 Preisübersicht
               </div>
               <div className="space-y-2">
-                {ticket.estimated_price && (
-                  <div className="flex justify-between">
+                {ticket.estimated_price && <div className="flex justify-between">
                     <span className="text-muted-foreground">Reparaturkosten</span>
                     <span className="font-medium">{ticket.estimated_price.toFixed(2)} €</span>
-                  </div>
-                )}
-                {totalPartsPrice > 0 && (
-                  <div className="flex justify-between">
+                  </div>}
+                {totalPartsPrice > 0 && <div className="flex justify-between">
                     <span className="text-muted-foreground">Ersatzteile</span>
                     <span className="font-medium">{totalPartsPrice.toFixed(2)} €</span>
-                  </div>
-                )}
+                  </div>}
                 <Separator />
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Gesamtbetrag</span>
@@ -561,9 +516,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
                 </div>
                 <div className="font-medium">{ticket.location?.name}</div>
                 <div className="text-sm text-muted-foreground">{ticket.location?.address}</div>
-                {ticket.location?.phone && (
-                  <div className="text-sm text-muted-foreground">Tel: {ticket.location?.phone}</div>
-                )}
+                {ticket.location?.phone && <div className="text-sm text-muted-foreground">Tel: {ticket.location?.phone}</div>}
               </div>
 
               <div className="section">
@@ -593,6 +546,5 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 }
