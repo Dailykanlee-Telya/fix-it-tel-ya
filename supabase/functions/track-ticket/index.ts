@@ -225,19 +225,22 @@ Deno.serve(async (req) => {
         note: kva_approved ? 'KVA vom Kunden angenommen' : 'KVA vom Kunden abgelehnt',
       });
 
-      // Create notifications for all employees with relevant roles
+      // Create notifications for all employees with relevant roles (deduplicated)
       const { data: employees } = await supabase
         .from('user_roles')
         .select('user_id')
         .in('role', ['ADMIN', 'THEKE', 'TECHNIKER']);
 
       if (employees && employees.length > 0) {
-        const notifications = employees.map(emp => ({
+        // Deduplicate user_ids (users may have multiple roles)
+        const uniqueUserIds = [...new Set(employees.map(emp => emp.user_id))];
+        
+        const notifications = uniqueUserIds.map(userId => ({
           channel: 'EMAIL' as const,
           trigger: kva_approved ? 'KVA_APPROVED' as const : 'KVA_REJECTED' as const,
           repair_ticket_id: ticket.id,
           related_ticket_id: ticket.id,
-          user_id: emp.user_id,
+          user_id: userId,
           type: 'KVA_DECISION',
           title: kva_approved ? 'KVA angenommen' : 'KVA abgelehnt',
           message: `Kunde hat KVA für ${cleanTicketNumber} ${kva_approved ? 'angenommen' : 'abgelehnt'}.`,
@@ -288,19 +291,22 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Create notifications for all employees with relevant roles
+      // Create notifications for all employees with relevant roles (deduplicated)
       const { data: employees } = await supabase
         .from('user_roles')
         .select('user_id')
         .in('role', ['ADMIN', 'THEKE', 'TECHNIKER']);
 
       if (employees && employees.length > 0) {
-        const notifications = employees.map(emp => ({
+        // Deduplicate user_ids (users may have multiple roles)
+        const uniqueUserIds = [...new Set(employees.map(emp => emp.user_id))];
+        
+        const notifications = uniqueUserIds.map(userId => ({
           channel: 'EMAIL' as const,
           trigger: 'TICKET_CREATED' as const,
           repair_ticket_id: ticket.id,
           related_ticket_id: ticket.id,
-          user_id: emp.user_id,
+          user_id: userId,
           type: 'NEW_CUSTOMER_MESSAGE',
           title: 'Neue Kundennachricht',
           message: `Neue Nachricht vom Kunden für ${cleanTicketNumber}: ${cleanMessage.substring(0, 100)}${cleanMessage.length > 100 ? '...' : ''}`,
