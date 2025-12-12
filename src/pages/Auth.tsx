@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, Mail, Lock, User, Loader2, Search } from 'lucide-react';
+import { Wrench, Mail, Lock, User, Loader2, Search, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
+import { useRateLimiter, AUTH_RATE_LIMIT_CONFIG } from '@/hooks/useRateLimiter';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const loginSchema = z.object({
   email: z.string().email('Ungültige E-Mail-Adresse'),
@@ -32,6 +34,10 @@ export default function Auth() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Rate limiting for login attempts
+  const loginRateLimiter = useRateLimiter('auth_login', AUTH_RATE_LIMIT_CONFIG);
+  const signupRateLimiter = useRateLimiter('auth_signup', AUTH_RATE_LIMIT_CONFIG);
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -52,6 +58,17 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    
+    // Check rate limit
+    if (loginRateLimiter.isLocked) {
+      toast({
+        variant: 'destructive',
+        title: 'Zu viele Anmeldeversuche',
+        description: `Bitte warten Sie ${loginRateLimiter.lockoutSeconds} Sekunden.`,
+      });
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -63,11 +80,16 @@ export default function Auth() {
       const { error } = await signIn(validated.email, validated.password);
       
       if (error) {
+        // Record failed attempt
+        loginRateLimiter.recordAttempt(false);
+        
         if (error.message.includes('Invalid login credentials')) {
           toast({
             variant: 'destructive',
             title: 'Anmeldung fehlgeschlagen',
-            description: 'Ungültige E-Mail oder Passwort.',
+            description: loginRateLimiter.attemptsRemaining <= 2 
+              ? `Ungültige E-Mail oder Passwort. Noch ${loginRateLimiter.attemptsRemaining} Versuche.`
+              : 'Ungültige E-Mail oder Passwort.',
           });
         } else {
           toast({
@@ -77,6 +99,8 @@ export default function Auth() {
           });
         }
       } else {
+        // Record successful attempt (resets counter)
+        loginRateLimiter.recordAttempt(true);
         toast({
           title: 'Willkommen!',
           description: 'Sie wurden erfolgreich angemeldet.',
@@ -101,6 +125,17 @@ export default function Auth() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    
+    // Check rate limit
+    if (signupRateLimiter.isLocked) {
+      toast({
+        variant: 'destructive',
+        title: 'Zu viele Registrierungsversuche',
+        description: `Bitte warten Sie ${signupRateLimiter.lockoutSeconds} Sekunden.`,
+      });
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -114,6 +149,9 @@ export default function Auth() {
       const { error } = await signUp(validated.email, validated.password, validated.name);
       
       if (error) {
+        // Record failed attempt
+        signupRateLimiter.recordAttempt(false);
+        
         if (error.message.includes('already registered')) {
           toast({
             variant: 'destructive',
@@ -128,6 +166,8 @@ export default function Auth() {
           });
         }
       } else {
+        // Record successful attempt
+        signupRateLimiter.recordAttempt(true);
         toast({
           title: 'Registrierung erfolgreich!',
           description: 'Ihr Konto wurde erstellt. Ein Administrator muss Ihr Konto freischalten, bevor Sie sich anmelden können.',
@@ -191,6 +231,16 @@ export default function Auth() {
 
             <CardContent>
               <TabsContent value="login" className="mt-0">
+                {loginRateLimiter.isLocked && (
+                  <Alert variant="destructive" className="mb-4">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertDescription>
+                      Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie{' '}
+                      <strong>{Math.floor(loginRateLimiter.lockoutSeconds / 60)}:{String(loginRateLimiter.lockoutSeconds % 60).padStart(2, '0')}</strong>{' '}
+                      Minuten.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">E-Mail</Label>
@@ -230,12 +280,14 @@ export default function Auth() {
                     )}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full" disabled={loading || loginRateLimiter.isLocked}>
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Anmelden...
                       </>
+                    ) : loginRateLimiter.isLocked ? (
+                      'Gesperrt'
                     ) : (
                       'Anmelden'
                     )}
@@ -244,6 +296,16 @@ export default function Auth() {
               </TabsContent>
 
               <TabsContent value="signup" className="mt-0">
+                {signupRateLimiter.isLocked && (
+                  <Alert variant="destructive" className="mb-4">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertDescription>
+                      Zu viele fehlgeschlagene Registrierungsversuche. Bitte warten Sie{' '}
+                      <strong>{Math.floor(signupRateLimiter.lockoutSeconds / 60)}:{String(signupRateLimiter.lockoutSeconds % 60).padStart(2, '0')}</strong>{' '}
+                      Minuten.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <form onSubmit={handleSignup} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-name">Name</Label>
@@ -321,12 +383,14 @@ export default function Auth() {
                     )}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full" disabled={loading || signupRateLimiter.isLocked}>
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Registrieren...
                       </>
+                    ) : signupRateLimiter.isLocked ? (
+                      'Gesperrt'
                     ) : (
                       'Konto erstellen'
                     )}
