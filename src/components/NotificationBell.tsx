@@ -41,6 +41,7 @@ export default function NotificationBell() {
       if (!profile) return [];
 
       // Fetch from notification_logs with ticket info
+      // Use explicit foreign key reference to avoid ambiguity
       const { data, error } = await supabase
         .from('notification_logs')
         .select(`
@@ -51,9 +52,9 @@ export default function NotificationBell() {
           related_ticket_id,
           is_read,
           created_at,
-          repair_ticket:repair_tickets(ticket_number)
+          repair_ticket:repair_tickets!notification_logs_related_ticket_id_fkey(ticket_number)
         `)
-        .or(`user_id.eq.${profile.id},user_id.is.null`)
+        .eq('user_id', profile.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
