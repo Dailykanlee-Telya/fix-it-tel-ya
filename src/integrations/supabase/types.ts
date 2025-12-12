@@ -180,7 +180,10 @@ export type Database = {
           device_type: Database["public"]["Enums"]["device_type"]
           id: string
           imei_or_serial: string | null
+          imei_unreadable: boolean
           model: string
+          serial_number: string | null
+          serial_unreadable: boolean
           updated_at: string
         }
         Insert: {
@@ -191,7 +194,10 @@ export type Database = {
           device_type?: Database["public"]["Enums"]["device_type"]
           id?: string
           imei_or_serial?: string | null
+          imei_unreadable?: boolean
           model: string
+          serial_number?: string | null
+          serial_unreadable?: boolean
           updated_at?: string
         }
         Update: {
@@ -202,7 +208,10 @@ export type Database = {
           device_type?: Database["public"]["Enums"]["device_type"]
           id?: string
           imei_or_serial?: string | null
+          imei_unreadable?: boolean
           model?: string
+          serial_number?: string | null
+          serial_unreadable?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -706,6 +715,45 @@ export type Database = {
             columns: ["repair_ticket_id"]
             isOneToOne: false
             referencedRelation: "repair_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_internal_notes: {
+        Row: {
+          created_at: string
+          id: string
+          note_text: string
+          repair_ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note_text: string
+          repair_ticket_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note_text?: string
+          repair_ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_internal_notes_repair_ticket_id_fkey"
+            columns: ["repair_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "repair_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_internal_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

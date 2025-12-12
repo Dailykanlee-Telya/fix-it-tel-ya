@@ -39,6 +39,7 @@ import {
 import DeviceModelSelect from '@/components/DeviceModelSelect';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { validateIMEI } from '@/lib/imei-validation';
+import PhotoUpload, { UploadedPhoto, usePhotoUpload } from '@/components/intake/PhotoUpload';
 
 const ACCESSORIES = [
   { id: 'case', label: 'Hülle' },
@@ -73,8 +74,14 @@ export default function Intake() {
     model: '',
     imei_or_serial: '',
     color: '',
+    imei_unreadable: false,
+    serial_number: '',
+    serial_unreadable: false,
   });
   const [imeiError, setImeiError] = useState<string | null>(null);
+
+  // Photo upload hook
+  const { photos, setPhotos, uploadPhotos, savePhotoRecords } = usePhotoUpload();
 
   // Repair state
   const [repair, setRepair] = useState({
@@ -156,7 +163,7 @@ export default function Intake() {
 
       if (!customerId) throw new Error('Kein Kunde ausgewählt');
 
-      // Create device
+      // Create device with IMEI/Serial fields
       const { data: deviceData, error: deviceError } = await supabase
         .from('devices')
         .insert({
@@ -164,8 +171,11 @@ export default function Intake() {
           device_type: device.device_type,
           brand: device.brand,
           model: device.model,
-          imei_or_serial: device.imei_or_serial || null,
+          imei_or_serial: device.device_type === 'HANDY' ? (device.imei_or_serial || null) : null,
           color: device.color || null,
+          imei_unreadable: device.device_type === 'HANDY' ? device.imei_unreadable : false,
+          serial_number: device.device_type !== 'HANDY' ? (device.serial_number || null) : null,
+          serial_unreadable: device.device_type !== 'HANDY' ? device.serial_unreadable : false,
         })
         .select()
         .single();
@@ -232,18 +242,19 @@ export default function Intake() {
         note: 'Auftrag erstellt',
       });
 
+      // Upload photos if any
+      if (photos.length > 0) {
+        try {
+          const uploadedUrls = await uploadPhotos(ticketData.id);
+          await savePhotoRecords(ticketData.id, uploadedUrls);
+        } catch (photoError) {
+          console.error('Error uploading photos:', photoError);
+          // Don't fail the whole ticket creation if photo upload fails
+        }
+      }
+
       // TODO: Email-Versand vorübergehend deaktiviert bis Domain bei Resend verifiziert ist
       // Reaktivieren nach Domain-Verifizierung unter resend.com/domains
-      // try {
-      //   await supabase.functions.invoke('send-email', {
-      //     body: {
-      //       type: 'ticket_created',
-      //       ticket_id: ticketData.id,
-      //     },
-      //   });
-      // } catch (emailError) {
-      //   console.error('Failed to send confirmation email:', emailError);
-      // }
 
       return ticketData;
     },
@@ -293,8 +304,16 @@ export default function Intake() {
       return;
     }
 
-    // IMEI Validation
-    if (device.imei_or_serial) {
+    // IMEI Validation for HANDY only (if not marked as unreadable)
+    if (device.device_type === 'HANDY' && !device.imei_unreadable) {
+      if (!device.imei_or_serial) {
+        toast({
+          variant: 'destructive',
+          title: 'IMEI erforderlich',
+          description: 'Bitte geben Sie die IMEI ein oder markieren Sie "IMEI nicht lesbar".',
+        });
+        return;
+      }
       const imeiResult = validateIMEI(device.imei_or_serial);
       if (!imeiResult.isValid) {
         toast({
@@ -534,37 +553,118 @@ export default function Intake() {
               onModelChange={(model) => setDevice(prev => ({ ...prev, model }))}
             />
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>IMEI / Seriennummer</Label>
-                <Input
-                  value={device.imei_or_serial}
-                  onChange={(e) => {
-                    setDevice({ ...device, imei_or_serial: e.target.value });
-                    // Live validation
-                    if (e.target.value) {
-                      const result = validateIMEI(e.target.value);
-                      setImeiError(result.isValid ? null : (result.error || null));
-                    } else {
-                      setImeiError(null);
-                    }
-                  }}
-                  placeholder="Optional"
-                  className={imeiError ? 'border-destructive' : ''}
-                />
-                {imeiError && (
-                  <p className="text-sm text-destructive">{imeiError}</p>
-                )}
+            {/* IMEI for HANDY */}
+            {device.device_type === 'HANDY' && (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>IMEI {!device.imei_unreadable && '*'}</Label>
+                    <Input
+                      value={device.imei_or_serial}
+                      onChange={(e) => {
+                        setDevice({ ...device, imei_or_serial: e.target.value });
+                        // Live validation
+                        if (e.target.value && !device.imei_unreadable) {
+                          const result = validateIMEI(e.target.value);
+                          setImeiError(result.isValid ? null : (result.error || null));
+                        } else {
+                          setImeiError(null);
+                        }
+                      }}
+                      placeholder={device.imei_unreadable ? 'Nicht lesbar' : '15-stellige IMEI'}
+                      disabled={device.imei_unreadable}
+                      className={imeiError && !device.imei_unreadable ? 'border-destructive' : ''}
+                    />
+                    {imeiError && !device.imei_unreadable && (
+                      <p className="text-sm text-destructive">{imeiError}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Farbe</Label>
+                    <Input
+                      value={device.color}
+                      onChange={(e) => setDevice({ ...device, color: e.target.value })}
+                      placeholder="z.B. Schwarz, Space Grau"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="imei_unreadable"
+                    checked={device.imei_unreadable}
+                    onCheckedChange={(checked) => {
+                      setDevice({ 
+                        ...device, 
+                        imei_unreadable: checked === true,
+                        imei_or_serial: checked ? '' : device.imei_or_serial
+                      });
+                      if (checked) setImeiError(null);
+                    }}
+                  />
+                  <Label htmlFor="imei_unreadable" className="text-sm font-normal cursor-pointer">
+                    IMEI nicht lesbar
+                  </Label>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Farbe</Label>
-                <Input
-                  value={device.color}
-                  onChange={(e) => setDevice({ ...device, color: e.target.value })}
-                  placeholder="z.B. Schwarz, Space Grau"
-                />
+            )}
+
+            {/* Serial number for non-HANDY devices */}
+            {device.device_type !== 'HANDY' && (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Seriennummer</Label>
+                    <Input
+                      value={device.serial_number}
+                      onChange={(e) => setDevice({ ...device, serial_number: e.target.value })}
+                      placeholder={device.serial_unreadable ? 'Nicht lesbar' : 'Optional'}
+                      disabled={device.serial_unreadable}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Farbe</Label>
+                    <Input
+                      value={device.color}
+                      onChange={(e) => setDevice({ ...device, color: e.target.value })}
+                      placeholder="z.B. Schwarz, Silber"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="serial_unreadable"
+                    checked={device.serial_unreadable}
+                    onCheckedChange={(checked) => {
+                      setDevice({ 
+                        ...device, 
+                        serial_unreadable: checked === true,
+                        serial_number: checked ? '' : device.serial_number
+                      });
+                    }}
+                  />
+                  <Label htmlFor="serial_unreadable" className="text-sm font-normal cursor-pointer">
+                    Seriennummer nicht lesbar
+                  </Label>
+                </div>
               </div>
-            </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Photo Upload Section */}
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Camera className="h-5 w-5 text-primary" />
+              Fotos
+            </CardTitle>
+            <CardDescription>Fotos hinzufügen (z.B. Zustand bei Abgabe)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PhotoUpload 
+              onPhotosChange={setPhotos}
+              maxPhotos={5}
+            />
           </CardContent>
         </Card>
 
