@@ -47,6 +47,9 @@ import {
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import TicketDocuments from '@/components/documents/TicketDocuments';
+import TicketMessages from '@/components/tickets/TicketMessages';
+import TicketPhotos from '@/components/tickets/TicketPhotos';
+import TicketInternalNotes from '@/components/tickets/TicketInternalNotes';
 
 const STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   NEU_EINGEGANGEN: ['IN_DIAGNOSE', 'STORNIERT'],
@@ -465,10 +468,25 @@ export default function TicketDetail() {
                   {DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType]}
                   {ticket.device?.color && ` • ${ticket.device.color}`}
                 </p>
-                {ticket.device?.imei_or_serial && (
-                  <p className="text-xs text-muted-foreground font-mono mt-1">
-                    {ticket.device.imei_or_serial}
-                  </p>
+                {/* IMEI for HANDY */}
+                {ticket.device?.device_type === 'HANDY' && (
+                  ticket.device?.imei_unreadable ? (
+                    <p className="text-xs text-warning mt-1">IMEI nicht lesbar</p>
+                  ) : ticket.device?.imei_or_serial ? (
+                    <p className="text-xs text-muted-foreground font-mono mt-1">
+                      IMEI: {ticket.device.imei_or_serial}
+                    </p>
+                  ) : null
+                )}
+                {/* Serial for non-HANDY */}
+                {ticket.device?.device_type !== 'HANDY' && (
+                  ticket.device?.serial_unreadable ? (
+                    <p className="text-xs text-warning mt-1">Seriennummer nicht lesbar</p>
+                  ) : ticket.device?.serial_number ? (
+                    <p className="text-xs text-muted-foreground font-mono mt-1">
+                      S/N: {ticket.device.serial_number}
+                    </p>
+                  ) : null
                 )}
               </div>
             </div>
@@ -515,6 +533,8 @@ export default function TicketDetail() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
+          {/* Photos Section */}
+          <TicketPhotos ticketId={id!} />
           <div className="grid gap-4 lg:grid-cols-2">
             {/* Problem Description */}
             <Card className="card-elevated">
@@ -633,32 +653,8 @@ export default function TicketDetail() {
         </TabsContent>
 
         <TabsContent value="repair" className="space-y-4">
-          <Card className="card-elevated">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                Interne Notizen
-              </CardTitle>
-              <CardDescription>Nur für Mitarbeiter sichtbar</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Textarea
-                placeholder="Interne Notizen zur Reparatur..."
-                value={internalNote || ticket.internal_notes || ''}
-                onChange={(e) => setInternalNote(e.target.value)}
-                rows={4}
-              />
-              <Button 
-                onClick={() => updateNotesMutation.mutate()}
-                disabled={updateNotesMutation.isPending}
-              >
-                {updateNotesMutation.isPending && (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                )}
-                Notiz speichern
-              </Button>
-            </CardContent>
-          </Card>
+          {/* Internal Notes - Now using chronological component */}
+          <TicketInternalNotes ticketId={id!} />
         </TabsContent>
 
         {/* Quality Checklist Tab */}
@@ -871,59 +867,58 @@ export default function TicketDetail() {
         </TabsContent>
 
         <TabsContent value="communication" className="space-y-4">
-          <Card className="card-elevated">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                Kundenkommunikation
-              </CardTitle>
-              <CardDescription>
-                Nachrichten vom Kunden und wichtige Kommunikation
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const customerMessages = statusHistory?.filter((entry: any) => 
-                  entry.note?.startsWith('[Kundennachricht]')
-                ) || [];
-                
-                if (customerMessages.length === 0) {
-                  return (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Keine Kundennachrichten vorhanden
-                    </p>
-                  );
-                }
-                
-                return (
-                  <div className="space-y-4">
-                    {customerMessages.map((entry: any) => (
-                      <div key={entry.id} className="p-4 rounded-lg bg-muted/50 border border-border">
-                        <div className="flex items-start gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <User className="h-4 w-4 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium">Kundenanfrage</span>
-                              <span className="text-xs text-muted-foreground">
-                                {format(new Date(entry.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
-                              </span>
-                            </div>
-                            <p className="text-sm">
-                              {entry.note?.replace('[Kundennachricht] ', '')}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+          {/* KVA Status Card */}
+          {ticket.kva_required && (
+            <Card className="card-elevated">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Euro className="h-5 w-5 text-amber-500" />
+                  KVA-Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`p-4 rounded-lg ${
+                  ticket.kva_approved === true 
+                    ? 'bg-success/10 border-success/30' 
+                    : ticket.kva_approved === false
+                    ? 'bg-destructive/10 border-destructive/30'
+                    : 'bg-warning/10 border-warning/30'
+                } border`}>
+                  <div className="flex items-center gap-2">
+                    {ticket.kva_approved === true ? (
+                      <>
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                        <span className="font-medium text-success">KVA angenommen</span>
+                      </>
+                    ) : ticket.kva_approved === false ? (
+                      <>
+                        <AlertTriangle className="h-5 w-5 text-destructive" />
+                        <span className="font-medium text-destructive">KVA abgelehnt</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="h-5 w-5 text-warning" />
+                        <span className="font-medium text-warning">KVA ausstehend</span>
+                      </>
+                    )}
                   </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
+                  {ticket.kva_approved_at && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Entschieden am {format(new Date(ticket.kva_approved_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                    </p>
+                  )}
+                  {ticket.estimated_price && (
+                    <p className="text-lg font-bold mt-2">{ticket.estimated_price.toFixed(2)} €</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Messages Component */}
+          <TicketMessages ticketId={id!} />
           
-          {/* Customer Email Info */}
+          {/* Customer Tracking Info */}
           {ticket.customer?.email && (
             <Card className="card-elevated">
               <CardHeader>

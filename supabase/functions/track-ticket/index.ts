@@ -225,17 +225,27 @@ Deno.serve(async (req) => {
         note: kva_approved ? 'KVA vom Kunden angenommen' : 'KVA vom Kunden abgelehnt',
       });
 
-      // Create notification for employees
-      await supabase.from('notification_logs').insert({
-        channel: 'EMAIL',
-        trigger: kva_approved ? 'KVA_APPROVED' : 'KVA_REJECTED',
-        repair_ticket_id: ticket.id,
-        related_ticket_id: ticket.id,
-        type: 'KVA_DECISION',
-        title: kva_approved ? 'KVA angenommen' : 'KVA abgelehnt',
-        message: `Kunde hat KVA für ${cleanTicketNumber} ${kva_approved ? 'angenommen' : 'abgelehnt'}.`,
-        is_read: false,
-      });
+      // Create notifications for all employees with relevant roles
+      const { data: employees } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['ADMIN', 'THEKE', 'TECHNIKER']);
+
+      if (employees && employees.length > 0) {
+        const notifications = employees.map(emp => ({
+          channel: 'EMAIL' as const,
+          trigger: kva_approved ? 'KVA_APPROVED' as const : 'KVA_REJECTED' as const,
+          repair_ticket_id: ticket.id,
+          related_ticket_id: ticket.id,
+          user_id: emp.user_id,
+          type: 'KVA_DECISION',
+          title: kva_approved ? 'KVA angenommen' : 'KVA abgelehnt',
+          message: `Kunde hat KVA für ${cleanTicketNumber} ${kva_approved ? 'angenommen' : 'abgelehnt'}.`,
+          is_read: false,
+        }));
+
+        await supabase.from('notification_logs').insert(notifications);
+      }
 
       console.log('KVA decision recorded:', { ticket_number: cleanTicketNumber, approved: kva_approved });
 
@@ -278,17 +288,27 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Create notification for employees
-      await supabase.from('notification_logs').insert({
-        channel: 'EMAIL',
-        trigger: 'TICKET_CREATED',
-        repair_ticket_id: ticket.id,
-        related_ticket_id: ticket.id,
-        type: 'NEW_CUSTOMER_MESSAGE',
-        title: 'Neue Kundennachricht',
-        message: `Neue Nachricht vom Kunden für ${cleanTicketNumber}: ${cleanMessage.substring(0, 100)}...`,
-        is_read: false,
-      });
+      // Create notifications for all employees with relevant roles
+      const { data: employees } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['ADMIN', 'THEKE', 'TECHNIKER']);
+
+      if (employees && employees.length > 0) {
+        const notifications = employees.map(emp => ({
+          channel: 'EMAIL' as const,
+          trigger: 'TICKET_CREATED' as const,
+          repair_ticket_id: ticket.id,
+          related_ticket_id: ticket.id,
+          user_id: emp.user_id,
+          type: 'NEW_CUSTOMER_MESSAGE',
+          title: 'Neue Kundennachricht',
+          message: `Neue Nachricht vom Kunden für ${cleanTicketNumber}: ${cleanMessage.substring(0, 100)}${cleanMessage.length > 100 ? '...' : ''}`,
+          is_read: false,
+        }));
+
+        await supabase.from('notification_logs').insert(notifications);
+      }
 
       console.log('Customer message sent:', { ticket_number: cleanTicketNumber, message_length: cleanMessage.length });
 
