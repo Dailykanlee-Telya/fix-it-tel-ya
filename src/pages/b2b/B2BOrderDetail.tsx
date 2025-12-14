@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useB2BAuth } from '@/hooks/useB2BAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Loader2, ArrowLeft, Smartphone, Laptop, Watch, Tablet, HelpCircle, Pack
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { STATUS_LABELS, STATUS_COLORS, TicketStatus, DeviceType, DEVICE_TYPE_LABELS } from '@/types/database';
+import { B2BPriceAdjustment } from '@/components/b2b/B2BPriceAdjustment';
 
 const deviceIcons: Record<DeviceType, React.ComponentType<{ className?: string }>> = {
   HANDY: Smartphone,
@@ -23,6 +24,7 @@ export default function B2BOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const { b2bPartnerId } = useB2BAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['b2b-order', id],
@@ -196,6 +198,17 @@ export default function B2BOrderDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {/* B2B Price Adjustment - Only show if KVA is required */}
+        {order.kva_required && (
+          <B2BPriceAdjustment
+            ticketId={order.id}
+            internalPrice={order.internal_price}
+            endcustomerPrice={order.endcustomer_price}
+            endcustomerPriceReleased={order.endcustomer_price_released || false}
+            onUpdate={() => queryClient.invalidateQueries({ queryKey: ['b2b-order', id] })}
+          />
+        )}
 
         {/* Error Description */}
         <Card className="md:col-span-2">
