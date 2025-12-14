@@ -251,7 +251,17 @@ Deno.serve(async (req) => {
       
       const arrayBuffer = await fileResponse.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
-      base64Data = btoa(String.fromCharCode(...uint8Array));
+      
+      // Convert to base64 in chunks to avoid stack overflow
+      const chunkSize = 8192;
+      let binaryString = '';
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+        binaryString += String.fromCharCode.apply(null, chunk as unknown as number[]);
+      }
+      base64Data = btoa(binaryString);
+      
+      console.log('File fetched, size:', uint8Array.length, 'base64 length:', base64Data.length);
       
       // Determine MIME type
       const contentType = fileResponse.headers.get('content-type') || '';
