@@ -50,6 +50,7 @@ import TicketDocuments from '@/components/documents/TicketDocuments';
 import TicketMessages from '@/components/tickets/TicketMessages';
 import TicketPhotos from '@/components/tickets/TicketPhotos';
 import TicketInternalNotes from '@/components/tickets/TicketInternalNotes';
+import { KvaFeeInput } from '@/components/tickets/KvaFeeInput';
 
 const STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   NEU_EINGEGANGEN: ['IN_DIAGNOSE', 'STORNIERT'],
@@ -910,9 +911,31 @@ export default function TicketDetail() {
                   {ticket.estimated_price && (
                     <p className="text-lg font-bold mt-2">{ticket.estimated_price.toFixed(2)} €</p>
                   )}
+                  {ticket.disposal_option && (
+                    <p className="text-sm mt-2">
+                      <span className="text-muted-foreground">Entsorgung: </span>
+                      {ticket.disposal_option === 'KOSTENLOS_ENTSORGEN' ? 'Kostenlose Entsorgung' : 'Rücksendung'}
+                    </p>
+                  )}
+                  {ticket.kva_fee_applicable && ticket.kva_fee_amount && (
+                    <p className="text-sm mt-1">
+                      <span className="text-muted-foreground">KVA-Gebühr: </span>
+                      <span className="font-medium">{ticket.kva_fee_amount.toFixed(2)} €</span>
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* KVA Fee Input for Staff */}
+          {ticket.kva_required && (
+            <KvaFeeInput
+              ticketId={ticket.id}
+              currentFeeAmount={ticket.kva_fee_amount}
+              currentFeeApplicable={ticket.kva_fee_applicable}
+              onUpdate={() => queryClient.invalidateQueries({ queryKey: ['ticket', id] })}
+            />
           )}
 
           {/* Messages Component */}
