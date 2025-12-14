@@ -35,7 +35,7 @@ export default function B2BShipments() {
         .order('created_at', { ascending: false });
 
       if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+        query = query.eq('status', statusFilter as B2BShipmentStatus);
       }
 
       const { data, error } = await query;

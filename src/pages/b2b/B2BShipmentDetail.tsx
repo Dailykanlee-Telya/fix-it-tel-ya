@@ -11,8 +11,9 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, ArrowLeft, Package, Truck, FileText, Download, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { B2BShipmentStatus, B2B_SHIPMENT_STATUS_LABELS, B2B_SHIPMENT_STATUS_COLORS, TELYA_ADDRESS } from '@/types/b2b';
+import { B2BShipmentStatus, B2B_SHIPMENT_STATUS_LABELS, B2B_SHIPMENT_STATUS_COLORS, TELYA_ADDRESS, ReturnAddress } from '@/types/b2b';
 import { STATUS_LABELS, STATUS_COLORS, TicketStatus } from '@/types/database';
+import { Json } from '@/integrations/supabase/types';
 
 export default function B2BShipmentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -88,11 +89,17 @@ export default function B2BShipmentDetail() {
   const printPackingSlip = () => {
     if (!shipment || !b2bPartner) return;
 
-    const senderAddress = shipment.sender_address || {
+    const rawAddress = shipment.sender_address as Record<string, unknown> | null;
+    const senderAddress: ReturnAddress = rawAddress ? {
+      name: rawAddress.name as string | undefined,
+      street: rawAddress.street as string | undefined,
+      zip: rawAddress.zip as string | undefined,
+      city: rawAddress.city as string | undefined,
+    } : {
       name: b2bPartner.name,
-      street: b2bPartner.street,
-      zip: b2bPartner.zip,
-      city: b2bPartner.city,
+      street: b2bPartner.street ?? undefined,
+      zip: b2bPartner.zip ?? undefined,
+      city: b2bPartner.city ?? undefined,
     };
 
     const printWindow = window.open('', '_blank');
@@ -179,11 +186,17 @@ export default function B2BShipmentDetail() {
   const printDHLLabel = () => {
     if (!shipment || !b2bPartner) return;
 
-    const senderAddress = shipment.sender_address || {
+    const rawAddress = shipment.sender_address as Record<string, unknown> | null;
+    const senderAddress: ReturnAddress = rawAddress ? {
+      name: rawAddress.name as string | undefined,
+      street: rawAddress.street as string | undefined,
+      zip: rawAddress.zip as string | undefined,
+      city: rawAddress.city as string | undefined,
+    } : {
       name: b2bPartner.name,
-      street: b2bPartner.street,
-      zip: b2bPartner.zip,
-      city: b2bPartner.city,
+      street: b2bPartner.street ?? undefined,
+      zip: b2bPartner.zip ?? undefined,
+      city: b2bPartner.city ?? undefined,
     };
 
     const printWindow = window.open('', '_blank');

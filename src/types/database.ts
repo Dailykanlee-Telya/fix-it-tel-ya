@@ -1,6 +1,6 @@
 // Custom types for the repair management system
 
-export type AppRole = 'ADMIN' | 'THEKE' | 'TECHNIKER' | 'BUCHHALTUNG' | 'FILIALLEITER';
+export type AppRole = 'ADMIN' | 'THEKE' | 'TECHNIKER' | 'BUCHHALTUNG' | 'FILIALLEITER' | 'B2B_ADMIN' | 'B2B_USER';
 
 export type DeviceType = 'HANDY' | 'TABLET' | 'LAPTOP' | 'SMARTWATCH' | 'OTHER';
 
@@ -53,6 +53,7 @@ export interface Profile {
   name: string;
   email: string;
   location_id?: string;
+  b2b_partner_id?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -211,4 +212,6 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   TECHNIKER: 'Techniker',
   BUCHHALTUNG: 'Buchhaltung',
   FILIALLEITER: 'Filialleiter',
+  B2B_ADMIN: 'B2B-Administrator',
+  B2B_USER: 'B2B-Benutzer',
 };

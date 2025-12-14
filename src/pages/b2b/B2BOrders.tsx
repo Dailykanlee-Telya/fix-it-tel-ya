@@ -41,7 +41,7 @@ export default function B2BOrders() {
         .order('created_at', { ascending: false });
 
       if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+        query = query.eq('status', statusFilter as TicketStatus);
       }
 
       const { data, error } = await query;
