@@ -10,6 +10,7 @@ interface TrackRequest {
   ticket_number: string;
   tracking_token: string;
   kva_approved?: boolean;
+  disposal_option?: 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN';
   message?: string;
 }
 
@@ -96,7 +97,7 @@ Deno.serve(async (req) => {
     // Verify ticket exists and token matches
     const { data: ticket, error: ticketError } = await supabase
       .from('repair_tickets')
-      .select('id, ticket_number, status, kva_token, kva_required, kva_approved, kva_approved_at, estimated_price, created_at, updated_at, error_description_text, device_id, location_id')
+      .select('id, ticket_number, status, kva_token, kva_required, kva_approved, kva_approved_at, estimated_price, created_at, updated_at, error_description_text, device_id, location_id, is_b2b, endcustomer_price, endcustomer_price_released')
       .eq('ticket_number', cleanTicketNumber)
       .maybeSingle();
 
@@ -168,7 +169,10 @@ Deno.serve(async (req) => {
           kva_required: ticket.kva_required,
           kva_approved: ticket.kva_approved,
           kva_approved_at: ticket.kva_approved_at,
-          estimated_price: ticket.estimated_price,
+          estimated_price: ticket.is_b2b ? null : ticket.estimated_price,
+          endcustomer_price: ticket.is_b2b && ticket.endcustomer_price_released ? ticket.endcustomer_price : null,
+          endcustomer_price_released: ticket.endcustomer_price_released,
+          is_b2b: ticket.is_b2b,
           device: device ? { brand: device.brand, model: device.model, device_type: device.device_type } : null,
           location: location ? { name: location.name } : null,
           status_history: filteredHistory
@@ -200,13 +204,20 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Update ticket with KVA decision
+      // Update ticket with KVA decision and disposal option
+      const updateData: Record<string, any> = {
+        kva_approved: kva_approved,
+        kva_approved_at: new Date().toISOString(),
+      };
+      
+      // Store disposal option if rejecting
+      if (!kva_approved && body.disposal_option) {
+        updateData.disposal_option = body.disposal_option;
+      }
+
       const { error: updateError } = await supabase
         .from('repair_tickets')
-        .update({
-          kva_approved: kva_approved,
-          kva_approved_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', ticket.id);
 
       if (updateError) {

@@ -69,6 +69,10 @@ export default function Intake() {
     marketing_consent: false,
   });
 
+  // Notification opt-ins
+  const [emailOptIn, setEmailOptIn] = useState(true);
+  const [smsOptIn, setSmsOptIn] = useState(false);
+
   // Device state
   const [device, setDevice] = useState({
     device_type: 'HANDY' as DeviceType,
@@ -102,10 +106,15 @@ export default function Intake() {
   // Legal
   const [legalAck, setLegalAck] = useState(false);
 
-  // Location
+  // Location - preselect from user's default
   const [locationId, setLocationId] = useState('');
 
-  // Search customers
+  // Set default location from profile
+  React.useEffect(() => {
+    if (profile?.default_location_id && !locationId) {
+      setLocationId(profile.default_location_id);
+    }
+  }, [profile?.default_location_id]);
   const { data: customers, isLoading: searchLoading } = useQuery({
     queryKey: ['customers-search', customerSearch],
     queryFn: async () => {
@@ -211,7 +220,7 @@ export default function Intake() {
         accessoriesNote,
       ].filter(Boolean).join(', ');
 
-      // Create ticket with tracking token
+      // Create ticket with tracking token and opt-ins
       const { data: ticketData, error: ticketError } = await supabase
         .from('repair_tickets')
         .insert({
@@ -230,6 +239,8 @@ export default function Intake() {
           legal_notes_ack: legalAck,
           kva_required: repair.price_mode === 'KVA',
           kva_token: kvaToken,
+          email_opt_in: emailOptIn,
+          sms_opt_in: smsOptIn,
         })
         .select()
         .single();
@@ -815,6 +826,44 @@ export default function Intake() {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Notification Opt-Ins */}
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              Benachrichtigungen
+            </CardTitle>
+            <CardDescription>Wie soll der Kunde über den Reparaturstatus informiert werden?</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start space-x-2">
+              <Checkbox
+                id="email_opt_in"
+                checked={emailOptIn}
+                onCheckedChange={(checked) => setEmailOptIn(checked === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="email_opt_in" className="text-sm font-normal cursor-pointer leading-relaxed">
+                Ich möchte per <strong>E-Mail</strong> über den Reparaturstatus informiert werden.
+              </Label>
+            </div>
+            <div className="flex items-start space-x-2">
+              <Checkbox
+                id="sms_opt_in"
+                checked={smsOptIn}
+                onCheckedChange={(checked) => setSmsOptIn(checked === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="sms_opt_in" className="text-sm font-normal cursor-pointer leading-relaxed">
+                Ich möchte per <strong>SMS</strong> über den Reparaturstatus informiert werden.
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Status-Updates werden nur gesendet, wenn Sie der entsprechenden Benachrichtigungsart zugestimmt haben.
+            </p>
           </CardContent>
         </Card>
 

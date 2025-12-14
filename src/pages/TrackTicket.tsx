@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search,
@@ -19,8 +20,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
-  History,
   AlertTriangle,
+  Truck,
+  Trash2,
 } from 'lucide-react';
 import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { format } from 'date-fns';
@@ -36,6 +38,9 @@ interface TicketData {
   kva_approved: boolean | null;
   kva_approved_at: string | null;
   estimated_price: number | null;
+  endcustomer_price: number | null;
+  endcustomer_price_released: boolean;
+  is_b2b: boolean;
   device: { brand: string; model: string; device_type: string } | null;
   location: { name: string } | null;
   status_history: Array<{
@@ -46,6 +51,22 @@ interface TicketData {
   }>;
 }
 
+// Status timeline steps (simplified for customer view)
+const STATUS_TIMELINE: { status: TicketStatus; label: string; icon: React.ComponentType<any> }[] = [
+  { status: 'NEU_EINGEGANGEN', label: 'Eingegangen', icon: Package },
+  { status: 'IN_DIAGNOSE', label: 'In Diagnose', icon: Search },
+  { status: 'WARTET_AUF_TEIL_ODER_FREIGABE', label: 'KVA / Ersatzteil', icon: Clock },
+  { status: 'IN_REPARATUR', label: 'In Reparatur', icon: Wrench },
+  { status: 'FERTIG_ZUR_ABHOLUNG', label: 'Fertig', icon: CheckCircle2 },
+];
+
+const getStatusIndex = (status: TicketStatus): number => {
+  const index = STATUS_TIMELINE.findIndex(s => s.status === status);
+  if (status === 'ABGEHOLT') return STATUS_TIMELINE.length;
+  if (status === 'STORNIERT') return -1;
+  return index >= 0 ? index : 0;
+};
+
 export default function TrackTicket() {
   const { toast } = useToast();
   const [ticketNumber, setTicketNumber] = useState('');
@@ -54,6 +75,7 @@ export default function TrackTicket() {
   const [submitting, setSubmitting] = useState(false);
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [customerMessage, setCustomerMessage] = useState('');
+  const [disposalOption, setDisposalOption] = useState<'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN'>('ZURUECKSENDEN');
 
   const callTrackingApi = async (action: string, extraData: Record<string, any> = {}) => {
     const response = await supabase.functions.invoke('track-ticket', {
@@ -100,7 +122,12 @@ export default function TrackTicket() {
     setSubmitting(true);
 
     try {
-      const result = await callTrackingApi('kva_decision', { kva_approved: approved });
+      const extraData: Record<string, any> = { kva_approved: approved };
+      if (!approved) {
+        extraData.disposal_option = disposalOption;
+      }
+      
+      const result = await callTrackingApi('kva_decision', extraData);
       
       setTicket({ 
         ...ticket, 
@@ -112,7 +139,9 @@ export default function TrackTicket() {
         title: approved ? 'KVA angenommen' : 'KVA abgelehnt',
         description: approved 
           ? 'Vielen Dank! Wir werden die Reparatur durchführen.' 
-          : 'Ihre Ablehnung wurde registriert. Wir werden Sie kontaktieren.',
+          : disposalOption === 'KOSTENLOS_ENTSORGEN'
+            ? 'Ihre Ablehnung wurde registriert. Das Gerät wird kostenlos entsorgt.'
+            : 'Ihre Ablehnung wurde registriert. Das Gerät wird zurückgesendet.',
       });
     } catch (error: any) {
       toast({
@@ -152,100 +181,78 @@ export default function TrackTicket() {
     }
   };
 
-  const getStatusInfo = (status: TicketStatus) => {
-    const statusConfig: Record<TicketStatus, { icon: any; color: string; description: string }> = {
-      NEU_EINGEGANGEN: {
-        icon: Clock,
-        color: 'text-primary',
-        description: 'Ihr Gerät wurde entgegengenommen und wartet auf die Diagnose.',
-      },
-      IN_DIAGNOSE: {
-        icon: Search,
-        color: 'text-purple-500',
-        description: 'Unser Techniker analysiert gerade den Schaden.',
-      },
-      WARTET_AUF_TEIL_ODER_FREIGABE: {
-        icon: Package,
-        color: 'text-amber-500',
-        description: 'Wir warten auf benötigte Ersatzteile oder Ihre Freigabe für den Kostenvoranschlag.',
-      },
-      IN_REPARATUR: {
-        icon: Wrench,
-        color: 'text-cyan-500',
-        description: 'Die Reparatur ist in vollem Gange.',
-      },
-      FERTIG_ZUR_ABHOLUNG: {
-        icon: CheckCircle2,
-        color: 'text-emerald-500',
-        description: 'Ihr Gerät ist fertig und wartet auf Sie!',
-      },
-      ABGEHOLT: {
-        icon: CheckCircle2,
-        color: 'text-emerald-500',
-        description: 'Das Gerät wurde abgeholt. Vielen Dank!',
-      },
-      STORNIERT: {
-        icon: Clock,
-        color: 'text-muted-foreground',
-        description: 'Dieser Auftrag wurde storniert.',
-      },
-    };
+  const currentStatusIndex = ticket ? getStatusIndex(ticket.status) : -1;
 
-    return statusConfig[status] || statusConfig.NEU_EINGEGANGEN;
+  // Determine which price to show
+  const getDisplayPrice = (): number | null => {
+    if (!ticket) return null;
+    // For B2B orders, only show price if explicitly released
+    if (ticket.is_b2b) {
+      if (ticket.endcustomer_price_released && ticket.endcustomer_price != null) {
+        return ticket.endcustomer_price;
+      }
+      return null; // Don't show any price for B2B if not released
+    }
+    // For B2C, show estimated_price
+    return ticket.estimated_price;
   };
 
+  const displayPrice = getDisplayPrice();
+  const shouldShowKVA = ticket?.kva_required && (!ticket.is_b2b || ticket.endcustomer_price_released);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Logo */}
+        {/* Header */}
         <div className="flex flex-col items-center mb-8">
-          <div className="h-16 w-16 rounded-2xl gradient-primary flex items-center justify-center mb-4 shadow-lg">
-            <Wrench className="h-8 w-8 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">Telya Reparatur</h1>
-          <p className="text-muted-foreground mt-1">Reparatur-Status prüfen</p>
+          <img 
+            src="/telya-logo.png" 
+            alt="Telya Logo" 
+            className="h-16 w-16 rounded-2xl shadow-lg mb-4"
+          />
+          <h1 className="text-3xl font-bold text-foreground text-center">Reparaturstatus abfragen</h1>
+          <p className="text-muted-foreground mt-2 text-center">
+            Geben Sie Ihre Auftragsdaten ein, um den Status zu prüfen
+          </p>
         </div>
 
         {/* Search Form */}
         <Card className="shadow-xl border-0 mb-6">
-          <CardHeader>
-            <CardTitle>Auftrag suchen</CardTitle>
-            <CardDescription>
-              Geben Sie Ihre Auftragsnummer und den Tracking-Code aus Ihrer Bestätigungs-E-Mail ein.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <form onSubmit={handleSearch} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="ticket">Auftragsnummer</Label>
+                <Label htmlFor="ticket" className="text-base font-medium">Auftragsnummer</Label>
                 <Input
                   id="ticket"
-                  placeholder="TELYA-20241210-0001"
+                  placeholder="z.B. TELYA-20241210-0001"
                   value={ticketNumber}
                   onChange={(e) => setTicketNumber(e.target.value)}
                   required
+                  className="h-12 text-lg"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="token">Tracking-Code</Label>
+                <Label htmlFor="token" className="text-base font-medium">Tracking-Code</Label>
                 <Input
                   id="token"
-                  placeholder="Ihr Tracking-Code aus der E-Mail"
+                  placeholder="8-stelliger Code aus Ihrer Bestätigung"
                   value={trackingToken}
-                  onChange={(e) => setTrackingToken(e.target.value)}
+                  onChange={(e) => setTrackingToken(e.target.value.toUpperCase())}
                   required
+                  className="h-12 text-lg uppercase"
+                  maxLength={8}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
                 {loading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Suche...
                   </>
                 ) : (
                   <>
-                    <Search className="mr-2 h-4 w-4" />
-                    Status prüfen
+                    <Search className="mr-2 h-5 w-5" />
+                    Status anzeigen
                   </>
                 )}
               </Button>
@@ -256,61 +263,121 @@ export default function TrackTicket() {
         {/* Result */}
         {ticket && (
           <div className="space-y-6 animate-slide-up">
-            {/* Status Card */}
+            {/* Status Timeline */}
             <Card className="shadow-xl border-0">
-              <CardHeader>
+              <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-mono">{ticket.ticket_number}</CardTitle>
+                  {ticket.status === 'STORNIERT' && (
+                    <span className="px-3 py-1 rounded-full bg-destructive/10 text-destructive text-sm font-medium">
+                      Storniert
+                    </span>
+                  )}
+                  {ticket.status === 'ABGEHOLT' && (
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-sm font-medium">
+                      Abgeholt
+                    </span>
+                  )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Status */}
-                <div className="text-center py-6 rounded-lg bg-muted/50">
-                  {(() => {
-                    const statusInfo = getStatusInfo(ticket.status);
-                    const StatusIcon = statusInfo.icon;
-                    return (
-                      <>
-                        <StatusIcon className={`h-12 w-12 mx-auto mb-3 ${statusInfo.color}`} />
-                        <h3 className="text-xl font-semibold mb-2">
-                          {STATUS_LABELS[ticket.status]}
-                        </h3>
-                        <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                          {statusInfo.description}
-                        </p>
-                      </>
-                    );
-                  })()}
+              <CardContent className="pt-4">
+                {/* Visual Timeline */}
+                {ticket.status !== 'STORNIERT' && (
+                  <div className="relative">
+                    {/* Progress bar background */}
+                    <div className="absolute top-5 left-0 right-0 h-1 bg-muted rounded-full" />
+                    {/* Progress bar filled */}
+                    <div 
+                      className="absolute top-5 left-0 h-1 bg-primary rounded-full transition-all duration-500"
+                      style={{ 
+                        width: `${Math.min(100, (currentStatusIndex / (STATUS_TIMELINE.length - 1)) * 100)}%` 
+                      }}
+                    />
+                    
+                    {/* Timeline steps */}
+                    <div className="relative flex justify-between">
+                      {STATUS_TIMELINE.map((step, index) => {
+                        const isCompleted = index < currentStatusIndex;
+                        const isCurrent = index === currentStatusIndex;
+                        const StepIcon = step.icon;
+                        
+                        return (
+                          <div key={step.status} className="flex flex-col items-center">
+                            <div 
+                              className={`h-10 w-10 rounded-full flex items-center justify-center transition-all ${
+                                isCompleted 
+                                  ? 'bg-primary text-primary-foreground' 
+                                  : isCurrent 
+                                    ? 'bg-primary text-primary-foreground ring-4 ring-primary/30' 
+                                    : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {isCompleted ? (
+                                <CheckCircle2 className="h-5 w-5" />
+                              ) : (
+                                <StepIcon className="h-5 w-5" />
+                              )}
+                            </div>
+                            <span className={`text-xs mt-2 text-center max-w-[60px] ${
+                              isCurrent ? 'font-semibold text-foreground' : 'text-muted-foreground'
+                            }`}>
+                              {step.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Current Status Description */}
+                <div className="mt-8 p-4 rounded-lg bg-muted/50 text-center">
+                  <p className="font-semibold text-lg">
+                    {STATUS_LABELS[ticket.status]}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Letzte Aktualisierung: {format(new Date(ticket.updated_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                  </p>
                 </div>
-
-                {/* Device Info */}
-                {ticket.device && (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                    <Smartphone className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{ticket.device.brand} {ticket.device.model}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {ticket.error_description_text || 'Keine Beschreibung'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Location */}
-                {ticket.location && (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                    <MapPin className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{ticket.location.name}</p>
-                      <p className="text-sm text-muted-foreground">Abholstandort</p>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
+            {/* Device & Location Info */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {ticket.device && (
+                <Card className="shadow-lg border-0">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Smartphone className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{ticket.device.brand} {ticket.device.model}</p>
+                        <p className="text-sm text-muted-foreground">Ihr Gerät</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {ticket.location && (
+                <Card className="shadow-lg border-0">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                        <MapPin className="h-5 w-5 text-emerald-500" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{ticket.location.name}</p>
+                        <p className="text-sm text-muted-foreground">Abholstandort</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
             {/* KVA Section */}
-            {ticket.kva_required && (
+            {shouldShowKVA && (
               <Card className="shadow-xl border-0">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -325,15 +392,40 @@ export default function TrackTicket() {
                         <p className="text-sm mb-2">
                           Für Ihre Reparatur liegt ein Kostenvoranschlag vor.
                         </p>
-                        {ticket.estimated_price && (
+                        {displayPrice != null && (
                           <p className="text-2xl font-bold text-amber-600">
-                            {ticket.estimated_price.toFixed(2)} €
+                            {displayPrice.toFixed(2)} €
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground mt-2">
                           Bitte bestätigen Sie, ob wir die Reparatur zu diesem Preis durchführen sollen.
                         </p>
                       </div>
+
+                      {/* Disposal options shown when rejecting */}
+                      <div className="p-4 rounded-lg bg-muted/50">
+                        <p className="text-sm font-medium mb-3">Falls Sie den KVA ablehnen möchten:</p>
+                        <RadioGroup 
+                          value={disposalOption} 
+                          onValueChange={(v) => setDisposalOption(v as 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN')}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="ZURUECKSENDEN" id="return" />
+                            <Label htmlFor="return" className="flex items-center gap-2 cursor-pointer">
+                              <Truck className="h-4 w-4" />
+                              Gerät zurücksenden
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <RadioGroupItem value="KOSTENLOS_ENTSORGEN" id="dispose" />
+                            <Label htmlFor="dispose" className="flex items-center gap-2 cursor-pointer">
+                              <Trash2 className="h-4 w-4" />
+                              Gerät kostenlos entsorgen
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+
                       <div className="flex gap-3">
                         <Button
                           className="flex-1 gap-2"
@@ -373,43 +465,6 @@ export default function TrackTicket() {
                       )}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Status History */}
-            {ticket.status_history && ticket.status_history.length > 0 && (
-              <Card className="shadow-xl border-0">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <History className="h-5 w-5" />
-                    Statusverlauf
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {ticket.status_history.map((entry, index) => (
-                      <div key={entry.id} className="flex gap-3">
-                        <div className="flex flex-col items-center">
-                          <div className={`h-2 w-2 rounded-full ${index === ticket.status_history.length - 1 ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
-                          {index < ticket.status_history.length - 1 && (
-                            <div className="w-px h-full bg-muted-foreground/20 my-1" />
-                          )}
-                        </div>
-                        <div className="flex-1 pb-3">
-                          <p className="text-sm font-medium">
-                            {STATUS_LABELS[entry.new_status]}
-                          </p>
-                          {entry.note && (
-                            <p className="text-sm text-muted-foreground mt-0.5">{entry.note}</p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(entry.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </CardContent>
               </Card>
             )}
