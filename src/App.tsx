@@ -24,6 +24,9 @@ import Settings from "@/pages/Settings";
 import TrackTicket from "@/pages/TrackTicket";
 import UserManagement from "@/pages/UserManagement";
 import B2BPartners from "@/pages/B2BPartners";
+import B2BReturnShipments from "@/pages/B2BReturnShipments";
+import B2BReturnShipmentNew from "@/pages/B2BReturnShipmentNew";
+import B2BReturnShipmentDetail from "@/pages/B2BReturnShipmentDetail";
 import NotFound from "@/pages/NotFound";
 
 // B2B Pages
@@ -114,6 +117,9 @@ function AppRoutes() {
         <Route path="settings" element={<Settings />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="b2b-partners" element={<B2BPartners />} />
+        <Route path="b2b-return-shipments" element={<B2BReturnShipments />} />
+        <Route path="b2b-return-shipments/new" element={<B2BReturnShipmentNew />} />
+        <Route path="b2b-return-shipments/:id" element={<B2BReturnShipmentDetail />} />
       </Route>
 
       {/* B2B Portal routes */}

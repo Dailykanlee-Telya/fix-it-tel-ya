@@ -115,8 +115,10 @@ export type Database = {
           dhl_tracking_number: string | null
           id: string
           notes: string | null
+          recipient_address: Json | null
           sender_address: Json | null
           shipment_number: string
+          shipment_type: string
           status: Database["public"]["Enums"]["b2b_shipment_status"]
           updated_at: string
         }
@@ -128,8 +130,10 @@ export type Database = {
           dhl_tracking_number?: string | null
           id?: string
           notes?: string | null
+          recipient_address?: Json | null
           sender_address?: Json | null
           shipment_number: string
+          shipment_type?: string
           status?: Database["public"]["Enums"]["b2b_shipment_status"]
           updated_at?: string
         }
@@ -141,8 +145,10 @@ export type Database = {
           dhl_tracking_number?: string | null
           id?: string
           notes?: string | null
+          recipient_address?: Json | null
           sender_address?: Json | null
           shipment_number?: string
+          shipment_type?: string
           status?: Database["public"]["Enums"]["b2b_shipment_status"]
           updated_at?: string
         }
@@ -1077,6 +1083,9 @@ export type Database = {
         | "GERAETE_UNTERWEGS"
         | "BEI_TELYA_EINGEGANGEN"
         | "ABGESCHLOSSEN"
+        | "RETOUR_ANGELEGT"
+        | "RETOUR_UNTERWEGS"
+        | "RETOUR_ZUGESTELLT"
       device_type: "HANDY" | "TABLET" | "LAPTOP" | "SMARTWATCH" | "OTHER"
       error_cause:
         | "STURZ"
@@ -1253,6 +1262,9 @@ export const Constants = {
         "GERAETE_UNTERWEGS",
         "BEI_TELYA_EINGEGANGEN",
         "ABGESCHLOSSEN",
+        "RETOUR_ANGELEGT",
+        "RETOUR_UNTERWEGS",
+        "RETOUR_ZUGESTELLT",
       ],
       device_type: ["HANDY", "TABLET", "LAPTOP", "SMARTWATCH", "OTHER"],
       error_cause: [
