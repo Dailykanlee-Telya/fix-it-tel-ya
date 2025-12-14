@@ -23,6 +23,7 @@ import Reports from "@/pages/Reports";
 import Settings from "@/pages/Settings";
 import TrackTicket from "@/pages/TrackTicket";
 import UserManagement from "@/pages/UserManagement";
+import B2BPartners from "@/pages/B2BPartners";
 import NotFound from "@/pages/NotFound";
 
 // B2B Pages
@@ -112,6 +113,7 @@ function AppRoutes() {
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
         <Route path="users" element={<UserManagement />} />
+        <Route path="b2b-partners" element={<B2BPartners />} />
       </Route>
 
       {/* B2B Portal routes */}
