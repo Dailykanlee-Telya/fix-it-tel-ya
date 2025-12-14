@@ -29,6 +29,7 @@ import B2BReturnShipmentNew from "@/pages/B2BReturnShipmentNew";
 import B2BReturnShipmentDetail from "@/pages/B2BReturnShipmentDetail";
 import NotFound from "@/pages/NotFound";
 import Datenschutz from "@/pages/Datenschutz";
+import B2BRegister from "@/pages/B2BRegister";
 
 // B2B Pages
 import B2BDashboard from "@/pages/b2b/B2BDashboard";
@@ -96,6 +97,7 @@ function AppRoutes() {
       <Route path="/auth" element={<Auth />} />
       <Route path="/track" element={<TrackTicket />} />
       <Route path="/datenschutz" element={<Datenschutz />} />
+      <Route path="/b2b-register" element={<B2BRegister />} />
 
       {/* Protected routes */}
       <Route

@@ -192,11 +192,10 @@ export default function Auth() {
                     Noch kein B2B-Partner?
                   </p>
                   <Button variant="outline" className="w-full gap-2" asChild>
-                    <a href="mailto:service@telya.de?subject=B2B-Partner%20Anfrage">
+                    <Link to="/b2b-register">
                       <Building2 className="h-4 w-4" />
                       B2B-Partner werden
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    </Link>
                   </Button>
                 </div>
               </>}
