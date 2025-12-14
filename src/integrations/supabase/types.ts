@@ -52,6 +52,117 @@ export type Database = {
           },
         ]
       }
+      b2b_partners: {
+        Row: {
+          billing_email: string | null
+          city: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          country: string | null
+          created_at: string
+          customer_number: string | null
+          default_return_address: Json | null
+          id: string
+          is_active: boolean
+          name: string
+          street: string | null
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          billing_email?: string | null
+          city?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string | null
+          created_at?: string
+          customer_number?: string | null
+          default_return_address?: Json | null
+          id?: string
+          is_active?: boolean
+          name: string
+          street?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          billing_email?: string | null
+          city?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string | null
+          created_at?: string
+          customer_number?: string | null
+          default_return_address?: Json | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          street?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: []
+      }
+      b2b_shipments: {
+        Row: {
+          b2b_partner_id: string
+          created_at: string
+          created_by: string | null
+          dhl_label_url: string | null
+          dhl_tracking_number: string | null
+          id: string
+          notes: string | null
+          sender_address: Json | null
+          shipment_number: string
+          status: Database["public"]["Enums"]["b2b_shipment_status"]
+          updated_at: string
+        }
+        Insert: {
+          b2b_partner_id: string
+          created_at?: string
+          created_by?: string | null
+          dhl_label_url?: string | null
+          dhl_tracking_number?: string | null
+          id?: string
+          notes?: string | null
+          sender_address?: Json | null
+          shipment_number: string
+          status?: Database["public"]["Enums"]["b2b_shipment_status"]
+          updated_at?: string
+        }
+        Update: {
+          b2b_partner_id?: string
+          created_at?: string
+          created_by?: string | null
+          dhl_label_url?: string | null
+          dhl_tracking_number?: string | null
+          id?: string
+          notes?: string | null
+          sender_address?: Json | null
+          shipment_number?: string
+          status?: Database["public"]["Enums"]["b2b_shipment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "b2b_shipments_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "b2b_shipments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_items: {
         Row: {
           checklist_template_id: string
@@ -479,6 +590,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          b2b_partner_id: string | null
           created_at: string
           email: string
           id: string
@@ -488,6 +600,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          b2b_partner_id?: string | null
           created_at?: string
           email: string
           id: string
@@ -497,6 +610,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          b2b_partner_id?: string | null
           created_at?: string
           email?: string
           id?: string
@@ -506,6 +620,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_location_id_fkey"
             columns: ["location_id"]
@@ -519,9 +640,12 @@ export type Database = {
         Row: {
           accessories: string | null
           assigned_technician_id: string | null
+          auto_approved_limit: number | null
+          b2b_partner_id: string | null
           created_at: string
           customer_id: string
           device_id: string
+          endcustomer_reference: string | null
           error_cause: Database["public"]["Enums"]["error_cause"] | null
           error_code: Database["public"]["Enums"]["error_code"] | null
           error_description_text: string | null
@@ -529,6 +653,7 @@ export type Database = {
           final_price: number | null
           id: string
           internal_notes: string | null
+          is_b2b: boolean
           kva_approved: boolean | null
           kva_approved_at: string | null
           kva_required: boolean
@@ -538,6 +663,7 @@ export type Database = {
           passcode_info: string | null
           price_mode: Database["public"]["Enums"]["price_mode"]
           priority: string | null
+          shipment_id: string | null
           status: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at: string
@@ -545,9 +671,12 @@ export type Database = {
         Insert: {
           accessories?: string | null
           assigned_technician_id?: string | null
+          auto_approved_limit?: number | null
+          b2b_partner_id?: string | null
           created_at?: string
           customer_id: string
           device_id: string
+          endcustomer_reference?: string | null
           error_cause?: Database["public"]["Enums"]["error_cause"] | null
           error_code?: Database["public"]["Enums"]["error_code"] | null
           error_description_text?: string | null
@@ -555,6 +684,7 @@ export type Database = {
           final_price?: number | null
           id?: string
           internal_notes?: string | null
+          is_b2b?: boolean
           kva_approved?: boolean | null
           kva_approved_at?: string | null
           kva_required?: boolean
@@ -564,6 +694,7 @@ export type Database = {
           passcode_info?: string | null
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
+          shipment_id?: string | null
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at?: string
@@ -571,9 +702,12 @@ export type Database = {
         Update: {
           accessories?: string | null
           assigned_technician_id?: string | null
+          auto_approved_limit?: number | null
+          b2b_partner_id?: string | null
           created_at?: string
           customer_id?: string
           device_id?: string
+          endcustomer_reference?: string | null
           error_cause?: Database["public"]["Enums"]["error_cause"] | null
           error_code?: Database["public"]["Enums"]["error_code"] | null
           error_description_text?: string | null
@@ -581,6 +715,7 @@ export type Database = {
           final_price?: number | null
           id?: string
           internal_notes?: string | null
+          is_b2b?: boolean
           kva_approved?: boolean | null
           kva_approved_at?: string | null
           kva_required?: boolean
@@ -590,6 +725,7 @@ export type Database = {
           passcode_info?: string | null
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
+          shipment_id?: string | null
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number?: string
           updated_at?: string
@@ -600,6 +736,13 @@ export type Database = {
             columns: ["assigned_technician_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_tickets_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
             referencedColumns: ["id"]
           },
           {
@@ -621,6 +764,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_tickets_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_shipments"
             referencedColumns: ["id"]
           },
         ]
@@ -899,8 +1049,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_shipment_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
       generate_tracking_token: { Args: never; Returns: string }
+      get_b2b_partner_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -908,10 +1060,23 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_b2b_user: { Args: { _user_id: string }; Returns: boolean }
       is_employee: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "ADMIN" | "THEKE" | "TECHNIKER" | "BUCHHALTUNG" | "FILIALLEITER"
+      app_role:
+        | "ADMIN"
+        | "THEKE"
+        | "TECHNIKER"
+        | "BUCHHALTUNG"
+        | "FILIALLEITER"
+        | "B2B_ADMIN"
+        | "B2B_USER"
+      b2b_shipment_status:
+        | "ANGELEGT"
+        | "GERAETE_UNTERWEGS"
+        | "BEI_TELYA_EINGEGANGEN"
+        | "ABGESCHLOSSEN"
       device_type: "HANDY" | "TABLET" | "LAPTOP" | "SMARTWATCH" | "OTHER"
       error_cause:
         | "STURZ"
@@ -1074,7 +1239,21 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["ADMIN", "THEKE", "TECHNIKER", "BUCHHALTUNG", "FILIALLEITER"],
+      app_role: [
+        "ADMIN",
+        "THEKE",
+        "TECHNIKER",
+        "BUCHHALTUNG",
+        "FILIALLEITER",
+        "B2B_ADMIN",
+        "B2B_USER",
+      ],
+      b2b_shipment_status: [
+        "ANGELEGT",
+        "GERAETE_UNTERWEGS",
+        "BEI_TELYA_EINGEGANGEN",
+        "ABGESCHLOSSEN",
+      ],
       device_type: ["HANDY", "TABLET", "LAPTOP", "SMARTWATCH", "OTHER"],
       error_cause: [
         "STURZ",
