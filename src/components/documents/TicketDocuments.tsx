@@ -8,16 +8,18 @@ import { de } from 'date-fns/locale';
 import telyaLogo from '@/assets/telya-logo.png';
 import { STATUS_LABELS, TicketStatus, DEVICE_TYPE_LABELS, DeviceType, ERROR_CODE_LABELS, ErrorCode } from '@/types/database';
 
-// Company Information
+import { TELYA_ADDRESS } from '@/types/b2b';
+
+// Company Information (using real Telya data)
 const COMPANY_INFO = {
-  name: 'Telya GmbH',
-  address: 'Musterstraße 123, 12345 Musterstadt',
-  phone: '+49 (0) 123 456 789',
-  email: 'info@telya.de',
+  name: TELYA_ADDRESS.name,
+  address: `${TELYA_ADDRESS.street}, ${TELYA_ADDRESS.zip} ${TELYA_ADDRESS.city}`,
+  phone: TELYA_ADDRESS.phone,
+  email: TELYA_ADDRESS.email,
   website: 'www.telya.de',
-  hrb: 'HRB 12345, Amtsgericht Musterstadt',
-  ust_id: 'DE123456789',
-  geschaeftsfuehrer: 'Max Mustermann'
+  hrb: `${TELYA_ADDRESS.hrb}, Amtsgericht Gelsenkirchen`,
+  ust_id: TELYA_ADDRESS.vatId,
+  geschaeftsfuehrer: TELYA_ADDRESS.managingDirector
 };
 interface TicketDocumentsProps {
   ticket: any;
