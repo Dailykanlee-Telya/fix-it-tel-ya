@@ -4,7 +4,12 @@ export type B2BShipmentStatus =
   | 'ANGELEGT' 
   | 'GERAETE_UNTERWEGS' 
   | 'BEI_TELYA_EINGEGANGEN' 
-  | 'ABGESCHLOSSEN';
+  | 'ABGESCHLOSSEN'
+  | 'RETOUR_ANGELEGT'
+  | 'RETOUR_UNTERWEGS'
+  | 'RETOUR_ZUGESTELLT';
+
+export type B2BShipmentType = 'INBOUND' | 'OUTBOUND';
 
 export interface B2BPartner {
   id: string;
@@ -37,10 +42,12 @@ export interface B2BShipment {
   b2b_partner_id: string;
   shipment_number: string;
   status: B2BShipmentStatus;
+  shipment_type: B2BShipmentType;
   created_by: string | null;
   dhl_tracking_number: string | null;
   dhl_label_url: string | null;
   sender_address: ReturnAddress | null;
+  recipient_address: ReturnAddress | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -67,6 +74,9 @@ export const B2B_SHIPMENT_STATUS_LABELS: Record<B2BShipmentStatus, string> = {
   'GERAETE_UNTERWEGS': 'Geräte unterwegs',
   'BEI_TELYA_EINGEGANGEN': 'Bei Telya eingegangen',
   'ABGESCHLOSSEN': 'Abgeschlossen',
+  'RETOUR_ANGELEGT': 'Rücksendung angelegt',
+  'RETOUR_UNTERWEGS': 'Rücksendung unterwegs',
+  'RETOUR_ZUGESTELLT': 'Rücksendung zugestellt',
 };
 
 export const B2B_SHIPMENT_STATUS_COLORS: Record<B2BShipmentStatus, string> = {
@@ -74,6 +84,14 @@ export const B2B_SHIPMENT_STATUS_COLORS: Record<B2BShipmentStatus, string> = {
   'GERAETE_UNTERWEGS': 'bg-blue-100 text-blue-800',
   'BEI_TELYA_EINGEGANGEN': 'bg-amber-100 text-amber-800',
   'ABGESCHLOSSEN': 'bg-green-100 text-green-800',
+  'RETOUR_ANGELEGT': 'bg-purple-100 text-purple-800',
+  'RETOUR_UNTERWEGS': 'bg-indigo-100 text-indigo-800',
+  'RETOUR_ZUGESTELLT': 'bg-emerald-100 text-emerald-800',
+};
+
+export const B2B_SHIPMENT_TYPE_LABELS: Record<B2BShipmentType, string> = {
+  'INBOUND': 'Eingang (Partner → Telya)',
+  'OUTBOUND': 'Rücksendung (Telya → Partner)',
 };
 
 // Company address for shipping labels
