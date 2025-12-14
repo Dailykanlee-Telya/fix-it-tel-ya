@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.send-sms]
 verify_jwt = true
+
+[functions.b2b-register]
+verify_jwt = false
