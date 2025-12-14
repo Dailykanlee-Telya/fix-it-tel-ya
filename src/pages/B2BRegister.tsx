@@ -58,33 +58,17 @@ export default function B2BRegister() {
         notes,
       });
 
-      // Insert into b2b_partners with is_active = false (pending approval)
-      const { error } = await supabase.from('b2b_partners').insert({
-        name: validated.companyName,
-        contact_name: validated.contactName,
-        contact_email: validated.email,
-        contact_phone: validated.phone,
-        street: validated.street,
-        zip: validated.zip,
-        city: validated.city,
-        customer_number: validated.customerNumber || null,
-        is_active: false, // Needs admin approval
-        billing_email: validated.email,
-        default_return_address: {
-          name: validated.companyName,
-          street: validated.street,
-          zip: validated.zip,
-          city: validated.city,
-          country: 'Deutschland',
-        },
+      // Call the edge function to register (bypasses RLS)
+      const { data, error } = await supabase.functions.invoke('b2b-register', {
+        body: validated,
       });
 
-      if (error) {
-        console.error('B2B registration error:', error);
+      if (error || data?.error) {
+        console.error('B2B registration error:', error || data?.error);
         toast({
           variant: 'destructive',
           title: 'Fehler',
-          description: 'Die Registrierung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
+          description: data?.error || 'Die Registrierung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
         });
       } else {
         setSubmitted(true);
