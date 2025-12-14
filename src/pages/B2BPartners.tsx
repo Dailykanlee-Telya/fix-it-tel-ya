@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Plus, Building2, Users, Edit, UserPlus, Search } from 'lucide-react';
+import { Loader2, Plus, Building2, Users, Edit, UserPlus, Search, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -44,6 +44,7 @@ export default function B2BPartners() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAssignUserOpen, setIsAssignUserOpen] = useState(false);
@@ -192,7 +193,47 @@ export default function B2BPartners() {
     },
   });
 
-  const filteredPartners = partners?.filter(p => 
+  // Approve partner mutation
+  const approvePartnerMutation = useMutation({
+    mutationFn: async (partnerId: string) => {
+      const { error } = await supabase
+        .from('b2b_partners')
+        .update({ is_active: true })
+        .eq('id', partnerId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: 'Partner freigegeben', description: 'Der B2B-Partner wurde erfolgreich aktiviert.' });
+      queryClient.invalidateQueries({ queryKey: ['b2b-partners-admin'] });
+    },
+    onError: () => {
+      toast({ title: 'Fehler', description: 'Partner konnte nicht freigegeben werden.', variant: 'destructive' });
+    },
+  });
+
+  // Reject/Delete partner mutation
+  const rejectPartnerMutation = useMutation({
+    mutationFn: async (partnerId: string) => {
+      const { error } = await supabase
+        .from('b2b_partners')
+        .delete()
+        .eq('id', partnerId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: 'Anfrage abgelehnt', description: 'Die Partner-Anfrage wurde gelöscht.' });
+      queryClient.invalidateQueries({ queryKey: ['b2b-partners-admin'] });
+    },
+    onError: () => {
+      toast({ title: 'Fehler', description: 'Anfrage konnte nicht gelöscht werden.', variant: 'destructive' });
+    },
+  });
+
+  // Filter partners
+  const pendingPartners = partners?.filter(p => !p.is_active) || [];
+  const activePartners = partners?.filter(p => p.is_active) || [];
+
+  const filteredPartners = (activeTab === 'pending' ? pendingPartners : activePartners)?.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.customer_number?.toLowerCase().includes(search.toLowerCase()) ||
     p.city?.toLowerCase().includes(search.toLowerCase())
@@ -326,109 +367,275 @@ export default function B2BPartners() {
         </Dialog>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Suche nach Name, Kundennummer, Stadt..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Pending Requests Alert */}
+      {pendingPartners.length > 0 && activeTab !== 'pending' && (
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  {pendingPartners.length} neue Partner-Anfrage{pendingPartners.length !== 1 ? 'n' : ''}
+                </p>
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  Warten auf Überprüfung und Freigabe
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                className="border-amber-300 hover:bg-amber-100 dark:border-amber-700"
+                onClick={() => setActiveTab('pending')}
+              >
+                Anfragen anzeigen
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Partners Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Partner ({filteredPartners?.length || 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoadingPartners ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          ) : filteredPartners?.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Keine Partner gefunden
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Kundennr.</TableHead>
-                  <TableHead>Ort</TableHead>
-                  <TableHead>Ansprechpartner</TableHead>
-                  <TableHead>Benutzer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Aktionen</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPartners?.map((partner) => {
-                  const userCount = allUsers?.filter(u => u.b2b_partner_id === partner.id).length || 0;
-                  return (
-                    <TableRow key={partner.id}>
-                      <TableCell className="font-medium">{partner.name}</TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {partner.customer_number || '-'}
-                      </TableCell>
-                      <TableCell>{partner.city || '-'}</TableCell>
-                      <TableCell>
-                        {partner.contact_name && (
-                          <div className="text-sm">
-                            <div>{partner.contact_name}</div>
-                            {partner.contact_email && (
-                              <div className="text-muted-foreground">{partner.contact_email}</div>
-                            )}
-                          </div>
-                        )}
-                        {!partner.contact_name && '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{userCount} Benutzer</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={partner.is_active ? 'default' : 'secondary'}>
-                          {partner.is_active ? 'Aktiv' : 'Inaktiv'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedPartner(partner);
-                              setIsEditOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedPartner(partner);
-                              setIsAssignUserOpen(true);
-                            }}
-                          >
-                            <UserPlus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'all' | 'pending')}>
+        <TabsList>
+          <TabsTrigger value="all" className="gap-2">
+            <Building2 className="h-4 w-4" />
+            Aktive Partner ({activePartners.length})
+          </TabsTrigger>
+          <TabsTrigger value="pending" className="gap-2">
+            <Clock className="h-4 w-4" />
+            Ausstehende Anfragen
+            {pendingPartners.length > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 px-1.5">
+                {pendingPartners.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="space-y-4 mt-4">
+          {/* Search */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Suche nach Name, Kundennummer, Stadt..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Active Partners Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Aktive Partner ({filteredPartners?.length || 0})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPartners ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : filteredPartners?.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  Keine aktiven Partner gefunden
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Kundennr.</TableHead>
+                      <TableHead>Ort</TableHead>
+                      <TableHead>Ansprechpartner</TableHead>
+                      <TableHead>Benutzer</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Aktionen</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPartners?.map((partner) => {
+                      const userCount = allUsers?.filter(u => u.b2b_partner_id === partner.id).length || 0;
+                      return (
+                        <TableRow key={partner.id}>
+                          <TableCell className="font-medium">{partner.name}</TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {partner.customer_number || '-'}
+                          </TableCell>
+                          <TableCell>{partner.city || '-'}</TableCell>
+                          <TableCell>
+                            {partner.contact_name && (
+                              <div className="text-sm">
+                                <div>{partner.contact_name}</div>
+                                {partner.contact_email && (
+                                  <div className="text-muted-foreground">{partner.contact_email}</div>
+                                )}
+                              </div>
+                            )}
+                            {!partner.contact_name && '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{userCount} Benutzer</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={partner.is_active ? 'default' : 'secondary'}>
+                              {partner.is_active ? 'Aktiv' : 'Inaktiv'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedPartner(partner);
+                                  setIsEditOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedPartner(partner);
+                                  setIsAssignUserOpen(true);
+                                }}
+                              >
+                                <UserPlus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pending" className="space-y-4 mt-4">
+          {/* Pending Partners */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                Ausstehende Partner-Anfragen ({pendingPartners.length})
+              </CardTitle>
+              <CardDescription>
+                Diese Anfragen wurden über das B2B-Registrierungsformular eingereicht und warten auf Ihre Prüfung.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPartners ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : pendingPartners.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <p className="font-medium">Keine ausstehenden Anfragen</p>
+                  <p className="text-sm">Alle Partner-Anfragen wurden bearbeitet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingPartners.map((partner) => (
+                    <Card key={partner.id} className="border-dashed">
+                      <CardContent className="pt-6">
+                        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <Building2 className="h-5 w-5 text-primary" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-lg">{partner.name}</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  Anfrage vom {format(new Date(partner.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Ansprechpartner</p>
+                                <p className="font-medium">{partner.contact_name || '-'}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">E-Mail</p>
+                                <p className="font-medium">{partner.contact_email || '-'}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Telefon</p>
+                                <p className="font-medium">{partner.contact_phone || '-'}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Adresse</p>
+                                <p className="font-medium">
+                                  {partner.street ? `${partner.street}, ` : ''}
+                                  {partner.zip} {partner.city}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-row lg:flex-col gap-2">
+                            <Button
+                              className="flex-1 lg:flex-none gap-2"
+                              onClick={() => approvePartnerMutation.mutate(partner.id)}
+                              disabled={approvePartnerMutation.isPending}
+                            >
+                              {approvePartnerMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4" />
+                              )}
+                              Freigeben
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="flex-1 lg:flex-none gap-2 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm(`Partner "${partner.name}" wirklich ablehnen und löschen?`)) {
+                                  rejectPartnerMutation.mutate(partner.id);
+                                }
+                              }}
+                              disabled={rejectPartnerMutation.isPending}
+                            >
+                              {rejectPartnerMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <XCircle className="h-4 w-4" />
+                              )}
+                              Ablehnen
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedPartner(partner);
+                                setIsEditOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
 
       {/* Edit Partner Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
