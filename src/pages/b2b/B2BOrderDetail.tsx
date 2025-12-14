@@ -16,7 +16,7 @@ const deviceIcons: Record<DeviceType, React.ComponentType<{ className?: string }
   TABLET: Tablet,
   LAPTOP: Laptop,
   SMARTWATCH: Watch,
-  SONSTIGES: HelpCircle,
+  OTHER: HelpCircle,
 };
 
 export default function B2BOrderDetail() {

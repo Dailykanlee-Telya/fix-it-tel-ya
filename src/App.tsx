@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 // Layouts
 import AppLayout from "@/components/layout/AppLayout";
+import B2BLayout from "@/components/layout/B2BLayout";
 
 // Pages
 import Auth from "@/pages/Auth";
@@ -23,6 +24,15 @@ import Settings from "@/pages/Settings";
 import TrackTicket from "@/pages/TrackTicket";
 import UserManagement from "@/pages/UserManagement";
 import NotFound from "@/pages/NotFound";
+
+// B2B Pages
+import B2BDashboard from "@/pages/b2b/B2BDashboard";
+import B2BOrders from "@/pages/b2b/B2BOrders";
+import B2BOrderNew from "@/pages/b2b/B2BOrderNew";
+import B2BOrderDetail from "@/pages/b2b/B2BOrderDetail";
+import B2BShipments from "@/pages/b2b/B2BShipments";
+import B2BShipmentNew from "@/pages/b2b/B2BShipmentNew";
+import B2BShipmentDetail from "@/pages/b2b/B2BShipmentDetail";
 
 const queryClient = new QueryClient();
 
@@ -102,6 +112,25 @@ function AppRoutes() {
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
         <Route path="users" element={<UserManagement />} />
+      </Route>
+
+      {/* B2B Portal routes */}
+      <Route
+        path="/b2b"
+        element={
+          <ProtectedRoute>
+            <B2BLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/b2b/dashboard" replace />} />
+        <Route path="dashboard" element={<B2BDashboard />} />
+        <Route path="orders" element={<B2BOrders />} />
+        <Route path="orders/new" element={<B2BOrderNew />} />
+        <Route path="orders/:id" element={<B2BOrderDetail />} />
+        <Route path="shipments" element={<B2BShipments />} />
+        <Route path="shipments/new" element={<B2BShipmentNew />} />
+        <Route path="shipments/:id" element={<B2BShipmentDetail />} />
       </Route>
 
       {/* 404 */}
