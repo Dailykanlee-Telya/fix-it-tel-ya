@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Ticket, Wrench, Package, Users, MapPin, BarChart3, Settings, LogOut, Menu, X, ChevronDown, UserCog } from 'lucide-react';
+import { LayoutDashboard, Ticket, Wrench, Package, Users, MapPin, BarChart3, Settings, LogOut, Menu, X, ChevronDown, UserCog, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -50,6 +50,10 @@ const adminNavigation = [{
   name: 'Benutzerverwaltung',
   href: '/users',
   icon: UserCog
+}, {
+  name: 'B2B-Partner',
+  href: '/b2b-partners',
+  icon: Building2
 }];
 export default function AppLayout() {
   const {
