@@ -10,17 +10,26 @@ import { Building2, Mail, Phone, User, MapPin, FileText, Loader2, ArrowLeft, Che
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 
-const b2bRegisterSchema = z.object({
-  companyName: z.string().min(2, 'Firmenname muss mindestens 2 Zeichen haben'),
-  contactName: z.string().min(2, 'Ansprechpartner muss mindestens 2 Zeichen haben'),
-  email: z.string().email('Ungültige E-Mail-Adresse'),
-  phone: z.string().min(6, 'Telefonnummer muss mindestens 6 Zeichen haben'),
-  street: z.string().min(3, 'Straße muss mindestens 3 Zeichen haben'),
-  zip: z.string().min(4, 'PLZ muss mindestens 4 Zeichen haben'),
-  city: z.string().min(2, 'Stadt muss mindestens 2 Zeichen haben'),
-  customerNumber: z.string().optional(),
-  notes: z.string().optional(),
-});
+const b2bRegisterSchema = z
+  .object({
+    companyName: z.string().min(2, 'Firmenname muss mindestens 2 Zeichen haben'),
+    contactName: z.string().min(2, 'Ansprechpartner muss mindestens 2 Zeichen haben'),
+    email: z.string().email('Ungültige E-Mail-Adresse'),
+    phone: z.string().min(6, 'Telefonnummer muss mindestens 6 Zeichen haben'),
+    street: z.string().min(3, 'Straße muss mindestens 3 Zeichen haben'),
+    zip: z.string().min(4, 'PLZ muss mindestens 4 Zeichen haben'),
+    city: z.string().min(2, 'Stadt muss mindestens 2 Zeichen haben'),
+    customerNumber: z.string().optional(),
+    notes: z.string().optional(),
+    password: z
+      .string()
+      .min(8, 'Passwort muss mindestens 8 Zeichen haben'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwörter stimmen nicht überein',
+  });
 
 export default function B2BRegister() {
   const navigate = useNavigate();
@@ -39,6 +48,8 @@ export default function B2BRegister() {
   const [city, setCity] = useState('');
   const [customerNumber, setCustomerNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,11 +67,42 @@ export default function B2BRegister() {
         city,
         customerNumber,
         notes,
+        password,
+        confirmPassword,
       });
 
-      // Call the edge function to register (bypasses RLS)
+      const { password: pw, confirmPassword: _cpw, ...partnerPayload } = validated;
+
+      // Schritt 1: Auth-User anlegen, damit der Partner später ein Login hat
+      const redirectUrl = `${window.location.origin}/auth`;
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: validated.email,
+        password: pw,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            name: validated.contactName,
+            registration_type: 'B2B',
+          },
+        },
+      });
+
+      if (signUpError) {
+        console.error('B2B signup error:', signUpError);
+        toast({
+          variant: 'destructive',
+          title: 'Fehler bei der Kontoerstellung',
+          description:
+            signUpError.message || 'Das Benutzerkonto konnte nicht erstellt werden. Bitte versuchen Sie es erneut.',
+        });
+        return;
+      }
+
+      console.log('B2B signup created user:', signUpData?.user?.id);
+
+      // Schritt 2: B2B-Partner über Edge Function registrieren (bypasst RLS)
       const { data, error } = await supabase.functions.invoke('b2b-register', {
-        body: validated,
+        body: partnerPayload,
       });
 
       if (error || data?.error) {
@@ -68,13 +110,15 @@ export default function B2BRegister() {
         toast({
           variant: 'destructive',
           title: 'Fehler',
-          description: data?.error || 'Die Registrierung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
+          description:
+            data?.error || 'Die Registrierung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
         });
       } else {
         setSubmitted(true);
         toast({
           title: 'Anfrage gesendet',
-          description: 'Ihre B2B-Partner-Anfrage wurde erfolgreich übermittelt.',
+          description:
+            'Ihre B2B-Partner-Anfrage wurde erfolgreich übermittelt. Ihr Zugang wird nach Freigabe aktiviert.',
         });
       }
     } catch (error) {
@@ -286,6 +330,36 @@ export default function B2BRegister() {
                     className="pl-9"
                     disabled={loading}
                   />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Passwort *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                  />
+                  {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Passwort wiederholen *</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={loading}
+                  />
+                  {errors.confirmPassword && (
+                    <p className="text-sm text-destructive">{errors.confirmPassword}</p>
+                  )}
                 </div>
               </div>
 
