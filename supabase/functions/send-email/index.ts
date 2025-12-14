@@ -202,8 +202,9 @@ Deno.serve(async (req) => {
 
     // Handle custom email
     if (type === 'custom' && to_email && subject && customBody) {
+      // Use Resend testing domain until telya.de is verified at https://resend.com/domains
       const { data, error } = await resend.emails.send({
-        from: 'Telya Reparatur <noreply@telya.de>',
+        from: 'Telya Reparatur <onboarding@resend.dev>',
         to: [to_email],
         subject,
         html: customBody,
