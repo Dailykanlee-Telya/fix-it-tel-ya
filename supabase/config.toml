@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.b2b-register]
 verify_jwt = false
+
+[functions.ocr-intake]
+verify_jwt = true

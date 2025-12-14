@@ -30,6 +30,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { DocumentScanner } from '@/components/intake/DocumentScanner';
 import {
   DeviceType,
   ErrorCode,
@@ -108,6 +109,11 @@ export default function Intake() {
 
   // Location - preselect from user's default
   const [locationId, setLocationId] = useState('');
+
+  // Document scanner state
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannedDocumentPath, setScannedDocumentPath] = useState<string | null>(null);
+  const [ocrRawText, setOcrRawText] = useState<string | null>(null);
 
   // Set default location from profile
   React.useEffect(() => {
@@ -351,12 +357,116 @@ export default function Intake() {
     createTicketMutation.mutate();
   };
 
+  // Handle OCR scan completion
+  const handleScanComplete = (fields: any, documentPath: string, rawText: string) => {
+    setShowScanner(false);
+    setScannedDocumentPath(documentPath);
+    setOcrRawText(rawText);
+
+    // Prefill customer data
+    if (fields.customer_name) {
+      const nameParts = fields.customer_name.split(' ');
+      if (nameParts.length >= 2) {
+        setNewCustomer(prev => ({
+          ...prev,
+          first_name: nameParts[0] || '',
+          last_name: nameParts.slice(1).join(' ') || '',
+        }));
+        setShowNewCustomer(true);
+      }
+    }
+
+    if (fields.customer_street) {
+      setNewCustomer(prev => ({
+        ...prev,
+        address: `${fields.customer_street}${fields.customer_zip ? ', ' + fields.customer_zip : ''}${fields.customer_city ? ' ' + fields.customer_city : ''}`,
+      }));
+    }
+
+    // Prefill device data
+    if (fields.manufacturer) {
+      setDevice(prev => ({ ...prev, brand: fields.manufacturer }));
+    }
+    if (fields.model) {
+      setDevice(prev => ({ ...prev, model: fields.model }));
+    }
+    if (fields.imei) {
+      setDevice(prev => ({ ...prev, imei_or_serial: fields.imei }));
+    }
+
+    // Prefill error description
+    if (fields.error_description || fields.damage_story) {
+      const description = [
+        fields.error_description,
+        fields.damage_cause ? `Ursache: ${fields.damage_cause}` : null,
+        fields.damage_story ? `Hergang: ${fields.damage_story}` : null,
+      ].filter(Boolean).join('\n');
+      
+      setRepair(prev => ({ ...prev, error_description_text: description }));
+    }
+
+    // Store claim/contract numbers in accessories note for reference
+    const references = [
+      fields.contract_number ? `Vertragsnr: ${fields.contract_number}` : null,
+      fields.claim_number ? `Schadennr: ${fields.claim_number}` : null,
+    ].filter(Boolean).join(', ');
+    
+    if (references) {
+      setAccessoriesNote(prev => prev ? `${prev}\n${references}` : references);
+    }
+
+    toast({
+      title: 'Beleg gescannt',
+      description: 'Die erkannten Daten wurden übernommen. Bitte prüfen und ergänzen Sie die Angaben.',
+    });
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Geräteannahme</h1>
-        <p className="text-muted-foreground">Neuen Reparaturauftrag erstellen</p>
+      {/* Document Scanner Dialog */}
+      {showScanner && (
+        <DocumentScanner
+          onScanComplete={handleScanComplete}
+          onCancel={() => setShowScanner(false)}
+        />
+      )}
+
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Geräteannahme</h1>
+          <p className="text-muted-foreground">Neuen Reparaturauftrag erstellen</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2"
+          onClick={() => setShowScanner(true)}
+        >
+          <FileText className="h-4 w-4" />
+          Beleg scannen / hochladen
+        </Button>
       </div>
+
+      {/* OCR Result Indicator */}
+      {scannedDocumentPath && (
+        <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-green-800 dark:text-green-200">
+                  Beleg wurde gescannt
+                </p>
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  Daten wurden übernommen. Bitte prüfen Sie die Angaben.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Customer Section */}
