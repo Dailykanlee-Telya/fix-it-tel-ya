@@ -272,6 +272,25 @@ export default function Intake() {
         }
       }
 
+      // Link scanned document to ticket if available
+      if (scannedDocumentPath) {
+        try {
+          const { data: publicUrlData } = supabase.storage
+            .from('intake_documents')
+            .getPublicUrl(scannedDocumentPath);
+          
+          await supabase.from('ticket_photos').insert({
+            repair_ticket_id: ticketData.id,
+            storage_url: publicUrlData.publicUrl,
+            file_name: `Eingangsbeleg_${ticketNumber}.pdf`,
+            file_type: scannedDocumentPath.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
+          });
+        } catch (docError) {
+          console.error('Error linking scanned document:', docError);
+          // Don't fail the whole ticket creation
+        }
+      }
+
       // TODO: Email-Versand vorübergehend deaktiviert bis Domain bei Resend verifiziert ist
       // Reaktivieren nach Domain-Verifizierung unter resend.com/domains
 
