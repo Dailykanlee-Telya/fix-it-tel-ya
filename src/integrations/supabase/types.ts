@@ -598,6 +598,7 @@ export type Database = {
         Row: {
           b2b_partner_id: string | null
           created_at: string
+          default_location_id: string | null
           email: string
           id: string
           is_active: boolean
@@ -608,6 +609,7 @@ export type Database = {
         Insert: {
           b2b_partner_id?: string | null
           created_at?: string
+          default_location_id?: string | null
           email: string
           id: string
           is_active?: boolean
@@ -618,6 +620,7 @@ export type Database = {
         Update: {
           b2b_partner_id?: string | null
           created_at?: string
+          default_location_id?: string | null
           email?: string
           id?: string
           is_active?: boolean
@@ -631,6 +634,13 @@ export type Database = {
             columns: ["b2b_partner_id"]
             isOneToOne: false
             referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_default_location_id_fkey"
+            columns: ["default_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
           {
@@ -651,6 +661,10 @@ export type Database = {
           created_at: string
           customer_id: string
           device_id: string
+          disposal_option: string | null
+          email_opt_in: boolean | null
+          endcustomer_price: number | null
+          endcustomer_price_released: boolean | null
           endcustomer_reference: string | null
           error_cause: Database["public"]["Enums"]["error_cause"] | null
           error_code: Database["public"]["Enums"]["error_code"] | null
@@ -659,9 +673,12 @@ export type Database = {
           final_price: number | null
           id: string
           internal_notes: string | null
+          internal_price: number | null
           is_b2b: boolean
           kva_approved: boolean | null
           kva_approved_at: string | null
+          kva_fee_amount: number | null
+          kva_fee_applicable: boolean | null
           kva_required: boolean
           kva_token: string | null
           legal_notes_ack: boolean
@@ -670,6 +687,7 @@ export type Database = {
           price_mode: Database["public"]["Enums"]["price_mode"]
           priority: string | null
           shipment_id: string | null
+          sms_opt_in: boolean | null
           status: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at: string
@@ -682,6 +700,10 @@ export type Database = {
           created_at?: string
           customer_id: string
           device_id: string
+          disposal_option?: string | null
+          email_opt_in?: boolean | null
+          endcustomer_price?: number | null
+          endcustomer_price_released?: boolean | null
           endcustomer_reference?: string | null
           error_cause?: Database["public"]["Enums"]["error_cause"] | null
           error_code?: Database["public"]["Enums"]["error_code"] | null
@@ -690,9 +712,12 @@ export type Database = {
           final_price?: number | null
           id?: string
           internal_notes?: string | null
+          internal_price?: number | null
           is_b2b?: boolean
           kva_approved?: boolean | null
           kva_approved_at?: string | null
+          kva_fee_amount?: number | null
+          kva_fee_applicable?: boolean | null
           kva_required?: boolean
           kva_token?: string | null
           legal_notes_ack?: boolean
@@ -701,6 +726,7 @@ export type Database = {
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
           shipment_id?: string | null
+          sms_opt_in?: boolean | null
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at?: string
@@ -713,6 +739,10 @@ export type Database = {
           created_at?: string
           customer_id?: string
           device_id?: string
+          disposal_option?: string | null
+          email_opt_in?: boolean | null
+          endcustomer_price?: number | null
+          endcustomer_price_released?: boolean | null
           endcustomer_reference?: string | null
           error_cause?: Database["public"]["Enums"]["error_cause"] | null
           error_code?: Database["public"]["Enums"]["error_code"] | null
@@ -721,9 +751,12 @@ export type Database = {
           final_price?: number | null
           id?: string
           internal_notes?: string | null
+          internal_price?: number | null
           is_b2b?: boolean
           kva_approved?: boolean | null
           kva_approved_at?: string | null
+          kva_fee_amount?: number | null
+          kva_fee_applicable?: boolean | null
           kva_required?: boolean
           kva_token?: string | null
           legal_notes_ack?: boolean
@@ -732,6 +765,7 @@ export type Database = {
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
           shipment_id?: string | null
+          sms_opt_in?: boolean | null
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number?: string
           updated_at?: string

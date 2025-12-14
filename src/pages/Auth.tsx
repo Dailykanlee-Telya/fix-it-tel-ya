@@ -5,49 +5,33 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, Mail, Lock, User, Loader2, Search, ShieldAlert } from 'lucide-react';
+import { Wrench, Mail, Lock, User, Loader2, Search, ShieldAlert, Building2, Users, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useRateLimiter, AUTH_RATE_LIMIT_CONFIG } from '@/hooks/useRateLimiter';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 
 const loginSchema = z.object({
   email: z.string().email('Ungültige E-Mail-Adresse'),
   password: z.string().min(6, 'Passwort muss mindestens 6 Zeichen haben'),
 });
 
-const signupSchema = z.object({
-  name: z.string().min(2, 'Name muss mindestens 2 Zeichen haben'),
-  email: z.string().email('Ungültige E-Mail-Adresse'),
-  password: z.string().min(6, 'Passwort muss mindestens 6 Zeichen haben'),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Passwörter stimmen nicht überein',
-  path: ['confirmPassword'],
-});
-
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, signIn, signUp, loading: authLoading } = useAuth();
+  const { user, signIn, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loginType, setLoginType] = useState<'employee' | 'b2b'>('employee');
   
   // Rate limiting for login attempts
   const loginRateLimiter = useRateLimiter('auth_login', AUTH_RATE_LIMIT_CONFIG);
-  const signupRateLimiter = useRateLimiter('auth_signup', AUTH_RATE_LIMIT_CONFIG);
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-
-  // Signup form state
-  const [signupName, setSignupName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -105,79 +89,12 @@ export default function Auth() {
           title: 'Willkommen!',
           description: 'Sie wurden erfolgreich angemeldet.',
         });
-        navigate('/dashboard');
-      }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const fieldErrors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            fieldErrors[err.path[0] as string] = err.message;
-          }
-        });
-        setErrors(fieldErrors);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    
-    // Check rate limit
-    if (signupRateLimiter.isLocked) {
-      toast({
-        variant: 'destructive',
-        title: 'Zu viele Registrierungsversuche',
-        description: `Bitte warten Sie ${signupRateLimiter.lockoutSeconds} Sekunden.`,
-      });
-      return;
-    }
-    
-    setLoading(true);
-
-    try {
-      const validated = signupSchema.parse({
-        name: signupName,
-        email: signupEmail,
-        password: signupPassword,
-        confirmPassword: signupConfirmPassword,
-      });
-
-      const { error } = await signUp(validated.email, validated.password, validated.name);
-      
-      if (error) {
-        // Record failed attempt
-        signupRateLimiter.recordAttempt(false);
-        
-        if (error.message.includes('already registered')) {
-          toast({
-            variant: 'destructive',
-            title: 'Registrierung fehlgeschlagen',
-            description: 'Diese E-Mail-Adresse ist bereits registriert.',
-          });
+        // Navigate based on login type
+        if (loginType === 'b2b') {
+          navigate('/b2b/dashboard');
         } else {
-          toast({
-            variant: 'destructive',
-            title: 'Fehler',
-            description: error.message,
-          });
+          navigate('/dashboard');
         }
-      } else {
-        // Record successful attempt
-        signupRateLimiter.recordAttempt(true);
-        toast({
-          title: 'Registrierung erfolgreich!',
-          description: 'Ihr Konto wurde erstellt. Ein Administrator muss Ihr Konto freischalten, bevor Sie sich anmelden können.',
-          duration: 10000,
-        });
-        // Don't auto-navigate, let user know they need approval
-        setSignupName('');
-        setSignupEmail('');
-        setSignupPassword('');
-        setSignupConfirmPassword('');
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -213,192 +130,137 @@ export default function Auth() {
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="h-16 w-16 rounded-2xl gradient-primary flex items-center justify-center mb-4 shadow-lg shadow-primary/25">
-            <Wrench className="h-8 w-8 text-primary-foreground" />
-          </div>
+          <img 
+            src="/telya-logo.png" 
+            alt="Telya Logo" 
+            className="h-16 w-16 rounded-2xl shadow-lg shadow-primary/25 mb-4"
+          />
           <h1 className="text-2xl font-bold text-foreground">Telya Reparatur</h1>
           <p className="text-muted-foreground mt-1">Management System</p>
         </div>
 
+        {/* Login Type Selection */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => setLoginType('employee')}
+            className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+              loginType === 'employee'
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border bg-card hover:border-muted-foreground/50'
+            }`}
+          >
+            <Users className="h-6 w-6" />
+            <span className="text-sm font-medium">Mitarbeiter</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setLoginType('b2b')}
+            className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+              loginType === 'b2b'
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border bg-card hover:border-muted-foreground/50'
+            }`}
+          >
+            <Building2 className="h-6 w-6" />
+            <span className="text-sm font-medium">B2B-Partner</span>
+          </button>
+        </div>
+
         <Card className="border-0 shadow-xl">
-          <Tabs defaultValue="login" className="w-full">
-            <CardHeader className="pb-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Anmelden</TabsTrigger>
-                <TabsTrigger value="signup">Registrieren</TabsTrigger>
-              </TabsList>
-            </CardHeader>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">
+              {loginType === 'employee' ? 'Telya Mitarbeiter Login' : 'B2B-Partner Login'}
+            </CardTitle>
+            <CardDescription>
+              {loginType === 'employee' 
+                ? 'Melden Sie sich mit Ihren Mitarbeiter-Zugangsdaten an.' 
+                : 'Melden Sie sich mit Ihren B2B-Partner-Zugangsdaten an.'}
+            </CardDescription>
+          </CardHeader>
 
-            <CardContent>
-              <TabsContent value="login" className="mt-0">
-                {loginRateLimiter.isLocked && (
-                  <Alert variant="destructive" className="mb-4">
-                    <ShieldAlert className="h-4 w-4" />
-                    <AlertDescription>
-                      Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie{' '}
-                      <strong>{Math.floor(loginRateLimiter.lockoutSeconds / 60)}:{String(loginRateLimiter.lockoutSeconds % 60).padStart(2, '0')}</strong>{' '}
-                      Minuten.
-                    </AlertDescription>
-                  </Alert>
+          <CardContent>
+            {loginRateLimiter.isLocked && (
+              <Alert variant="destructive" className="mb-4">
+                <ShieldAlert className="h-4 w-4" />
+                <AlertDescription>
+                  Zu viele fehlgeschlagene Anmeldeversuche. Bitte warten Sie{' '}
+                  <strong>{Math.floor(loginRateLimiter.lockoutSeconds / 60)}:{String(loginRateLimiter.lockoutSeconds % 60).padStart(2, '0')}</strong>{' '}
+                  Minuten.
+                </AlertDescription>
+              </Alert>
+            )}
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">E-Mail</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="ihre@email.de"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="pl-9"
+                    disabled={loading}
+                  />
+                </div>
+                {errors.email && (
+                  <p className="text-sm text-destructive">{errors.email}</p>
                 )}
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">E-Mail</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="ihre@email.de"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        className="pl-9"
-                        disabled={loading}
-                      />
-                    </div>
-                    {errors.email && (
-                      <p className="text-sm text-destructive">{errors.email}</p>
-                    )}
-                  </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Passwort</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        className="pl-9"
-                        disabled={loading}
-                      />
-                    </div>
-                    {errors.password && (
-                      <p className="text-sm text-destructive">{errors.password}</p>
-                    )}
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={loading || loginRateLimiter.isLocked}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Anmelden...
-                      </>
-                    ) : loginRateLimiter.isLocked ? (
-                      'Gesperrt'
-                    ) : (
-                      'Anmelden'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup" className="mt-0">
-                {signupRateLimiter.isLocked && (
-                  <Alert variant="destructive" className="mb-4">
-                    <ShieldAlert className="h-4 w-4" />
-                    <AlertDescription>
-                      Zu viele fehlgeschlagene Registrierungsversuche. Bitte warten Sie{' '}
-                      <strong>{Math.floor(signupRateLimiter.lockoutSeconds / 60)}:{String(signupRateLimiter.lockoutSeconds % 60).padStart(2, '0')}</strong>{' '}
-                      Minuten.
-                    </AlertDescription>
-                  </Alert>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Passwort</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="pl-9"
+                    disabled={loading}
+                  />
+                </div>
+                {errors.password && (
+                  <p className="text-sm text-destructive">{errors.password}</p>
                 )}
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        placeholder="Max Mustermann"
-                        value={signupName}
-                        onChange={(e) => setSignupName(e.target.value)}
-                        className="pl-9"
-                        disabled={loading}
-                      />
-                    </div>
-                    {errors.name && (
-                      <p className="text-sm text-destructive">{errors.name}</p>
-                    )}
-                  </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">E-Mail</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="ihre@email.de"
-                        value={signupEmail}
-                        onChange={(e) => setSignupEmail(e.target.value)}
-                        className="pl-9"
-                        disabled={loading}
-                      />
-                    </div>
-                    {errors.email && (
-                      <p className="text-sm text-destructive">{errors.email}</p>
-                    )}
-                  </div>
+              <Button type="submit" className="w-full" disabled={loading || loginRateLimiter.isLocked}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Anmelden...
+                  </>
+                ) : loginRateLimiter.isLocked ? (
+                  'Gesperrt'
+                ) : (
+                  'Anmelden'
+                )}
+              </Button>
+            </form>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Passwort</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        className="pl-9"
-                        disabled={loading}
-                      />
-                    </div>
-                    {errors.password && (
-                      <p className="text-sm text-destructive">{errors.password}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-confirm">Passwort bestätigen</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="signup-confirm"
-                        type="password"
-                        placeholder="••••••••"
-                        value={signupConfirmPassword}
-                        onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                        className="pl-9"
-                        disabled={loading}
-                      />
-                    </div>
-                    {errors.confirmPassword && (
-                      <p className="text-sm text-destructive">{errors.confirmPassword}</p>
-                    )}
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={loading || signupRateLimiter.isLocked}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Registrieren...
-                      </>
-                    ) : signupRateLimiter.isLocked ? (
-                      'Gesperrt'
-                    ) : (
-                      'Konto erstellen'
-                    )}
+            {loginType === 'b2b' && (
+              <>
+                <Separator className="my-6" />
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Noch kein B2B-Partner?
+                  </p>
+                  <Button variant="outline" className="w-full gap-2" asChild>
+                    <a href="mailto:service@telya.de?subject=B2B-Partner%20Anfrage">
+                      <Building2 className="h-4 w-4" />
+                      B2B-Partner werden
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </Button>
-                </form>
-              </TabsContent>
-            </CardContent>
-          </Tabs>
+                </div>
+              </>
+            )}
+          </CardContent>
         </Card>
 
         {/* Customer Tracking Link */}
@@ -421,7 +283,7 @@ export default function Auth() {
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          © 2024 Telya GmbH. Alle Rechte vorbehalten.
+          © {new Date().getFullYear()} Telya GmbH. Alle Rechte vorbehalten.
         </p>
       </div>
     </div>

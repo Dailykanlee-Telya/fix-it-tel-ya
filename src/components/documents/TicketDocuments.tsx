@@ -225,6 +225,25 @@ export default function TicketDocuments({
                     </div>}
                 </div>
               </div>
+
+              <div className="section">
+                <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
+                  Benachrichtigungen
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">E-Mail:</span>
+                    <span className="font-medium text-sm">{ticket.email_opt_in ? 'Ja' : 'Nein'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">SMS:</span>
+                    <span className="font-medium text-sm">{ticket.sms_opt_in ? 'Ja' : 'Nein'}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Status-Updates werden nur über die gewählten Kanäle gesendet.
+                </p>
+              </div>
             </div>
 
             <div className="mt-8 pt-4 border-t">

@@ -53,6 +53,7 @@ export interface Profile {
   name: string;
   email: string;
   location_id?: string;
+  default_location_id?: string;
   b2b_partner_id?: string;
   is_active: boolean;
   created_at: string;
