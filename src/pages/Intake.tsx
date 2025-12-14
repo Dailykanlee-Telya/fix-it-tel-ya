@@ -27,7 +27,9 @@ import {
   Search,
   Plus,
   Check,
+  ExternalLink,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   DeviceType,
   ErrorCode,
@@ -480,16 +482,18 @@ export default function Intake() {
                   />
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start space-x-2">
                   <Checkbox
                     id="marketing_consent"
                     checked={newCustomer.marketing_consent}
                     onCheckedChange={(checked) => 
                       setNewCustomer({ ...newCustomer, marketing_consent: checked === true })
                     }
+                    className="mt-0.5"
                   />
-                  <Label htmlFor="marketing_consent" className="text-sm font-normal cursor-pointer">
-                    Kunde stimmt zu, Marketing- und Werbemitteilungen per E-Mail/SMS zu erhalten
+                  <Label htmlFor="marketing_consent" className="text-sm font-normal cursor-pointer leading-relaxed">
+                    Kunde stimmt zu, Marketing- und Werbemitteilungen per E-Mail, SMS, WhatsApp und Telefon zu erhalten. 
+                    Diese Einwilligung kann jederzeit widerrufen werden.
                   </Label>
                 </div>
               </div>
@@ -830,17 +834,28 @@ export default function Intake() {
                 <li>Face ID / Touch ID muss vor der Reparatur deaktiviert werden.</li>
                 <li>Bei wasserbeschädigten Geräten besteht ein erhöhtes Risiko für Folgeschäden.</li>
                 <li>Die Reparatur erfolgt nach bestem Wissen und Gewissen.</li>
+                <li>
+                  Informationen zur Verarbeitung Ihrer Daten finden Sie in unserer{' '}
+                  <Link to="/datenschutz" target="_blank" className="text-primary hover:underline inline-flex items-center gap-1">
+                    Datenschutzerklärung <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </li>
               </ul>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-start space-x-2">
               <Checkbox
                 id="legal-ack"
                 checked={legalAck}
                 onCheckedChange={(checked) => setLegalAck(checked as boolean)}
+                className="mt-0.5"
               />
-              <Label htmlFor="legal-ack" className="cursor-pointer">
-                Der Kunde bestätigt, die AGB und Haftungshinweise zur Kenntnis genommen zu haben *
+              <Label htmlFor="legal-ack" className="cursor-pointer leading-relaxed">
+                Der Kunde bestätigt, die AGB, Haftungshinweise und{' '}
+                <Link to="/datenschutz" target="_blank" className="text-primary hover:underline">
+                  Datenschutzerklärung
+                </Link>{' '}
+                zur Kenntnis genommen zu haben *
               </Label>
             </div>
           </CardContent>
