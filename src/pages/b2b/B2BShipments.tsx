@@ -8,20 +8,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Plus, Search, Filter, Package, Truck } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Plus, Search, Filter, Package, Truck, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { B2BShipmentStatus, B2B_SHIPMENT_STATUS_LABELS, B2B_SHIPMENT_STATUS_COLORS } from '@/types/b2b';
+import { B2BShipmentStatus, B2BShipmentType, B2B_SHIPMENT_STATUS_LABELS, B2B_SHIPMENT_STATUS_COLORS } from '@/types/b2b';
 
 export default function B2BShipments() {
   const { b2bPartnerId } = useB2BAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'INBOUND' | 'OUTBOUND'>('all');
 
   const { data: shipments, isLoading } = useQuery({
-    queryKey: ['b2b-shipments', b2bPartnerId, statusFilter],
+    queryKey: ['b2b-shipments', b2bPartnerId, statusFilter, typeFilter],
     queryFn: async () => {
       if (!b2bPartnerId) return [];
 
@@ -36,6 +38,10 @@ export default function B2BShipments() {
 
       if (statusFilter && statusFilter !== 'all') {
         query = query.eq('status', statusFilter as B2BShipmentStatus);
+      }
+
+      if (typeFilter !== 'all') {
+        query = query.eq('shipment_type', typeFilter);
       }
 
       const { data, error } = await query;
@@ -54,13 +60,57 @@ export default function B2BShipments() {
     );
   });
 
-  const statusOptions = [
-    { value: 'all', label: 'Alle Status' },
-    { value: 'ANGELEGT', label: 'Angelegt' },
-    { value: 'GERAETE_UNTERWEGS', label: 'Geräte unterwegs' },
-    { value: 'BEI_TELYA_EINGEGANGEN', label: 'Bei Telya eingegangen' },
-    { value: 'ABGESCHLOSSEN', label: 'Abgeschlossen' },
-  ];
+  // Status options based on selected type
+  const getStatusOptions = () => {
+    const baseOptions = [{ value: 'all', label: 'Alle Status' }];
+    
+    if (typeFilter === 'OUTBOUND') {
+      return [
+        ...baseOptions,
+        { value: 'RETOUR_ANGELEGT', label: 'Rücksendung angelegt' },
+        { value: 'RETOUR_UNTERWEGS', label: 'Rücksendung unterwegs' },
+        { value: 'RETOUR_ZUGESTELLT', label: 'Rücksendung zugestellt' },
+      ];
+    }
+    
+    if (typeFilter === 'INBOUND') {
+      return [
+        ...baseOptions,
+        { value: 'ANGELEGT', label: 'Angelegt' },
+        { value: 'GERAETE_UNTERWEGS', label: 'Geräte unterwegs' },
+        { value: 'BEI_TELYA_EINGEGANGEN', label: 'Bei Telya eingegangen' },
+        { value: 'ABGESCHLOSSEN', label: 'Abgeschlossen' },
+      ];
+    }
+
+    // All types
+    return [
+      ...baseOptions,
+      { value: 'ANGELEGT', label: 'Angelegt' },
+      { value: 'GERAETE_UNTERWEGS', label: 'Geräte unterwegs' },
+      { value: 'BEI_TELYA_EINGEGANGEN', label: 'Bei Telya eingegangen' },
+      { value: 'ABGESCHLOSSEN', label: 'Abgeschlossen' },
+      { value: 'RETOUR_ANGELEGT', label: 'Rücksendung angelegt' },
+      { value: 'RETOUR_UNTERWEGS', label: 'Rücksendung unterwegs' },
+      { value: 'RETOUR_ZUGESTELLT', label: 'Rücksendung zugestellt' },
+    ];
+  };
+
+  const statusOptions = getStatusOptions();
+
+  const getShipmentTypeIcon = (type: string) => {
+    if (type === 'OUTBOUND') {
+      return <ArrowDownToLine className="h-4 w-4 text-green-600" />;
+    }
+    return <ArrowUpFromLine className="h-4 w-4 text-blue-600" />;
+  };
+
+  const getShipmentTypeLabel = (type: string) => {
+    if (type === 'OUTBOUND') {
+      return 'Rücksendung';
+    }
+    return 'Eingang';
+  };
 
   return (
     <div className="space-y-6">
@@ -78,6 +128,27 @@ export default function B2BShipments() {
         </Button>
       </div>
 
+      {/* Type Tabs */}
+      <Tabs value={typeFilter} onValueChange={(v) => {
+        setTypeFilter(v as 'all' | 'INBOUND' | 'OUTBOUND');
+        setStatusFilter('all');
+      }}>
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Alle
+          </TabsTrigger>
+          <TabsTrigger value="INBOUND" className="flex items-center gap-2">
+            <ArrowUpFromLine className="h-4 w-4" />
+            Eingang
+          </TabsTrigger>
+          <TabsTrigger value="OUTBOUND" className="flex items-center gap-2">
+            <ArrowDownToLine className="h-4 w-4" />
+            Rücksendung
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
@@ -92,7 +163,7 @@ export default function B2BShipments() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectTrigger className="w-full sm:w-[220px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status filtern" />
               </SelectTrigger>
@@ -125,11 +196,11 @@ export default function B2BShipments() {
             <div className="text-center py-12">
               <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground mb-4">
-                {search || statusFilter !== 'all' 
+                {search || statusFilter !== 'all' || typeFilter !== 'all'
                   ? 'Keine Sendungen gefunden' 
                   : 'Noch keine Sendungen vorhanden'}
               </p>
-              {!search && statusFilter === 'all' && (
+              {!search && statusFilter === 'all' && typeFilter === 'all' && (
                 <Button onClick={() => navigate('/b2b/shipments/new')}>
                   <Plus className="h-4 w-4 mr-2" />
                   Erste Sendung erstellen
@@ -141,6 +212,7 @@ export default function B2BShipments() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Typ</TableHead>
                     <TableHead>Sendungsnummer</TableHead>
                     <TableHead>Geräte</TableHead>
                     <TableHead>Status</TableHead>
@@ -155,6 +227,14 @@ export default function B2BShipments() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => navigate(`/b2b/shipments/${shipment.id}`)}
                     >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getShipmentTypeIcon(shipment.shipment_type)}
+                          <span className="text-sm text-muted-foreground">
+                            {getShipmentTypeLabel(shipment.shipment_type)}
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell className="font-mono text-sm font-medium">
                         {shipment.shipment_number}
                       </TableCell>

@@ -117,6 +117,167 @@ export default function B2BReturnShipmentDetail() {
     },
   });
 
+  // Print DHL Label Placeholder
+  const printDHLLabel = () => {
+    const recipientAddress = shipment?.recipient_address as ReturnAddress | null;
+    const partnerName = recipientAddress?.name || shipment?.b2b_partner?.name || '';
+    const partnerStreet = recipientAddress?.street || shipment?.b2b_partner?.street || '';
+    const partnerZip = recipientAddress?.zip || shipment?.b2b_partner?.zip || '';
+    const partnerCity = recipientAddress?.city || shipment?.b2b_partner?.city || '';
+    const partnerCountry = recipientAddress?.country || shipment?.b2b_partner?.country || 'Deutschland';
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>DHL-Label ${shipment?.shipment_number}</title>
+        <style>
+          @page { size: 100mm 150mm; margin: 0; }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0;
+            width: 100mm;
+            height: 150mm;
+          }
+          .label {
+            border: 2px solid #000;
+            padding: 10px;
+            height: calc(150mm - 24px);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+          }
+          .dhl-header {
+            background: #ffcc00;
+            color: #d40511;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 8px 12px;
+            margin: -10px -10px 10px -10px;
+            text-align: center;
+          }
+          .address-section {
+            flex: 1;
+          }
+          .address-label {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+          }
+          .sender {
+            font-size: 11px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ccc;
+          }
+          .recipient {
+            font-size: 14px;
+            font-weight: bold;
+          }
+          .recipient p {
+            margin: 3px 0;
+          }
+          .recipient .city {
+            font-size: 18px;
+          }
+          .barcode-area {
+            margin-top: auto;
+            padding-top: 15px;
+            border-top: 1px solid #000;
+          }
+          .barcode {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-align: center;
+            margin-bottom: 5px;
+          }
+          .barcode-placeholder {
+            background: repeating-linear-gradient(
+              90deg,
+              #000 0px, #000 2px,
+              #fff 2px, #fff 4px
+            );
+            height: 40px;
+            margin: 5px 0;
+          }
+          .tracking-number {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-align: center;
+            font-weight: bold;
+          }
+          .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 10px;
+            font-size: 10px;
+            text-align: center;
+            color: #856404;
+          }
+          .shipment-info {
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            margin-top: 8px;
+          }
+          @media print { 
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="label">
+          <div class="dhl-header">DHL PAKET</div>
+          
+          <div class="address-section">
+            <div class="sender">
+              <div class="address-label">Absender</div>
+              <strong>${TELYA_ADDRESS.name}</strong><br>
+              ${TELYA_ADDRESS.street}<br>
+              ${TELYA_ADDRESS.zip} ${TELYA_ADDRESS.city}
+            </div>
+            
+            <div class="recipient">
+              <div class="address-label">Empfänger</div>
+              <p>${partnerName}</p>
+              <p>${partnerStreet}</p>
+              <p class="city">${partnerZip} ${partnerCity}</p>
+              <p>${partnerCountry}</p>
+            </div>
+          </div>
+          
+          <div class="barcode-area">
+            <div class="barcode-placeholder"></div>
+            <div class="tracking-number">
+              ${shipment?.dhl_tracking_number || 'TRACKING-NUMMER FOLGT'}
+            </div>
+            <div class="shipment-info">
+              ${shipment?.shipment_number} • ${shipment?.tickets?.length || 0} Gerät(e)
+            </div>
+          </div>
+          
+          <div class="warning">
+            ⚠️ PLATZHALTER-ETIKETT<br>
+            Bitte echtes DHL-Label über Geschäftskundenportal erstellen
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   // Print packing slip
   const printPackingSlip = () => {
     const recipientAddress = shipment?.recipient_address as ReturnAddress | null;
@@ -272,6 +433,10 @@ export default function B2BReturnShipmentDetail() {
           <Button variant="outline" onClick={printPackingSlip}>
             <Printer className="mr-2 h-4 w-4" />
             Lieferschein drucken
+          </Button>
+          <Button variant="outline" onClick={printDHLLabel}>
+            <Truck className="mr-2 h-4 w-4" />
+            DHL-Label drucken
           </Button>
         </div>
       </div>

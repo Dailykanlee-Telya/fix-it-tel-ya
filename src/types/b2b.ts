@@ -97,10 +97,15 @@ export const B2B_SHIPMENT_TYPE_LABELS: Record<B2BShipmentType, string> = {
 // Company address for shipping labels
 export const TELYA_ADDRESS = {
   name: 'Telya GmbH',
-  street: 'Musterstraße 123',
-  zip: '12345',
-  city: 'Berlin',
+  street: 'Schalker Str. 59',
+  zip: '45881',
+  city: 'Gelsenkirchen',
   country: 'Deutschland',
-  phone: '+49 30 123456789',
-  email: 'reparatur@telya.de',
+  phone: '0209 88307161',
+  email: 'service@telya.de',
+  vatId: 'DE331142364',
+  hrb: 'HRB 15717',
+  managingDirector: 'Serkan Genc',
+  bank: 'Volksbank Bochum Witten',
+  iban: 'DE59430601290118905200',
 };
