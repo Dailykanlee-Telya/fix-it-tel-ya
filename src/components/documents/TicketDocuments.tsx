@@ -59,13 +59,10 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
   const report = getTemplate('REPARATURBERICHT', reportTemplate);
   const delivery = getTemplate('LIEFERSCHEIN', deliveryTemplate);
 
-  // Unified print strategy with proper filenames
-  const PRINT_ROOT_ID = 'telya-print-root';
-
+  // Print via dedicated iframe for correct PDF filename
   const handlePrint = (ref: React.RefObject<HTMLDivElement>, docType: 'eingangsbeleg' | 'kva' | 'reparaturbericht' | 'lieferschein') => {
     if (!ref.current) return;
 
-    // Set document title for PDF filename
     const ticketNumber = ticket.ticket_number || 'Auftrag';
     const filenameMap = {
       'eingangsbeleg': `Eingangsbeleg-${ticketNumber}`,
@@ -73,30 +70,80 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
       'reparaturbericht': `Reparaturbericht-${ticketNumber}`,
       'lieferschein': `Lieferschein-${ticketNumber}`
     };
-    const originalTitle = document.title;
-    document.title = filenameMap[docType];
+    const pdfFilename = filenameMap[docType];
 
-    let printRoot = document.getElementById(PRINT_ROOT_ID);
-    if (!printRoot) {
-      printRoot = document.createElement('div');
-      printRoot.id = PRINT_ROOT_ID;
-      document.body.appendChild(printRoot);
+    // Create hidden iframe for printing
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.left = '-9999px';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      document.body.removeChild(iframe);
+      return;
     }
 
-    printRoot.innerHTML = '';
-    printRoot.appendChild(ref.current.cloneNode(true));
+    // Get all stylesheets from main document
+    const styles = Array.from(document.styleSheets)
+      .map(sheet => {
+        try {
+          return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n');
+        } catch {
+          return '';
+        }
+      })
+      .join('\n');
 
-    const cleanup = () => {
-      document.body.classList.remove('telya-printing');
-      document.title = originalTitle;
-      const root = document.getElementById(PRINT_ROOT_ID);
-      if (root) root.innerHTML = '';
+    // Build iframe HTML with correct title for PDF filename
+    iframeDoc.open();
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${pdfFilename}</title>
+        <style>
+          ${styles}
+          @page { size: A4; margin: 8mm; }
+          html, body { margin: 0; padding: 0; font-size: 10px; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .document { padding: 4mm; font-size: 9px; }
+          .doc-header { margin-bottom: 3mm; padding-bottom: 2mm; }
+          .conditions-block { 
+            font-size: 6.5px !important; 
+            line-height: 1.15 !important;
+            max-height: 100px !important;
+            overflow: hidden !important;
+            padding: 4px !important;
+            margin-top: 4px !important;
+          }
+          .doc-footer { font-size: 7px; margin-top: 4px; padding-top: 4px; }
+          .footer-text { font-size: 7px; margin-top: 4px; }
+          table { font-size: 8px; }
+          table th, table td { padding: 2px 4px; }
+        </style>
+      </head>
+      <body>
+        ${ref.current.outerHTML}
+      </body>
+      </html>
+    `);
+    iframeDoc.close();
+
+    // Wait for iframe to load then print
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        // Cleanup after print dialog closes
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 100);
     };
-
-    window.addEventListener('afterprint', cleanup, { once: true });
-
-    document.body.classList.add('telya-printing');
-    window.print();
   };
 
   const totalPartsPrice = partUsage?.reduce((sum: number, p: any) => sum + (p.unit_sales_price || 0) * p.quantity, 0) || 0;
@@ -130,13 +177,13 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
     </div>
   );
 
-  // Compact Conditions Block (smaller, fixed height)
+  // Conditions Block with more content visible (smaller font, more lines)
   const ConditionsBlock = ({ text }: { text: string | null }) => {
     if (!text) return null;
     const processedText = replacePlaceholders(text, placeholderMap);
     return (
-      <div className="conditions-block mt-2 p-2 bg-muted/20 rounded text-[8px] text-muted-foreground whitespace-pre-wrap leading-[1.3] max-h-[70px] overflow-hidden">
-        <div className="font-semibold text-[9px] mb-1">Wichtige Hinweise</div>
+      <div className="conditions-block mt-2 p-2 bg-muted/20 rounded text-[7px] text-muted-foreground whitespace-pre-wrap leading-[1.15] max-h-[120px] overflow-hidden">
+        <div className="font-semibold text-[8px] mb-1">Wichtige Hinweise</div>
         {processedText}
       </div>
     );
@@ -179,53 +226,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
 
   return (
     <>
-      <style>{`
-        @media print {
-          @page { size: A4; margin: 8mm; }
-          html, body { height: initial !important; overflow: initial !important; font-size: 10px !important; }
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-
-          body.telya-printing > :not(#telya-print-root) { display: none !important; }
-          body.telya-printing #telya-print-root { display: block !important; }
-
-          body.telya-printing #telya-print-root { position: relative; width: 100%; }
-          body.telya-printing #telya-print-root .document { 
-            padding: 4mm !important;
-            font-size: 9px !important;
-          }
-          body.telya-printing #telya-print-root .doc-header { 
-            margin-bottom: 3mm !important;
-            padding-bottom: 2mm !important;
-          }
-          body.telya-printing #telya-print-root .conditions-block { 
-            font-size: 7px !important; 
-            line-height: 1.2 !important;
-            max-height: 60px !important;
-            overflow: hidden !important;
-            padding: 4px !important;
-            margin-top: 4px !important;
-          }
-          body.telya-printing #telya-print-root .doc-footer { 
-            font-size: 7px !important;
-            margin-top: 4px !important;
-            padding-top: 4px !important;
-          }
-          body.telya-printing #telya-print-root .footer-text {
-            font-size: 7px !important;
-            margin-top: 4px !important;
-          }
-          body.telya-printing #telya-print-root .section-header {
-            font-size: 8px !important;
-          }
-          body.telya-printing #telya-print-root table {
-            font-size: 8px !important;
-          }
-          body.telya-printing #telya-print-root table th,
-          body.telya-printing #telya-print-root table td {
-            padding: 2px 4px !important;
-          }
-        }
-      `}</style>
+      {/* Print styles handled in iframe */}
       <div className="space-y-6">
       {/* Eingangsbeleg (Intake Receipt) */}
       <Card className="card-elevated">
