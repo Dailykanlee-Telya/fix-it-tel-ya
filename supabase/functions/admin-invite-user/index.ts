@@ -233,10 +233,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate password reset link
+    // Generate password reset link with redirect to our app
+    const baseUrl = publicAppUrl || req.headers.get('origin') || '';
+    const redirectUrl = `${baseUrl}/auth`;
+    
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
+      options: {
+        redirectTo: redirectUrl,
+      }
     });
 
     if (linkError) {
@@ -247,40 +253,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Extract token from the generated link
-    const generatedLink = linkData?.properties?.action_link;
-    console.log('Generated link:', generatedLink);
-
-    // Build the frontend URL
-    // The Supabase link contains token_hash and type params that we need to preserve
-    let frontendUrl: string;
-    if (generatedLink) {
-      // Replace the Supabase URL with our app URL
-      try {
-        const parsedLink = new URL(generatedLink);
-        const token = parsedLink.searchParams.get('token') || parsedLink.hash?.split('access_token=')[1]?.split('&')[0];
-        const tokenHash = parsedLink.searchParams.get('token_hash');
-        const type = parsedLink.searchParams.get('type') || 'recovery';
-        
-        // Build our app URL with the necessary params
-        const baseUrl = publicAppUrl || req.headers.get('origin') || '';
-        frontendUrl = `${baseUrl}/auth?type=${type}`;
-        if (tokenHash) {
-          frontendUrl += `&token_hash=${tokenHash}`;
-        }
-        if (token) {
-          frontendUrl += `&token=${token}`;
-        }
-      } catch (e) {
-        console.error('Error parsing link:', e);
-        frontendUrl = generatedLink;
-      }
-    } else {
-      // Fallback - just use the original link
-      frontendUrl = linkData?.properties?.action_link || `${publicAppUrl}/auth`;
-    }
-
-    console.log('Frontend invitation URL:', frontendUrl);
+    // Use the Supabase verification link directly - it will redirect to our app with session
+    const frontendUrl = linkData?.properties?.action_link || '';
+    console.log('Invitation URL (Supabase verify link):', frontendUrl);
 
     // Send invitation email
     const roleLabels: Record<string, string> = {
