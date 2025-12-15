@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
+import { ProtectedRoute as PermissionProtectedRoute } from "@/components/layout/ProtectedRoute";
 
 // Layouts
 import AppLayout from "@/components/layout/AppLayout";
@@ -45,7 +46,7 @@ import B2BShipmentDetail from "@/pages/b2b/B2BShipmentDetail";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function AuthProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isApproved, signOut } = useAuth();
 
   if (loading) {
@@ -121,37 +122,101 @@ function AppRoutes() {
         <Route
           path="/"
           element={
-            <ProtectedRoute>
+            <AuthProtectedRoute>
               <AppLayout />
-            </ProtectedRoute>
+            </AuthProtectedRoute>
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="intake" element={<Intake />} />
-          <Route path="workshop" element={<Workshop />} />
-          <Route path="tickets" element={<Tickets />} />
-          <Route path="tickets/:id" element={<TicketDetail />} />
-          <Route path="parts" element={<Parts />} />
-          <Route path="customers" element={<Customers />} />
-          <Route path="locations" element={<Locations />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="permissions" element={<PermissionSettings />} />
-          <Route path="b2b-partners" element={<B2BPartners />} />
-          <Route path="b2b-return-shipments" element={<B2BReturnShipments />} />
-          <Route path="b2b-return-shipments/new" element={<B2BReturnShipmentNew />} />
-          <Route path="b2b-return-shipments/:id" element={<B2BReturnShipmentDetail />} />
+          <Route path="dashboard" element={
+            <PermissionProtectedRoute requiredPermission="VIEW_DASHBOARD">
+              <Dashboard />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="intake" element={
+            <PermissionProtectedRoute requiredPermission="VIEW_INTAKE">
+              <Intake />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="workshop" element={
+            <PermissionProtectedRoute requiredPermission="VIEW_WORKSHOP">
+              <Workshop />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="tickets" element={
+            <PermissionProtectedRoute requiredPermission="VIEW_TICKET_DETAILS">
+              <Tickets />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="tickets/:id" element={
+            <PermissionProtectedRoute requiredPermission="VIEW_TICKET_DETAILS">
+              <TicketDetail />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="parts" element={
+            <PermissionProtectedRoute requiredPermission="VIEW_PARTS">
+              <Parts />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="customers" element={
+            <PermissionProtectedRoute requiredPermission="VIEW_CUSTOMERS">
+              <Customers />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="locations" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_SETTINGS">
+              <Locations />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="reports" element={
+            <PermissionProtectedRoute requiredPermission="VIEW_REPORTS">
+              <Reports />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="settings" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_SETTINGS">
+              <Settings />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="users" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_USERS">
+              <UserManagement />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="permissions" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_PERMISSIONS">
+              <PermissionSettings />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="b2b-partners" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_B2B_PARTNERS">
+              <B2BPartners />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="b2b-return-shipments" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_B2B_PARTNERS">
+              <B2BReturnShipments />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="b2b-return-shipments/new" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_B2B_PARTNERS">
+              <B2BReturnShipmentNew />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="b2b-return-shipments/:id" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_B2B_PARTNERS">
+              <B2BReturnShipmentDetail />
+            </PermissionProtectedRoute>
+          } />
         </Route>
 
         {/* B2B Portal routes */}
         <Route
           path="/b2b"
           element={
-            <ProtectedRoute>
+            <AuthProtectedRoute>
               <B2BLayout />
-            </ProtectedRoute>
+            </AuthProtectedRoute>
           }
         >
           <Route index element={<Navigate to="/b2b/dashboard" replace />} />

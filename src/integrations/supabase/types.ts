@@ -1234,6 +1234,19 @@ export type Database = {
       generate_ticket_number: { Args: never; Returns: string }
       generate_tracking_token: { Args: never; Returns: string }
       get_b2b_partner_id: { Args: { _user_id: string }; Returns: string }
+      get_user_locations: {
+        Args: { _user_id: string }
+        Returns: {
+          is_default: boolean
+          location_id: string
+        }[]
+      }
+      get_user_permissions: {
+        Args: { _user_id: string }
+        Returns: {
+          permission_key: string
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
