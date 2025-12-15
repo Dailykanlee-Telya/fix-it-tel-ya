@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/table';
 import {
   Users,
-  Shield,
   CheckCircle2,
   XCircle,
   Clock,
@@ -26,6 +25,7 @@ import {
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { AppRole, ROLE_LABELS } from '@/types/database';
+import { InviteUserDialog } from '@/components/admin/InviteUserDialog';
 
 export default function UserManagement() {
   const { hasRole } = useAuth();
@@ -167,9 +167,12 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Benutzerverwaltung</h1>
-        <p className="text-muted-foreground">Benutzer freischalten und Rollen verwalten</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Benutzerverwaltung</h1>
+          <p className="text-muted-foreground">Benutzer einladen, freischalten und Rollen verwalten</p>
+        </div>
+        <InviteUserDialog />
       </div>
 
       {/* Pending Approvals */}
