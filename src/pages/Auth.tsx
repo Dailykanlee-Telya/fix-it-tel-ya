@@ -1,23 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Wrench, Mail, Lock, User, Loader2, Search, ShieldAlert, Building2, Users, ExternalLink } from 'lucide-react';
+import { Mail, Lock, Loader2, Search, ShieldAlert, Building2, Users, KeyRound, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useRateLimiter, AUTH_RATE_LIMIT_CONFIG } from '@/hooks/useRateLimiter';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+
 const loginSchema = z.object({
   email: z.string().email('Ungültige E-Mail-Adresse'),
   password: z.string().min(6, 'Passwort muss mindestens 6 Zeichen haben')
 });
+
+const passwordSchema = z.object({
+  password: z.string().min(6, 'Passwort muss mindestens 6 Zeichen haben'),
+  confirmPassword: z.string().min(6, 'Passwort muss mindestens 6 Zeichen haben'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwörter stimmen nicht überein",
+  path: ["confirmPassword"],
+});
+
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     user,
     signIn,
@@ -30,17 +42,71 @@ export default function Auth() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loginType, setLoginType] = useState<'employee' | 'b2b'>('employee');
 
+  // Password reset state
+  const [isPasswordResetMode, setIsPasswordResetMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordResetSuccess, setPasswordResetSuccess] = useState(false);
+
   // Rate limiting for login attempts
   const loginRateLimiter = useRateLimiter('auth_login', AUTH_RATE_LIMIT_CONFIG);
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+
+  // Check URL params for recovery flow
   useEffect(() => {
-    if (user && !authLoading) {
+    const type = searchParams.get('type');
+    const tokenHash = searchParams.get('token_hash');
+    const accessToken = searchParams.get('access_token');
+    const error = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
+
+    // Handle error from Supabase redirect
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: errorDescription || 'Ein Fehler ist aufgetreten.',
+      });
+      return;
+    }
+
+    // Check if this is a recovery/invite flow
+    if (type === 'recovery' || tokenHash || accessToken) {
+      setIsPasswordResetMode(true);
+      
+      // If there's an access token in URL, we need to handle the session
+      if (accessToken) {
+        // The session should be automatically picked up by Supabase client
+        console.log('Recovery session detected');
+      }
+    }
+  }, [searchParams, toast]);
+
+  // Check auth state for recovery sessions
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change:', event, session?.user?.email);
+      
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordResetMode(true);
+      }
+      
+      if (event === 'SIGNED_IN' && !isPasswordResetMode && session?.user) {
+        navigate('/dashboard');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate, isPasswordResetMode]);
+
+  useEffect(() => {
+    if (user && !authLoading && !isPasswordResetMode) {
       navigate('/dashboard');
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, isPasswordResetMode]);
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -107,10 +173,167 @@ export default function Auth() {
       setLoading(false);
     }
   };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+    setLoading(true);
+
+    try {
+      const validated = passwordSchema.parse({
+        password: newPassword,
+        confirmPassword: confirmPassword,
+      });
+
+      const { error } = await supabase.auth.updateUser({
+        password: validated.password,
+      });
+
+      if (error) {
+        if (error.message.includes('expired') || error.message.includes('invalid')) {
+          toast({
+            variant: 'destructive',
+            title: 'Link abgelaufen',
+            description: 'Der Einladungslink ist abgelaufen oder ungültig. Bitte wenden Sie sich an Ihren Administrator.',
+          });
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Fehler',
+            description: error.message,
+          });
+        }
+        return;
+      }
+
+      setPasswordResetSuccess(true);
+      toast({
+        title: 'Passwort gesetzt',
+        description: 'Ihr Passwort wurde erfolgreich gespeichert.',
+      });
+
+      // After 2 seconds, redirect to dashboard
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
+
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        error.errors.forEach(err => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>;
+  }
+
+  // Password Reset Mode (for invited users)
+  if (isPasswordResetMode) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-1/2 -right-1/2 w-full h-full bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-accent/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-md">
+          <div className="flex flex-col items-center mb-8">
+            <h1 className="text-2xl font-bold text-foreground">Telya Reparatur</h1>
+            <p className="text-muted-foreground mt-1">Management System</p>
+          </div>
+
+          <Card className="border-0 shadow-xl">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">Passwort setzen</CardTitle>
+              </div>
+              <CardDescription>
+                Willkommen! Bitte legen Sie jetzt Ihr Passwort fest, um sich anzumelden.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              {passwordResetSuccess ? (
+                <div className="text-center py-6">
+                  <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-foreground mb-2">Passwort erfolgreich gesetzt!</p>
+                  <p className="text-muted-foreground">Sie werden jetzt weitergeleitet...</p>
+                </div>
+              ) : (
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">Neues Passwort</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="new-password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        className="pl-9"
+                        disabled={loading}
+                        minLength={6}
+                      />
+                    </div>
+                    {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Passwort bestätigen</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        className="pl-9"
+                        disabled={loading}
+                        minLength={6}
+                      />
+                    </div>
+                    {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Das Passwort muss mindestens 6 Zeichen lang sein.
+                  </p>
+
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Wird gespeichert...
+                      </>
+                    ) : (
+                      'Passwort speichern'
+                    )}
+                  </Button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            © {new Date().getFullYear()} Telya GmbH. Alle Rechte vorbehalten.
+          </p>
+        </div>
+      </div>
+    );
   }
   return <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4 py-[4px] bg-primary text-destructive">
       {/* Background decoration */}
