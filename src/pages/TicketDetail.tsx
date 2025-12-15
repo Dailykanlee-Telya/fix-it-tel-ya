@@ -84,7 +84,8 @@ export default function TicketDetail() {
           customer:customers(*),
           device:devices(*),
           location:locations(*),
-          assigned_technician:profiles(*)
+          assigned_technician:profiles(*),
+          shipment:b2b_shipments(shipment_number)
         `)
         .eq('id', id)
         .maybeSingle();

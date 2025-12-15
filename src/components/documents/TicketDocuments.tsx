@@ -67,12 +67,14 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
     if (!ref.current) return;
 
     const ticketNumber = ticket.ticket_number || 'Auftrag';
+    // For Lieferschein: use shipment number if available, otherwise Auftragsnummer
+    const lieferscheinNumber = ticket.shipment?.shipment_number || ticketNumber;
 
     const filenameMap = {
       eingangsbeleg: `Eingangsbeleg-${ticketNumber}`,
       kva: `KVA-${ticketNumber}`,
       reparaturbericht: `Reparaturbericht-${ticketNumber}`,
-      lieferschein: `Lieferschein-${ticketNumber}`,
+      lieferschein: `Lieferschein-${lieferscheinNumber}`,
     } as const;
 
     const pdfFilename = filenameMap[docType];
