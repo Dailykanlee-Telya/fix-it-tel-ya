@@ -25,14 +25,44 @@ export default function PhotoUpload({ ticketId, onPhotosChange, maxPhotos = 5 }:
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Allowed MIME types and max file size (must match server-side bucket config)
+  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/jpg'];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     const remainingSlots = maxPhotos - photos.length;
-    const filesToAdd = Array.from(files).slice(0, remainingSlots);
+    const allFiles = Array.from(files);
+    
+    // Validate file types and sizes
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+    
+    for (const file of allFiles) {
+      if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+        invalidFiles.push(`${file.name}: Ungültiges Format (nur JPG, PNG, WebP, HEIC erlaubt)`);
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push(`${file.name}: Zu groß (max. 10 MB)`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+    
+    if (invalidFiles.length > 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Ungültige Dateien',
+        description: invalidFiles.slice(0, 3).join('\n') + (invalidFiles.length > 3 ? `\n...und ${invalidFiles.length - 3} weitere` : ''),
+      });
+    }
+    
+    const filesToAdd = validFiles.slice(0, remainingSlots);
 
-    if (filesToAdd.length < files.length) {
+    if (filesToAdd.length < validFiles.length) {
       toast({
         title: 'Hinweis',
         description: `Maximal ${maxPhotos} Fotos erlaubt. Einige Fotos wurden nicht hinzugefügt.`,
