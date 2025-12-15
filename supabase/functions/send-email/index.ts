@@ -9,11 +9,12 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: 'ticket_created' | 'kva_ready' | 'ready_for_pickup' | 'custom';
+  type: 'ticket_created' | 'kva_ready' | 'ready_for_pickup' | 'custom' | 'user_approved';
   ticket_id?: string;
   to_email?: string;
   subject?: string;
   body?: string;
+  user_name?: string;
 }
 
 interface TicketEmailData {
@@ -244,10 +245,85 @@ Deno.serve(async (req) => {
       );
     }
 
-    const body: EmailRequest = await req.json();
-    const { type, ticket_id, to_email, subject, body: customBody } = body;
+    const emailBody: EmailRequest = await req.json();
+    const { type, ticket_id, to_email, subject, body: customBody, user_name } = emailBody;
 
     console.log('Email request received:', { type, ticket_id, to_email, user_id: user.id });
+
+    // Handle user approved email - ADMIN only
+    if (type === 'user_approved' && to_email && user_name) {
+      const hasAdmin = roles.some(r => r.role === 'ADMIN');
+      if (!hasAdmin) {
+        console.error('Non-admin tried to send user approval email:', user.id);
+        return new Response(
+          JSON.stringify({ error: 'Keine Berechtigung - Nur Admins können Benutzer-E-Mails senden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const baseUrl = getBaseUrl(req);
+      const userApprovedHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+            .header { background: #1e3a5f; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; }
+            .info-box { background: #e8f4fd; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; }
+            .btn { display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+            .footer { font-size: 12px; color: #666; padding: 20px; border-top: 1px solid #eee; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Telya Reparaturservice</h1>
+          </div>
+          <div class="content">
+            <p>Hallo ${user_name},</p>
+            <p>Ihr Benutzerkonto wurde erfolgreich freigeschaltet. Sie können sich ab sofort im Telya Repair Management System anmelden.</p>
+            
+            <div class="info-box">
+              <p><strong>Ihr Konto ist jetzt aktiv!</strong></p>
+              <a href="${baseUrl}" class="btn">Jetzt anmelden</a>
+            </div>
+            
+            <p>Bei Fragen wenden Sie sich bitte an Ihren Administrator.</p>
+            <p>Mit freundlichen Grüßen,<br>Ihr Telya Team</p>
+          </div>
+          <div class="footer">
+            <p>Telya GmbH | Diese E-Mail wurde automatisch generiert.</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Log for audit
+      await supabase.from('audit_logs').insert({
+        action: 'send_user_approved_email',
+        user_id: user.id,
+        entity_type: 'user',
+        meta: { to_email, user_name }
+      });
+
+      const { data, error } = await resend.emails.send({
+        from: 'Telya Reparatur <noreply@telya.repariert.de>',
+        to: [to_email],
+        subject: 'Ihr Telya-Konto wurde freigeschaltet',
+        html: userApprovedHtml,
+      });
+
+      if (error) {
+        console.error('Error sending user approved email:', error);
+        throw error;
+      }
+
+      console.log('User approved email sent:', data);
+      return new Response(JSON.stringify({ success: true, data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Handle custom email - ADMIN only
     if (type === 'custom' && to_email && subject && customBody) {

@@ -61,20 +61,36 @@ export default function UserManagement() {
 
   // Approve user mutation
   const approveUserMutation = useMutation({
-    mutationFn: async ({ userId, approve }: { userId: string; approve: boolean }) => {
+    mutationFn: async ({ userId, approve, userEmail, userName }: { userId: string; approve: boolean; userEmail?: string; userName?: string }) => {
       const { error } = await supabase
         .from('profiles')
         .update({ is_active: approve })
         .eq('id', userId);
 
       if (error) throw error;
+
+      // Send approval email if approving and email is available
+      if (approve && userEmail && userName) {
+        try {
+          await supabase.functions.invoke('send-email', {
+            body: {
+              type: 'user_approved',
+              to_email: userEmail,
+              user_name: userName,
+            },
+          });
+        } catch (emailError) {
+          console.error('Failed to send approval email:', emailError);
+          // Don't throw - approval was successful, email is secondary
+        }
+      }
     },
     onSuccess: (_, { approve }) => {
       queryClient.invalidateQueries({ queryKey: ['users-management'] });
       toast({
         title: approve ? 'Benutzer freigeschaltet' : 'Benutzer deaktiviert',
         description: approve 
-          ? 'Der Benutzer kann sich jetzt anmelden.'
+          ? 'Der Benutzer wurde freigeschaltet und per E-Mail benachrichtigt.'
           : 'Der Benutzer wurde deaktiviert.',
       });
     },
@@ -209,7 +225,12 @@ export default function UserManagement() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => approveUserMutation.mutate({ userId: user.id, approve: true })}
+                          onClick={() => approveUserMutation.mutate({ 
+                            userId: user.id, 
+                            approve: true, 
+                            userEmail: user.email, 
+                            userName: user.name 
+                          })}
                           disabled={approveUserMutation.isPending}
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
