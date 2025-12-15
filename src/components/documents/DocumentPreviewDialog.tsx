@@ -145,162 +145,31 @@ export default function DocumentPreviewDialog({
     enabled: ticketSearch.length >= 2,
   });
 
-  const handlePrint = async () => {
+  const PRINT_ROOT_ID = 'telya-print-root';
+
+  const handlePrint = () => {
     if (!previewRef.current) return;
-    
-    // Convert logo to base64 for print
-    const logoBase64 = await new Promise<string>((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      };
-      img.onerror = () => resolve('');
-      img.src = telyaLogo;
-    });
-    
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    
-    // Replace img src with base64
-    let content = previewRef.current.innerHTML;
-    content = content.replace(/src="[^"]*telya-logo[^"]*"/g, `src="${logoBase64}"`);
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${template?.title || 'Dokument'}</title>
-          <style>
-            @page {
-              size: A4;
-              margin: 15mm;
-            }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { 
-              width: 210mm;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-              color: #1a1a1a; 
-              font-size: 11px; 
-              line-height: 1.4;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .document { 
-              width: 100%;
-              padding: 0;
-            }
-            
-            /* Header */
-            .header { 
-              display: flex; 
-              justify-content: space-between; 
-              align-items: flex-start; 
-              margin-bottom: 20px; 
-              padding-bottom: 12px; 
-              border-bottom: 2px solid #1e40af; 
-            }
-            .header img { height: 40px; display: block; }
-            
-            .text-right { text-align: right; }
-            .text-xl { font-size: 18px; }
-            .text-lg { font-size: 14px; }
-            .text-sm { font-size: 11px; }
-            .text-xs { font-size: 9px; }
-            .text-\\[10px\\] { font-size: 9px; }
-            .font-bold { font-weight: 700; }
-            .font-semibold { font-weight: 600; }
-            .font-medium { font-weight: 500; }
-            .font-mono { font-family: 'Courier New', monospace; }
-            .text-primary { color: #1e40af; }
-            .text-muted-foreground { color: #666; }
-            
-            /* Grid */
-            .grid { display: grid; }
-            .grid-cols-2 { grid-template-columns: 1fr 1fr; }
-            .gap-6 { gap: 20px; }
-            .gap-2 { gap: 6px; }
-            .space-y-2 > * + * { margin-top: 6px; }
-            .space-y-1 > * + * { margin-top: 4px; }
-            
-            /* Margins */
-            .mb-6 { margin-bottom: 20px; }
-            .mb-4 { margin-bottom: 14px; }
-            .mb-3 { margin-bottom: 10px; }
-            .mt-8 { margin-top: 24px; }
-            .mt-1 { margin-top: 3px; }
-            .ml-4 { margin-left: 12px; }
-            .p-4 { padding: 12px; }
-            .pb-4 { padding-bottom: 12px; }
-            .pb-2 { padding-bottom: 6px; }
-            .pt-4 { padding-top: 12px; }
-            .m-2 { margin: 0; }
-            
-            /* Borders */
-            .border-b { border-bottom: 1px solid #e5e7eb; }
-            .border-b-2 { border-bottom: 2px solid #1e40af; }
-            .border-t { border-top: 1px solid #e5e7eb; }
-            .rounded-lg { border-radius: 6px; }
-            .border { border: none; }
-            
-            /* Backgrounds */
-            .bg-muted\\/50 { background: #f3f4f6 !important; }
-            .bg-white { background: white; }
-            
-            /* Sections */
-            .intro { margin-bottom: 14px; line-height: 1.5; }
-            .conditions { 
-              background: #f3f4f6 !important; 
-              padding: 12px; 
-              border-radius: 6px; 
-              font-size: 10px; 
-              line-height: 1.5; 
-            }
-            .footer { 
-              margin-top: 20px; 
-              padding-top: 10px; 
-              border-top: 1px solid #e5e7eb; 
-              font-size: 9px; 
-              color: #666; 
-              text-align: center; 
-            }
-            
-            /* Flex */
-            .flex { display: flex; }
-            .items-start { align-items: flex-start; }
-            .justify-between { justify-content: space-between; }
-            .min-w-\\[1\\.5rem\\] { min-width: 1.2rem; }
-            
-            /* Text */
-            .uppercase { text-transform: uppercase; }
-            .tracking-wide { letter-spacing: 0.4px; }
-            .text-center { text-align: center; }
-            
-            /* Spacing */
-            .h-2 { height: 6px; }
-            .h-12 { height: 40px; }
-            
-            strong { font-weight: 700; }
-          </style>
-        </head>
-        <body>
-          <div class="document">
-            ${content}
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 100);
+
+    let printRoot = document.getElementById(PRINT_ROOT_ID);
+    if (!printRoot) {
+      printRoot = document.createElement('div');
+      printRoot.id = PRINT_ROOT_ID;
+      document.body.appendChild(printRoot);
+    }
+
+    printRoot.innerHTML = '';
+    printRoot.appendChild(previewRef.current.cloneNode(true));
+
+    const cleanup = () => {
+      document.body.classList.remove('telya-printing');
+      const root = document.getElementById(PRINT_ROOT_ID);
+      if (root) root.innerHTML = '';
+    };
+
+    window.addEventListener('afterprint', cleanup, { once: true });
+
+    document.body.classList.add('telya-printing');
+    window.print();
   };
 
   const isLoading = templateLoading || ticketLoading;
@@ -314,6 +183,20 @@ export default function DocumentPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 12mm; }
+          html, body { height: initial !important; overflow: initial !important; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+          body.telya-printing > :not(#telya-print-root) { display: none !important; }
+          body.telya-printing #telya-print-root { display: block !important; }
+
+          body.telya-printing #telya-print-root { position: relative; width: 100%; }
+          body.telya-printing #telya-print-root .m-2 { margin: 0 !important; }
+        }
+      `}</style>
+
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
