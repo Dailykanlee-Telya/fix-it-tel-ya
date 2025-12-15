@@ -19,6 +19,7 @@ import { de } from 'date-fns/locale';
 interface B2BPartner {
   id: string;
   name: string;
+  code: string | null;
   customer_number: string | null;
   street: string | null;
   zip: string | null;
@@ -51,6 +52,7 @@ export default function B2BPartners() {
   const [selectedPartner, setSelectedPartner] = useState<B2BPartner | null>(null);
   const [newPartner, setNewPartner] = useState({
     name: '',
+    code: '',
     customer_number: '',
     street: '',
     zip: '',
@@ -95,6 +97,7 @@ export default function B2BPartners() {
         .from('b2b_partners')
         .insert({
           name: partner.name,
+          code: partner.code?.toUpperCase().substring(0, 3) || null,
           customer_number: partner.customer_number || null,
           street: partner.street || null,
           zip: partner.zip || null,
@@ -115,7 +118,7 @@ export default function B2BPartners() {
       queryClient.invalidateQueries({ queryKey: ['b2b-partners-admin'] });
       setIsCreateOpen(false);
       setNewPartner({
-        name: '', customer_number: '', street: '', zip: '', city: '', country: 'Deutschland',
+        name: '', code: '', customer_number: '', street: '', zip: '', city: '', country: 'Deutschland',
         contact_name: '', contact_email: '', contact_phone: '', billing_email: '',
       });
     },
@@ -131,6 +134,7 @@ export default function B2BPartners() {
         .from('b2b_partners')
         .update({
           name: partner.name,
+          code: (partner as any).code?.toUpperCase().substring(0, 3) || null,
           customer_number: partner.customer_number,
           street: partner.street,
           zip: partner.zip,
@@ -332,8 +336,8 @@ export default function B2BPartners() {
               <DialogDescription>Erstellen Sie einen neuen Händler-Partner</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2 col-span-2">
                   <Label htmlFor="name">Firmenname *</Label>
                   <Input
                     id="name"
@@ -342,6 +346,20 @@ export default function B2BPartners() {
                     placeholder="Musterfirma GmbH"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="code">Kürzel (2-3 Z.) *</Label>
+                  <Input
+                    id="code"
+                    value={newPartner.code}
+                    onChange={(e) => setNewPartner({ ...newPartner, code: e.target.value.toUpperCase().substring(0, 3) })}
+                    placeholder="MF"
+                    maxLength={3}
+                    className="uppercase"
+                  />
+                  <p className="text-xs text-muted-foreground">Für Auftragsnummern</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="customer_number">Kundennummer</Label>
                   <Input
@@ -421,7 +439,7 @@ export default function B2BPartners() {
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Abbrechen</Button>
               <Button 
                 onClick={() => createPartnerMutation.mutate(newPartner)}
-                disabled={!newPartner.name || createPartnerMutation.isPending}
+                disabled={!newPartner.name || !newPartner.code || createPartnerMutation.isPending}
               >
                 {createPartnerMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Erstellen

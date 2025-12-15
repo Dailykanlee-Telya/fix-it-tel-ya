@@ -31,6 +31,7 @@ export default function Locations() {
   const [editingLocation, setEditingLocation] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: '',
+    code: '',
     address: '',
     phone: '',
   });
@@ -52,6 +53,7 @@ export default function Locations() {
     mutationFn: async () => {
       const locationData = {
         name: formData.name,
+        code: formData.code?.toUpperCase().substring(0, 3) || null,
         address: formData.address || null,
         phone: formData.phone || null,
       };
@@ -91,6 +93,7 @@ export default function Locations() {
     setEditingLocation(null);
     setFormData({
       name: '',
+      code: '',
       address: '',
       phone: '',
     });
@@ -100,6 +103,7 @@ export default function Locations() {
     setEditingLocation(location);
     setFormData({
       name: location.name,
+      code: location.code || '',
       address: location.address || '',
       phone: location.phone || '',
     });
@@ -134,13 +138,28 @@ export default function Locations() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Name *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="z.B. Filiale Hamburg"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Name *</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="z.B. Filiale Hamburg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Kürzel (2-3 Zeichen) *</Label>
+                  <Input
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase().substring(0, 3) })}
+                    placeholder="z.B. GE, BO, HH"
+                    maxLength={3}
+                    className="uppercase"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Wird für Auftragsnummern verwendet
+                  </p>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Adresse</Label>
@@ -163,7 +182,7 @@ export default function Locations() {
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
                 Abbrechen
               </Button>
-              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !formData.name}>
+              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !formData.name || !formData.code}>
                 {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Speichern
               </Button>
@@ -188,8 +207,8 @@ export default function Locations() {
           <Card key={location.id} className="card-elevated hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-primary" />
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary">
+                  {location.code || '??'}
                 </div>
                 <CardTitle className="text-lg">{location.name}</CardTitle>
               </div>

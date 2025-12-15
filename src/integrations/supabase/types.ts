@@ -56,6 +56,7 @@ export type Database = {
         Row: {
           billing_email: string | null
           city: string | null
+          code: string | null
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
@@ -73,6 +74,7 @@ export type Database = {
         Insert: {
           billing_email?: string | null
           city?: string | null
+          code?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -90,6 +92,7 @@ export type Database = {
         Update: {
           billing_email?: string | null
           city?: string | null
+          code?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -389,6 +392,7 @@ export type Database = {
       locations: {
         Row: {
           address: string | null
+          code: string | null
           created_at: string
           id: string
           name: string
@@ -397,6 +401,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          code?: string | null
           created_at?: string
           id?: string
           name: string
@@ -405,6 +410,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          code?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -983,6 +989,21 @@ export type Database = {
           },
         ]
       }
+      ticket_number_sequence: {
+        Row: {
+          next_number: number
+          year: number
+        }
+        Insert: {
+          next_number?: number
+          year: number
+        }
+        Update: {
+          next_number?: number
+          year?: number
+        }
+        Relationships: []
+      }
       ticket_part_usage: {
         Row: {
           created_at: string
@@ -1089,6 +1110,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_order_number: {
+        Args: { _b2b_partner_id?: string; _location_id: string }
+        Returns: string
+      }
       generate_shipment_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
       generate_tracking_token: { Args: never; Returns: string }
@@ -1102,6 +1127,7 @@ export type Database = {
       }
       is_b2b_user: { Args: { _user_id: string }; Returns: boolean }
       is_employee: { Args: { _user_id: string }; Returns: boolean }
+      reset_all_data: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role:

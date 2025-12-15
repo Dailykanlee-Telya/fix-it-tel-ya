@@ -112,9 +112,12 @@ export default function B2BOrderNew() {
 
       if (deviceError) throw deviceError;
 
-      // 3. Generate ticket number
+      // 3. Generate order number using the new function
       const { data: ticketNumberData, error: ticketNumberError } = await supabase
-        .rpc('generate_ticket_number');
+        .rpc('generate_order_number', {
+          _location_id: defaultLocationId,
+          _b2b_partner_id: b2bPartnerId,
+        });
 
       if (ticketNumberError) throw ticketNumberError;
 

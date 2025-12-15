@@ -199,15 +199,14 @@ export default function Intake() {
 
       if (deviceError) throw deviceError;
 
-      // Generate ticket number
-      const today = new Date();
-      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-      const { count } = await supabase
-        .from('repair_tickets')
-        .select('*', { count: 'exact', head: true })
-        .like('ticket_number', `TELYA-${dateStr}-%`);
-      
-      const ticketNumber = `TELYA-${dateStr}-${String((count || 0) + 1).padStart(4, '0')}`;
+      // Generate order number using the new function
+      const { data: ticketNumber, error: ticketNumberError } = await supabase
+        .rpc('generate_order_number', {
+          _location_id: locationId,
+          _b2b_partner_id: null,
+        });
+
+      if (ticketNumberError) throw ticketNumberError;
 
       // Generate tracking token (kva_token)
       const generateToken = () => {
