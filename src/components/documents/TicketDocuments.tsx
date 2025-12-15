@@ -60,90 +60,107 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
   const delivery = getTemplate('LIEFERSCHEIN', deliveryTemplate);
 
   // Print via dedicated iframe for correct PDF filename
-  const handlePrint = (ref: React.RefObject<HTMLDivElement>, docType: 'eingangsbeleg' | 'kva' | 'reparaturbericht' | 'lieferschein') => {
+  const handlePrint = (
+    ref: React.RefObject<HTMLDivElement>,
+    docType: 'eingangsbeleg' | 'kva' | 'reparaturbericht' | 'lieferschein'
+  ) => {
     if (!ref.current) return;
 
     const ticketNumber = ticket.ticket_number || 'Auftrag';
+
     const filenameMap = {
-      'eingangsbeleg': `Eingangsbeleg-${ticketNumber}`,
-      'kva': `KVA-${ticketNumber}`,
-      'reparaturbericht': `Reparaturbericht-${ticketNumber}`,
-      'lieferschein': `Lieferschein-${ticketNumber}`
-    };
+      eingangsbeleg: `Eingangsbeleg-${ticketNumber}`,
+      kva: `KVA-${ticketNumber}`,
+      reparaturbericht: `Reparaturbericht-${ticketNumber}`,
+      lieferschein: `Lieferschein-${ticketNumber}`,
+    } as const;
+
     const pdfFilename = filenameMap[docType];
 
-    // Create hidden iframe for printing
+    // IMPORTANT: Some browsers still use the top-level document title for the PDF suggestion.
+    // So we set it temporarily as well.
+    const originalTitle = document.title;
+    document.title = pdfFilename;
+
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
     iframe.style.width = '0';
     iframe.style.height = '0';
     iframe.style.border = 'none';
     iframe.style.left = '-9999px';
+    iframe.src = 'about:blank';
     document.body.appendChild(iframe);
 
     const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
     if (!iframeDoc) {
+      document.title = originalTitle;
       document.body.removeChild(iframe);
       return;
     }
 
+    const cleanup = () => {
+      document.title = originalTitle;
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    };
+
+    // Try to cleanup when print dialog closes
+    window.addEventListener('afterprint', cleanup, { once: true });
+    iframe.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
+
     // Get all stylesheets from main document
     const styles = Array.from(document.styleSheets)
-      .map(sheet => {
+      .map((sheet) => {
         try {
-          return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n');
+          return Array.from(sheet.cssRules)
+            .map((rule) => rule.cssText)
+            .join('\n');
         } catch {
           return '';
         }
       })
       .join('\n');
 
-    // Build iframe HTML with correct title for PDF filename
     iframeDoc.open();
     iframeDoc.write(`
       <!DOCTYPE html>
       <html>
-      <head>
-        <title>${pdfFilename}</title>
-        <style>
-          ${styles}
-          @page { size: A4; margin: 8mm; }
-          html, body { margin: 0; padding: 0; font-size: 10px; }
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .document { padding: 4mm; font-size: 9px; }
-          .doc-header { margin-bottom: 3mm; padding-bottom: 2mm; }
-          .conditions-block { 
-            font-size: 6.5px !important; 
-            line-height: 1.15 !important;
-            max-height: 100px !important;
-            overflow: hidden !important;
-            padding: 4px !important;
-            margin-top: 4px !important;
-          }
-          .doc-footer { font-size: 7px; margin-top: 4px; padding-top: 4px; }
-          .footer-text { font-size: 7px; margin-top: 4px; }
-          table { font-size: 8px; }
-          table th, table td { padding: 2px 4px; }
-        </style>
-      </head>
-      <body>
-        ${ref.current.outerHTML}
-      </body>
+        <head>
+          <title>${pdfFilename}</title>
+          <style>
+            ${styles}
+            @page { size: A4; margin: 8mm; }
+            html, body { margin: 0; padding: 0; font-size: 10px; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .document { padding: 4mm; font-size: 9px; }
+            .doc-header { margin-bottom: 3mm; padding-bottom: 2mm; }
+            .conditions-block {
+              font-size: 6.5px !important;
+              line-height: 1.15 !important;
+              max-height: 100px !important;
+              overflow: hidden !important;
+              padding: 4px !important;
+              margin-top: 4px !important;
+            }
+            .doc-footer { font-size: 7px; margin-top: 4px; padding-top: 4px; }
+            .footer-text { font-size: 7px; margin-top: 4px; }
+            table { font-size: 8px; }
+            table th, table td { padding: 2px 4px; }
+          </style>
+        </head>
+        <body>
+          ${ref.current.outerHTML}
+        </body>
       </html>
     `);
     iframeDoc.close();
 
-    // Wait for iframe to load then print
-    iframe.onload = () => {
-      setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        // Cleanup after print dialog closes
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-      }, 100);
-    };
+    // Print shortly after DOM is available
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      // Safety cleanup (in case afterprint doesn't fire)
+      setTimeout(cleanup, 4000);
+    }, 150);
   };
 
   const totalPartsPrice = partUsage?.reduce((sum: number, p: any) => sum + (p.unit_sales_price || 0) * p.quantity, 0) || 0;

@@ -156,44 +156,98 @@ export default function DocumentPreviewDialog({
     enabled: ticketSearch.length >= 2,
   });
 
-  const PRINT_ROOT_ID = 'telya-print-root';
-
   const handlePrint = () => {
     if (!previewRef.current) return;
 
-    // Set document title for PDF filename
     const ticketNumber = ticket?.ticket_number || 'Dokument';
     const typeMap: Record<string, string> = {
-      'EINGANGSBELEG': 'Eingangsbeleg',
-      'KVA': 'KVA',
-      'REPARATURBERICHT': 'Reparaturbericht',
-      'LIEFERSCHEIN': 'Lieferschein'
+      EINGANGSBELEG: 'Eingangsbeleg',
+      KVA: 'KVA',
+      REPARATURBERICHT: 'Reparaturbericht',
+      LIEFERSCHEIN: 'Lieferschein',
     };
-    const docName = typeMap[type || ''] || 'Dokument';
-    const originalTitle = document.title;
-    document.title = `${docName}-${ticketNumber}`;
 
-    let printRoot = document.getElementById(PRINT_ROOT_ID);
-    if (!printRoot) {
-      printRoot = document.createElement('div');
-      printRoot.id = PRINT_ROOT_ID;
-      document.body.appendChild(printRoot);
+    const docName = typeMap[type || ''] || 'Dokument';
+    const pdfFilename = `${docName}-${ticketNumber}`;
+
+    const originalTitle = document.title;
+    document.title = pdfFilename;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.left = '-9999px';
+    iframe.src = 'about:blank';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      document.title = originalTitle;
+      document.body.removeChild(iframe);
+      return;
     }
 
-    printRoot.innerHTML = '';
-    printRoot.appendChild(previewRef.current.cloneNode(true));
-
     const cleanup = () => {
-      document.body.classList.remove('telya-printing');
       document.title = originalTitle;
-      const root = document.getElementById(PRINT_ROOT_ID);
-      if (root) root.innerHTML = '';
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
     };
 
     window.addEventListener('afterprint', cleanup, { once: true });
+    iframe.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
 
-    document.body.classList.add('telya-printing');
-    window.print();
+    const styles = Array.from(document.styleSheets)
+      .map((sheet) => {
+        try {
+          return Array.from(sheet.cssRules)
+            .map((rule) => rule.cssText)
+            .join('\n');
+        } catch {
+          return '';
+        }
+      })
+      .join('\n');
+
+    iframeDoc.open();
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${pdfFilename}</title>
+          <style>
+            ${styles}
+            @page { size: A4; margin: 8mm; }
+            html, body { margin: 0; padding: 0; font-size: 10px; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .document { padding: 4mm; font-size: 9px; }
+            .doc-header { margin-bottom: 3mm; padding-bottom: 2mm; }
+            .conditions {
+              font-size: 6.5px !important;
+              line-height: 1.15 !important;
+              max-height: 100px !important;
+              overflow: hidden !important;
+              padding: 4px !important;
+              margin-top: 4px !important;
+            }
+            .doc-footer { font-size: 7px; margin-top: 4px; padding-top: 4px; }
+            .footer-text { font-size: 7px; margin-top: 4px; }
+            table { font-size: 8px; }
+            table th, table td { padding: 2px 4px; }
+          </style>
+        </head>
+        <body>
+          ${previewRef.current.outerHTML}
+        </body>
+      </html>
+    `);
+    iframeDoc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(cleanup, 4000);
+    }, 150);
   };
 
   const isLoading = templateLoading || ticketLoading;
