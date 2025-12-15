@@ -56,6 +56,7 @@ export interface Profile {
   default_location_id?: string;
   b2b_partner_id?: string;
   is_active: boolean;
+  can_view_all_locations?: boolean;
   created_at: string;
   updated_at: string;
 }
