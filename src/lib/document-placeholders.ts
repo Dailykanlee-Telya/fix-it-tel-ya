@@ -130,9 +130,11 @@ export function buildPlaceholderMap(data: PlaceholderData): Record<string, strin
     // Preise & KVA
     kva_betrag_brutto: `${(ticket?.estimated_price || 0).toFixed(2)} €`,
     kva_gebuehr_brutto: ticket?.kva_fee_amount ? `${ticket.kva_fee_amount.toFixed(2)} €` : '19,90 €',
+    kva_gebuehr_betrag: ticket?.kva_fee_amount ? `${ticket.kva_fee_amount.toFixed(2)} €` : '19,90 €', // Alias
     endbetrag_brutto: `${totalPrice.toFixed(2)} €`,
     teile_betrag: `${totalPartsPrice.toFixed(2)} €`,
     kva_gueltigkeit_tage: '14',
+    uhrzeit: format(now, 'HH:mm', { locale: de }),
     
     // Versand (Lieferschein)
     lieferscheinnummer: ticket?.ticket_number || '',
