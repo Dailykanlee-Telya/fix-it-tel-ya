@@ -291,8 +291,22 @@ export default function Intake() {
         }
       }
 
-      // TODO: Email-Versand vorübergehend deaktiviert bis Domain bei Resend verifiziert ist
-      // Reaktivieren nach Domain-Verifizierung unter resend.com/domains
+      // Send confirmation email if customer has email and opted in
+      const customerEmail = showNewCustomer ? newCustomer.email : selectedCustomer?.email;
+      if (customerEmail && emailOptIn) {
+        try {
+          await supabase.functions.invoke('send-email', {
+            body: {
+              type: 'ticket_created',
+              ticket_id: ticketData.id,
+            },
+          });
+          console.log('Confirmation email sent successfully');
+        } catch (emailError) {
+          console.error('Error sending confirmation email:', emailError);
+          // Don't fail the ticket creation if email fails
+        }
+      }
 
       return ticketData;
     },
