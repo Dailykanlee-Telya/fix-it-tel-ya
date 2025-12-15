@@ -35,8 +35,11 @@ import {
   Plus,
   Edit,
   Loader2,
+  Database,
+  AlertTriangle,
 } from 'lucide-react';
 import { AppRole, ROLE_LABELS, Profile } from '@/types/database';
+import { DataResetDialog } from '@/components/admin/DataResetDialog';
 
 export default function Settings() {
   const { profile, hasRole } = useAuth();
@@ -114,6 +117,7 @@ export default function Settings() {
         <TabsList>
           <TabsTrigger value="profile">Mein Profil</TabsTrigger>
           {isAdmin && <TabsTrigger value="users">Benutzer</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
@@ -259,6 +263,39 @@ export default function Settings() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="system" className="space-y-4">
+            <Card className="card-elevated">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Database className="h-5 w-5 text-primary" />
+                  Datenverwaltung
+                </CardTitle>
+                <CardDescription>
+                  Systemdaten verwalten und zurücksetzen
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-destructive">Testdaten löschen</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Löscht alle Kunden, B2B-Partner und Aufträge. Nutzen Sie diese Funktion
+                        nur in Test- oder Demo-Umgebungen. Diese Aktion kann nicht rückgängig gemacht werden.
+                      </p>
+                      <div className="pt-2">
+                        <DataResetDialog />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
