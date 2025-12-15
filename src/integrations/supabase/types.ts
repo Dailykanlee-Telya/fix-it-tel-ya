@@ -365,6 +365,42 @@ export type Database = {
           },
         ]
       }
+      document_templates: {
+        Row: {
+          conditions: string | null
+          created_at: string
+          footer: string | null
+          id: string
+          intro: string | null
+          locale: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          conditions?: string | null
+          created_at?: string
+          footer?: string | null
+          id?: string
+          intro?: string | null
+          locale?: string
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          conditions?: string | null
+          created_at?: string
+          footer?: string | null
+          id?: string
+          intro?: string | null
+          locale?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           comment: string | null

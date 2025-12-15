@@ -27,6 +27,7 @@ import Settings from "@/pages/Settings";
 import TrackTicket from "@/pages/TrackTicket";
 import UserManagement from "@/pages/UserManagement";
 import PermissionSettings from "@/pages/PermissionSettings";
+import DocumentTemplates from "@/pages/DocumentTemplates";
 import B2BPartners from "@/pages/B2BPartners";
 import B2BReturnShipments from "@/pages/B2BReturnShipments";
 import B2BReturnShipmentNew from "@/pages/B2BReturnShipmentNew";
@@ -186,6 +187,11 @@ function AppRoutes() {
           <Route path="permissions" element={
             <PermissionProtectedRoute requiredPermission="MANAGE_PERMISSIONS">
               <PermissionSettings />
+            </PermissionProtectedRoute>
+          } />
+          <Route path="document-templates" element={
+            <PermissionProtectedRoute requiredPermission="MANAGE_DOCUMENT_TEMPLATES">
+              <DocumentTemplates />
             </PermissionProtectedRoute>
           } />
           <Route path="b2b-partners" element={
