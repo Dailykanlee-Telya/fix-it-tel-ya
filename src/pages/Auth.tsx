@@ -60,11 +60,10 @@ export default function Auth() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Check URL params for recovery flow
+  // Check URL params and hash for recovery flow
   useEffect(() => {
     const type = searchParams.get('type');
     const tokenHash = searchParams.get('token_hash');
-    const accessToken = searchParams.get('access_token');
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
@@ -78,15 +77,23 @@ export default function Auth() {
       return;
     }
 
-    // Check if this is a recovery/invite flow
-    if (type === 'recovery' || tokenHash || accessToken) {
-      setIsPasswordResetMode(true);
+    // Check hash fragment for access_token (Supabase redirects with hash)
+    const hash = window.location.hash;
+    if (hash) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const hashType = hashParams.get('type');
       
-      // If there's an access token in URL, we need to handle the session
-      if (accessToken) {
-        // The session should be automatically picked up by Supabase client
-        console.log('Recovery session detected');
+      if (accessToken && hashType === 'recovery') {
+        console.log('Recovery session detected in hash');
+        setIsPasswordResetMode(true);
+        return;
       }
+    }
+
+    // Check if this is a recovery/invite flow from query params
+    if (type === 'recovery' || tokenHash) {
+      setIsPasswordResetMode(true);
     }
   }, [searchParams, toast]);
 
@@ -99,7 +106,14 @@ export default function Auth() {
         setIsPasswordResetMode(true);
       }
       
+      // Only redirect if NOT in password reset mode and user is signed in
       if (event === 'SIGNED_IN' && !isPasswordResetMode && session?.user) {
+        // Check if this is a recovery session - don't redirect
+        const hash = window.location.hash;
+        if (hash && hash.includes('type=recovery')) {
+          setIsPasswordResetMode(true);
+          return;
+        }
         navigate('/dashboard');
       }
     });
