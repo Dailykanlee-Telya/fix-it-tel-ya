@@ -24,19 +24,19 @@ interface TicketEmailData {
   device_info: string;
   error_description: string;
   location_name: string;
-  estimated_price?: number;
+  estimated_price?: number; tracking_url: string;
 }
 
-const getBaseUrl = () => {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-  const match = supabaseUrl.match(/https:\/\/([^.]+)/);
-  const projectId = match ? match[1] : '';
-  return `https://${projectId}.lovableproject.com`;
+const getBaseUrl = (req: Request) => {
+  const explicit = Deno.env.get('PUBLIC_APP_URL') || Deno.env.get('APP_BASE_URL'); const candidate = explicit || req.headers.get('origin') || req.headers.get('referer') || '';
+  try { return new URL(candidate).origin.replace(/\/+$/, ''); } catch {}
+  const s = Deno.env.get('SUPABASE_URL') || ''; const m = s.match(/https:\/\/([^.]+)/); const pid = m ? m[1] : '';
+  return pid ? `https://${pid}.lovableproject.com` : '';
 };
 
-const generateTrackingUrl = (ticketNumber: string, kvaToken: string) => {
-  const baseUrl = getBaseUrl();
-  return `${baseUrl}/track?ticket=${encodeURIComponent(ticketNumber)}&token=${encodeURIComponent(kvaToken)}`;
+const generateTrackingUrl = (baseUrl: string, ticketNumber: string, kvaToken: string) => {
+  const urlBase = (baseUrl || '').replace(/\/+$/, '');
+  return `${urlBase}/track?ticket=${encodeURIComponent(ticketNumber)}&token=${encodeURIComponent(kvaToken)}`;
 };
 
 const emailTemplates = {
@@ -77,7 +77,7 @@ const emailTemplates = {
             <p><strong>Ihr Tracking-Code:</strong></p>
             <div class="tracking-code">${data.kva_token}</div>
             <p>Mit diesem Code können Sie jederzeit den Status Ihrer Reparatur verfolgen.</p>
-            <a href="${generateTrackingUrl(data.ticket_number, data.kva_token)}" class="btn">Status prüfen</a>
+            <a href="${data.tracking_url}" class="btn">Status prüfen</a>
           </div>
           
           <p>Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p>
@@ -123,7 +123,7 @@ const emailTemplates = {
           
           <p>Bitte bestätigen Sie den Kostenvoranschlag, damit wir mit der Reparatur beginnen können:</p>
           <p style="text-align: center;">
-            <a href="${generateTrackingUrl(data.ticket_number, data.kva_token)}" class="btn">KVA bestätigen oder ablehnen</a>
+            <a href="${data.tracking_url}" class="btn">KVA bestätigen oder ablehnen</a>
           </p>
           
           <p>Mit freundlichen Grüßen,<br>Ihr Telya Team</p>
@@ -342,7 +342,7 @@ Deno.serve(async (req) => {
       device_info: `${ticket.device?.brand || ''} ${ticket.device?.model || ''}`.trim(),
       error_description: ticket.error_description_text || '',
       location_name: ticket.location?.name || '',
-      estimated_price: ticket.estimated_price,
+      estimated_price: ticket.estimated_price, tracking_url: generateTrackingUrl(getBaseUrl(req), ticket.ticket_number, ticket.kva_token || ''),
     };
 
     const template = emailTemplates[type as keyof typeof emailTemplates];
