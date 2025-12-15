@@ -262,14 +262,30 @@ export default function DocumentPreviewDialog({
           </Button>
         </div>
 
-        {/* Preview Content */}
-        <ScrollArea className="flex-1">
+        {/* Preview Content - A4 Page Preview */}
+        <ScrollArea className="flex-1 bg-muted/30">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : ticket ? (
-            <div ref={previewRef} className="document bg-white p-6 rounded-lg border m-2">
+            <div className="flex flex-col items-center py-4">
+              {/* A4 Info Label */}
+              <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
+                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-medium">A4</span>
+                <span>Druckvorschau mit 10mm Rändern (gestrichelte Linie)</span>
+              </div>
+              {/* A4 Page Container - 210mm x 297mm ratio, scaled to fit */}
+              <div className="a4-page bg-white shadow-lg border border-gray-300 relative" 
+                   style={{ 
+                     width: '210mm', 
+                     minHeight: '297mm',
+                     maxWidth: '100%'
+                   }}>
+                {/* A4 Margin Indicator */}
+                <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-blue-300 m-[10mm]" />
+                {/* Document Content */}
+                <div ref={previewRef} className="document p-[10mm]">
               {/* Header */}
               <div className="header flex justify-between items-start mb-6 pb-4 border-b-2 border-primary">
                 <div>
@@ -354,10 +370,12 @@ export default function DocumentPreviewDialog({
 
               {/* Footer */}
               {processedFooter && (
-                <div className="footer mt-8 pt-4 border-t text-center text-[10px] text-muted-foreground">
+                <div className="footer mt-6 pt-3 border-t text-center text-[10px] text-muted-foreground">
                   {processedFooter}
                 </div>
               )}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
