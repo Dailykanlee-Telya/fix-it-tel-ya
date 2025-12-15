@@ -1,9 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-// Inactivity timeout in milliseconds (15 minutes)
-const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
+// Default timeout in minutes (fallback if DB setting not available)
+const DEFAULT_TIMEOUT_MINUTES = 15;
 // Warning before logout (1 minute before)
 const WARNING_BEFORE_LOGOUT = 60 * 1000;
 
@@ -15,6 +16,34 @@ export function useSessionTimeout() {
   const [showWarning, setShowWarning] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(60);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const [timeoutMinutes, setTimeoutMinutes] = useState(DEFAULT_TIMEOUT_MINUTES);
+
+  // Fetch timeout setting from database
+  useEffect(() => {
+    const fetchTimeoutSetting = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'session_timeout_minutes')
+          .single();
+
+        if (!error && data?.value) {
+          const minutes = typeof data.value === 'number' ? data.value : parseInt(String(data.value), 10);
+          if (!isNaN(minutes) && minutes > 0) {
+            setTimeoutMinutes(minutes);
+          }
+        }
+      } catch (err) {
+        // Use default if fetch fails
+        console.log('Using default session timeout');
+      }
+    };
+
+    if (user) {
+      fetchTimeoutSetting();
+    }
+  }, [user]);
 
   const clearAllTimers = useCallback(() => {
     if (timeoutRef.current) {
@@ -67,16 +96,18 @@ export function useSessionTimeout() {
     setShowWarning(false);
     setSecondsRemaining(60);
 
+    const inactivityTimeout = timeoutMinutes * 60 * 1000;
+
     // Set warning timer
     warningRef.current = setTimeout(() => {
       startCountdown();
-    }, INACTIVITY_TIMEOUT - WARNING_BEFORE_LOGOUT);
+    }, inactivityTimeout - WARNING_BEFORE_LOGOUT);
 
     // Set logout timer
     timeoutRef.current = setTimeout(() => {
       handleLogout();
-    }, INACTIVITY_TIMEOUT);
-  }, [user, handleLogout, clearAllTimers, startCountdown]);
+    }, inactivityTimeout);
+  }, [user, handleLogout, clearAllTimers, startCountdown, timeoutMinutes]);
 
   const extendSession = useCallback(() => {
     setShowWarning(false);
@@ -122,5 +153,6 @@ export function useSessionTimeout() {
     secondsRemaining,
     extendSession,
     logout: handleLogout,
+    timeoutMinutes,
   };
 }

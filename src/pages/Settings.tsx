@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,9 +37,120 @@ import {
   Loader2,
   Database,
   AlertTriangle,
+  Clock,
+  Save,
 } from 'lucide-react';
 import { AppRole, ROLE_LABELS, Profile } from '@/types/database';
 import { DataResetDialog } from '@/components/admin/DataResetDialog';
+
+function SessionTimeoutSettings() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [timeoutValue, setTimeoutValue] = useState<string>('15');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch current setting
+  const { data: setting, isLoading } = useQuery({
+    queryKey: ['session-timeout-setting'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'session_timeout_minutes')
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  useEffect(() => {
+    if (setting?.value) {
+      const val = typeof setting.value === 'number' ? setting.value : parseInt(String(setting.value), 10);
+      setTimeoutValue(String(val));
+    }
+  }, [setting]);
+
+  const handleSave = async () => {
+    const minutes = parseInt(timeoutValue, 10);
+    if (isNaN(minutes) || minutes < 1 || minutes > 480) {
+      toast({
+        variant: 'destructive',
+        title: 'Ungültiger Wert',
+        description: 'Bitte geben Sie einen Wert zwischen 1 und 480 Minuten ein.',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'session_timeout_minutes',
+          value: minutes,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['session-timeout-setting'] });
+      toast({
+        title: 'Einstellung gespeichert',
+        description: `Session-Timeout wurde auf ${minutes} Minuten gesetzt.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error.message,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card className="card-elevated">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Clock className="h-5 w-5 text-primary" />
+          Session-Timeout
+        </CardTitle>
+        <CardDescription>
+          Automatische Abmeldung nach Inaktivität konfigurieren
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-end gap-4">
+          <div className="space-y-2 flex-1 max-w-xs">
+            <Label htmlFor="timeout">Timeout (Minuten)</Label>
+            <Input
+              id="timeout"
+              type="number"
+              min={1}
+              max={480}
+              value={timeoutValue}
+              onChange={(e) => setTimeoutValue(e.target.value)}
+              disabled={isLoading || isSaving}
+            />
+            <p className="text-xs text-muted-foreground">
+              Benutzer werden nach dieser Zeit der Inaktivität automatisch abgemeldet (1-480 Minuten).
+            </p>
+          </div>
+          <Button onClick={handleSave} disabled={isLoading || isSaving}>
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Speichern
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const { profile, hasRole } = useAuth();
@@ -271,6 +382,8 @@ export default function Settings() {
 
         {isAdmin && (
           <TabsContent value="system" className="space-y-4">
+            <SessionTimeoutSettings />
+            
             <Card className="card-elevated">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
