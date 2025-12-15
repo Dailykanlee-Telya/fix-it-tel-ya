@@ -48,6 +48,11 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordResetSuccess, setPasswordResetSuccess] = useState(false);
 
+  // Forgot password state
+  const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+
   // Rate limiting for login attempts
   const loginRateLimiter = useRateLimiter('auth_login', AUTH_RATE_LIMIT_CONFIG);
 
@@ -232,10 +237,145 @@ export default function Auth() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+    
+    if (!forgotPasswordEmail || !z.string().email().safeParse(forgotPasswordEmail).success) {
+      setErrors({ email: 'Bitte geben Sie eine gültige E-Mail-Adresse ein.' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Fehler',
+          description: error.message,
+        });
+        return;
+      }
+
+      setForgotPasswordSent(true);
+      toast({
+        title: 'E-Mail gesendet',
+        description: 'Wenn ein Konto mit dieser E-Mail existiert, erhalten Sie einen Link zum Zurücksetzen.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>;
+  }
+
+  // Forgot Password Mode
+  if (isForgotPasswordMode) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-1/2 -right-1/2 w-full h-full bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-accent/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-md">
+          <div className="flex flex-col items-center mb-8">
+            <h1 className="text-2xl font-bold text-foreground">Telya Reparatur</h1>
+            <p className="text-muted-foreground mt-1">Management System</p>
+          </div>
+
+          <Card className="border-0 shadow-xl">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">Passwort zurücksetzen</CardTitle>
+              </div>
+              <CardDescription>
+                Geben Sie Ihre E-Mail-Adresse ein. Wir senden Ihnen einen Link zum Zurücksetzen Ihres Passworts.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              {forgotPasswordSent ? (
+                <div className="text-center py-6">
+                  <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-foreground mb-2">E-Mail gesendet!</p>
+                  <p className="text-muted-foreground mb-4">
+                    Wenn ein Konto mit dieser E-Mail-Adresse existiert, erhalten Sie in Kürze eine E-Mail mit einem Link zum Zurücksetzen Ihres Passworts.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsForgotPasswordMode(false);
+                      setForgotPasswordSent(false);
+                      setForgotPasswordEmail('');
+                    }}
+                  >
+                    Zurück zur Anmeldung
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="forgot-email">E-Mail-Adresse</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="forgot-email"
+                        type="email"
+                        placeholder="ihre@email.de"
+                        value={forgotPasswordEmail}
+                        onChange={e => setForgotPasswordEmail(e.target.value)}
+                        className="pl-9"
+                        disabled={loading}
+                      />
+                    </div>
+                    {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Wird gesendet...
+                      </>
+                    ) : (
+                      'Link zum Zurücksetzen senden'
+                    )}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => {
+                      setIsForgotPasswordMode(false);
+                      setForgotPasswordEmail('');
+                      setErrors({});
+                    }}
+                  >
+                    Zurück zur Anmeldung
+                  </Button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            © {new Date().getFullYear()} Telya GmbH. Alle Rechte vorbehalten.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   // Password Reset Mode (for invited users)
@@ -398,6 +538,16 @@ export default function Auth() {
                   <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="pl-9" disabled={loading} />
                 </div>
                 {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPasswordMode(true)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Passwort vergessen?
+                </button>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading || loginRateLimiter.isLocked}>
