@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
+import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
 
 // Layouts
 import AppLayout from "@/components/layout/AppLayout";
@@ -90,64 +92,80 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function SessionTimeoutManager() {
+  const { showWarning, secondsRemaining, extendSession, logout } = useSessionTimeout();
+  
+  return (
+    <SessionTimeoutWarning
+      open={showWarning}
+      secondsRemaining={secondsRemaining}
+      onExtendSession={extendSession}
+      onLogout={logout}
+    />
+  );
+}
+
 function AppRoutes() {
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/track" element={<TrackTicket />} />
-      <Route path="/datenschutz" element={<Datenschutz />} />
-      <Route path="/b2b-register" element={<B2BRegister />} />
+    <>
+      <SessionTimeoutManager />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/track" element={<TrackTicket />} />
+        <Route path="/datenschutz" element={<Datenschutz />} />
+        <Route path="/b2b-register" element={<B2BRegister />} />
 
-      {/* Protected routes */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="intake" element={<Intake />} />
-        <Route path="workshop" element={<Workshop />} />
-        <Route path="tickets" element={<Tickets />} />
-        <Route path="tickets/:id" element={<TicketDetail />} />
-        <Route path="parts" element={<Parts />} />
-        <Route path="customers" element={<Customers />} />
-        <Route path="locations" element={<Locations />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="users" element={<UserManagement />} />
-        <Route path="b2b-partners" element={<B2BPartners />} />
-        <Route path="b2b-return-shipments" element={<B2BReturnShipments />} />
-        <Route path="b2b-return-shipments/new" element={<B2BReturnShipmentNew />} />
-        <Route path="b2b-return-shipments/:id" element={<B2BReturnShipmentDetail />} />
-      </Route>
+        {/* Protected routes */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="intake" element={<Intake />} />
+          <Route path="workshop" element={<Workshop />} />
+          <Route path="tickets" element={<Tickets />} />
+          <Route path="tickets/:id" element={<TicketDetail />} />
+          <Route path="parts" element={<Parts />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="locations" element={<Locations />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="b2b-partners" element={<B2BPartners />} />
+          <Route path="b2b-return-shipments" element={<B2BReturnShipments />} />
+          <Route path="b2b-return-shipments/new" element={<B2BReturnShipmentNew />} />
+          <Route path="b2b-return-shipments/:id" element={<B2BReturnShipmentDetail />} />
+        </Route>
 
-      {/* B2B Portal routes */}
-      <Route
-        path="/b2b"
-        element={
-          <ProtectedRoute>
-            <B2BLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="/b2b/dashboard" replace />} />
-        <Route path="dashboard" element={<B2BDashboard />} />
-        <Route path="orders" element={<B2BOrders />} />
-        <Route path="orders/new" element={<B2BOrderNew />} />
-        <Route path="orders/:id" element={<B2BOrderDetail />} />
-        <Route path="shipments" element={<B2BShipments />} />
-        <Route path="shipments/new" element={<B2BShipmentNew />} />
-        <Route path="shipments/:id" element={<B2BShipmentDetail />} />
-      </Route>
+        {/* B2B Portal routes */}
+        <Route
+          path="/b2b"
+          element={
+            <ProtectedRoute>
+              <B2BLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/b2b/dashboard" replace />} />
+          <Route path="dashboard" element={<B2BDashboard />} />
+          <Route path="orders" element={<B2BOrders />} />
+          <Route path="orders/new" element={<B2BOrderNew />} />
+          <Route path="orders/:id" element={<B2BOrderDetail />} />
+          <Route path="shipments" element={<B2BShipments />} />
+          <Route path="shipments/new" element={<B2BShipmentNew />} />
+          <Route path="shipments/:id" element={<B2BShipmentDetail />} />
+        </Route>
 
-      {/* 404 */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 }
 
