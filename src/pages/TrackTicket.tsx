@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,6 +70,7 @@ const getStatusIndex = (status: TicketStatus): number => {
 
 export default function TrackTicket() {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [ticketNumber, setTicketNumber] = useState('');
   const [trackingToken, setTrackingToken] = useState('');
   const [loading, setLoading] = useState(false);
@@ -76,13 +78,14 @@ export default function TrackTicket() {
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [customerMessage, setCustomerMessage] = useState('');
   const [disposalOption, setDisposalOption] = useState<'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN'>('ZURUECKSENDEN');
+  const [autoSearchDone, setAutoSearchDone] = useState(false);
 
-  const callTrackingApi = async (action: string, extraData: Record<string, any> = {}) => {
+  const callTrackingApi = useCallback(async (action: string, extraData: Record<string, any> = {}, overrideTicket?: string, overrideToken?: string) => {
     const response = await supabase.functions.invoke('track-ticket', {
       body: {
         action,
-        ticket_number: ticketNumber,
-        tracking_token: trackingToken,
+        ticket_number: overrideTicket || ticketNumber,
+        tracking_token: overrideToken || trackingToken,
         ...extraData
       }
     });
@@ -96,7 +99,53 @@ export default function TrackTicket() {
     }
     
     return response.data;
-  };
+  }, [ticketNumber, trackingToken]);
+
+  // Auto-search from URL parameters
+  useEffect(() => {
+    const ticketParam = searchParams.get('ticket');
+    const tokenParam = searchParams.get('token');
+    
+    if (ticketParam && tokenParam && !autoSearchDone) {
+      setTicketNumber(ticketParam);
+      setTrackingToken(tokenParam.toUpperCase());
+      setAutoSearchDone(true);
+      
+      // Perform automatic lookup
+      const performAutoSearch = async () => {
+        setLoading(true);
+        try {
+          const response = await supabase.functions.invoke('track-ticket', {
+            body: {
+              action: 'lookup',
+              ticket_number: ticketParam,
+              tracking_token: tokenParam.toUpperCase()
+            }
+          });
+          
+          if (response.error) {
+            throw new Error(response.error.message || 'Ein Fehler ist aufgetreten.');
+          }
+          
+          if (response.data?.error) {
+            throw new Error(response.data.error);
+          }
+          
+          setTicket(response.data);
+        } catch (error: any) {
+          toast({
+            variant: 'destructive',
+            title: 'Fehler',
+            description: error.message,
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      performAutoSearch();
+    }
+  }, [searchParams, autoSearchDone, toast]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
