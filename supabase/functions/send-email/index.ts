@@ -29,10 +29,11 @@ interface TicketEmailData {
 }
 
 const getBaseUrl = (req: Request) => {
-  const explicit = Deno.env.get('PUBLIC_APP_URL') || Deno.env.get('APP_BASE_URL'); const candidate = explicit || req.headers.get('origin') || req.headers.get('referer') || '';
+  const explicit = Deno.env.get('PUBLIC_APP_URL') || Deno.env.get('APP_BASE_URL'); 
+  const candidate = explicit || req.headers.get('origin') || req.headers.get('referer') || '';
   try { return new URL(candidate).origin.replace(/\/+$/, ''); } catch {}
-  const s = Deno.env.get('SUPABASE_URL') || ''; const m = s.match(/https:\/\/([^.]+)/); const pid = m ? m[1] : '';
-  return pid ? `https://${pid}.lovableproject.com` : '';
+  // Fallback to empty string - PUBLIC_APP_URL must be configured
+  return '';
 };
 
 const generateTrackingUrl = (baseUrl: string, ticketNumber: string, kvaToken: string) => {
