@@ -3,25 +3,45 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
 export type PermissionKey =
+  // Tickets / Orders
   | 'VIEW_DASHBOARD'
   | 'VIEW_INTAKE'
   | 'CREATE_TICKET'
   | 'VIEW_TICKET_DETAILS'
-  | 'EDIT_TICKET'
-  | 'VIEW_ALL_TICKETS'
+  | 'EDIT_TICKET_BASIC'
+  | 'EDIT_TICKET_SENSITIVE'
+  | 'CHANGE_TICKET_STATUS'
+  | 'HANDOVER_TICKET'
+  | 'CANCEL_TICKET'
+  // KVA / Pricing
+  | 'VIEW_KVA'
+  | 'CREATE_KVA'
+  | 'EDIT_KVA_PRICE'
+  | 'APPROVE_KVA'
+  | 'REJECT_KVA'
+  | 'CHANGE_FINAL_PRICE'
+  | 'GRANT_DISCOUNT'
+  // Workshop / Parts
   | 'VIEW_WORKSHOP'
   | 'VIEW_PARTS'
   | 'MANAGE_PARTS'
-  | 'VIEW_CUSTOMERS'
-  | 'EDIT_CUSTOMERS'
+  | 'USE_PARTS'
+  | 'COMPLETE_QC_CHECK'
+  // B2B
+  | 'VIEW_B2B_PORTAL'
+  | 'CREATE_B2B_TICKET'
+  | 'EDIT_B2B_PRICES'
+  | 'FORWARD_KVA_TO_ENDCUSTOMER'
+  // Admin / Organization
   | 'VIEW_REPORTS'
   | 'VIEW_FINANCIAL_REPORTS'
-  | 'VIEW_B2B_PORTAL'
-  | 'MANAGE_B2B_PARTNERS'
   | 'MANAGE_USERS'
   | 'MANAGE_PERMISSIONS'
+  | 'MANAGE_B2B_PARTNERS'
+  | 'VIEW_ALL_LOCATIONS'
   | 'MANAGE_SETTINGS'
-  | 'VIEW_ALL_LOCATIONS';
+  | 'VIEW_CUSTOMERS'
+  | 'EDIT_CUSTOMERS';
 
 interface Permission {
   key: string;
