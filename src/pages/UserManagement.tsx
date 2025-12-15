@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,26 +21,78 @@ import {
   XCircle,
   Clock,
   Loader2,
+  Pencil,
+  MapPin,
+  Globe,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { AppRole, ROLE_LABELS } from '@/types/database';
 import { InviteUserDialog } from '@/components/admin/InviteUserDialog';
+import { UserEditDialog } from '@/components/admin/UserEditDialog';
+
+interface UserWithDetails {
+  id: string;
+  name: string;
+  email: string;
+  is_active: boolean;
+  default_location_id: string | null;
+  can_view_all_locations: boolean;
+  created_at: string;
+  roles: AppRole[];
+  user_locations: {
+    location_id: string;
+    is_default: boolean;
+    can_view: boolean;
+  }[];
+  default_location?: {
+    name: string;
+    code: string | null;
+  };
+}
+
+interface Location {
+  id: string;
+  name: string;
+  code: string | null;
+}
 
 export default function UserManagement() {
   const { hasRole } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [editingUser, setEditingUser] = useState<UserWithDetails | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const isAdmin = hasRole('ADMIN');
 
-  // Fetch all users with roles
+  // Fetch all locations
+  const { data: locations } = useQuery({
+    queryKey: ['locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name, code')
+        .order('name');
+      if (error) throw error;
+      return data as Location[];
+    },
+    enabled: isAdmin,
+  });
+
+  // Fetch all users with roles and locations
   const { data: users, isLoading } = useQuery({
     queryKey: ['users-management'],
     queryFn: async () => {
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          default_location:locations!profiles_default_location_id_fkey (
+            name,
+            code
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -50,11 +102,18 @@ export default function UserManagement() {
         .from('user_roles')
         .select('*');
 
-      // Combine profiles with roles
+      // Fetch user_locations for all users
+      const { data: userLocations } = await supabase
+        .from('user_locations')
+        .select('*');
+
+      // Combine profiles with roles and locations
       return profiles.map(profile => ({
         ...profile,
+        can_view_all_locations: profile.can_view_all_locations ?? false,
         roles: roles?.filter(r => r.user_id === profile.id).map(r => r.role) || [],
-      }));
+        user_locations: userLocations?.filter(ul => ul.user_id === profile.id) || [],
+      })) as UserWithDetails[];
     },
     enabled: isAdmin,
   });
@@ -69,7 +128,6 @@ export default function UserManagement() {
 
       if (error) throw error;
 
-      // Send approval email if approving and email is available
       if (approve && userEmail && userName) {
         try {
           await supabase.functions.invoke('send-email', {
@@ -81,7 +139,6 @@ export default function UserManagement() {
           });
         } catch (emailError) {
           console.error('Failed to send approval email:', emailError);
-          // Don't throw - approval was successful, email is secondary
         }
       }
     },
@@ -103,10 +160,9 @@ export default function UserManagement() {
     },
   });
 
-  // Delete/reject user mutation - removes profile, roles AND auth user completely
+  // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // Call edge function to delete auth user (requires service role)
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Nicht angemeldet');
 
@@ -138,37 +194,13 @@ export default function UserManagement() {
     },
   });
 
-  // Update role mutation
-  const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      // Remove existing roles
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      // Add new role
-      const { error } = await supabase
-        .from('user_roles')
-        .insert({ user_id: userId, role });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users-management'] });
-      toast({
-        title: 'Rolle geändert',
-        description: 'Die Benutzerrolle wurde aktualisiert.',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: 'destructive',
-        title: 'Fehler',
-        description: error.message,
-      });
-    },
-  });
+  const handleEditUser = (user: UserWithDetails) => {
+    setEditingUser({
+      ...user,
+      role: user.roles[0] || 'THEKE',
+    } as any);
+    setEditDialogOpen(true);
+  };
 
   if (!isAdmin) {
     return (
@@ -278,7 +310,9 @@ export default function UserManagement() {
                   <TableHead>Name</TableHead>
                   <TableHead>E-Mail</TableHead>
                   <TableHead>Rolle</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Standard-Filiale</TableHead>
+                  <TableHead>Filialen</TableHead>
+                  <TableHead>Alle Filialen</TableHead>
                   <TableHead>Aktionen</TableHead>
                 </TableRow>
               </TableHeader>
@@ -297,27 +331,37 @@ export default function UserManagement() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                        {user.is_active ? 'Aktiv' : 'Inaktiv'}
+                      {user.default_location ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          {user.default_location.name}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {user.user_locations.length}
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      {user.can_view_all_locations ? (
+                        <Globe className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex gap-2 items-center">
-                        <Select
-                          value={user.roles[0] || ''}
-                          onValueChange={(value) => 
-                            updateRoleMutation.mutate({ userId: user.id, role: value as AppRole })
-                          }
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditUser(user)}
                         >
-                          <SelectTrigger className="w-32">
-                            <SelectValue placeholder="Rolle" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                              <SelectItem key={value} value={value}>{label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Bearbeiten
+                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -336,6 +380,14 @@ export default function UserManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <UserEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        user={editingUser as any}
+        locations={locations || []}
+      />
     </div>
   );
 }

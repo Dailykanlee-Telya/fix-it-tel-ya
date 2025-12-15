@@ -585,6 +585,30 @@ export type Database = {
         }
         Relationships: []
       }
+      permissions: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string
+          id: string
+          key: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          description: string
+          id?: string
+          key: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          key?: string
+        }
+        Relationships: []
+      }
       price_list: {
         Row: {
           active: boolean
@@ -624,6 +648,7 @@ export type Database = {
       profiles: {
         Row: {
           b2b_partner_id: string | null
+          can_view_all_locations: boolean
           created_at: string
           default_location_id: string | null
           email: string
@@ -635,6 +660,7 @@ export type Database = {
         }
         Insert: {
           b2b_partner_id?: string | null
+          can_view_all_locations?: boolean
           created_at?: string
           default_location_id?: string | null
           email: string
@@ -646,6 +672,7 @@ export type Database = {
         }
         Update: {
           b2b_partner_id?: string | null
+          can_view_all_locations?: boolean
           created_at?: string
           default_location_id?: string | null
           email?: string
@@ -839,6 +866,35 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "b2b_shipments"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          permission_key: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          permission_key: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          permission_key?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -1108,6 +1164,41 @@ export type Database = {
           },
         ]
       }
+      user_locations: {
+        Row: {
+          can_view: boolean
+          created_at: string | null
+          id: string
+          is_default: boolean
+          location_id: string
+          user_id: string
+        }
+        Insert: {
+          can_view?: boolean
+          created_at?: string | null
+          id?: string
+          is_default?: boolean
+          location_id: string
+          user_id: string
+        }
+        Update: {
+          can_view?: boolean
+          created_at?: string | null
+          id?: string
+          is_default?: boolean
+          location_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -1131,6 +1222,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_location: {
+        Args: { _location_id: string; _user_id: string }
+        Returns: boolean
+      }
       generate_order_number: {
         Args: { _b2b_partner_id?: string; _location_id: string }
         Returns: string
@@ -1139,6 +1234,14 @@ export type Database = {
       generate_ticket_number: { Args: never; Returns: string }
       generate_tracking_token: { Args: never; Returns: string }
       get_b2b_partner_id: { Args: { _user_id: string }; Returns: string }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_permission: {
+        Args: { _permission_key: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
