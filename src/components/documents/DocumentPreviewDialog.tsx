@@ -24,6 +24,65 @@ import { de } from 'date-fns/locale';
 import telyaLogo from '@/assets/telya-logo.png';
 import { TELYA_ADDRESS } from '@/types/b2b';
 
+// Simple Markdown renderer for bold, bullets, and line breaks
+function renderMarkdown(text: string): React.ReactNode {
+  if (!text) return null;
+  
+  const lines = text.split('\n');
+  
+  return lines.map((line, lineIndex) => {
+    // Check for bullet points
+    const bulletMatch = line.match(/^[-•]\s*(.*)$/);
+    const numberedMatch = line.match(/^(\d+)\.\s*(.*)$/);
+    
+    let content = bulletMatch ? bulletMatch[1] : numberedMatch ? numberedMatch[2] : line;
+    
+    // Process bold text (**text**)
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    const boldRegex = /\*\*([^*]+)\*\*/g;
+    let match;
+    
+    while ((match = boldRegex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.slice(lastIndex, match.index));
+      }
+      parts.push(<strong key={`bold-${lineIndex}-${match.index}`}>{match[1]}</strong>);
+      lastIndex = match.index + match[0].length;
+    }
+    
+    if (lastIndex < content.length) {
+      parts.push(content.slice(lastIndex));
+    }
+    
+    const processedContent = parts.length > 0 ? parts : content;
+    
+    if (bulletMatch) {
+      return (
+        <div key={lineIndex} className="flex items-start gap-2 ml-4">
+          <span className="text-primary mt-1">•</span>
+          <span>{processedContent}</span>
+        </div>
+      );
+    }
+    
+    if (numberedMatch) {
+      return (
+        <div key={lineIndex} className="flex items-start gap-2 ml-4">
+          <span className="font-medium min-w-[1.5rem]">{numberedMatch[1]}.</span>
+          <span>{processedContent}</span>
+        </div>
+      );
+    }
+    
+    if (line.trim() === '') {
+      return <div key={lineIndex} className="h-2" />;
+    }
+    
+    return <div key={lineIndex}>{processedContent}</div>;
+  });
+}
+
 interface DocumentPreviewDialogProps {
   type: string | null;
   open: boolean;
@@ -277,8 +336,8 @@ export default function DocumentPreviewDialog({
 
               {/* Conditions */}
               {processedConditions && (
-                <div className="conditions">
-                  {processedConditions}
+                <div className="conditions bg-muted/50 p-4 rounded-lg text-sm space-y-1">
+                  {renderMarkdown(processedConditions)}
                 </div>
               )}
 
