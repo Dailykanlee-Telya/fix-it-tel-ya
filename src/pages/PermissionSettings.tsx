@@ -21,17 +21,15 @@ interface RolePermission {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard',
-  intake: 'Auftragsannahme',
-  tickets: 'Aufträge',
-  workshop: 'Werkstatt',
-  parts: 'Lager / Teile',
-  customers: 'Kunden',
-  reports: 'Reports',
+  tickets: 'Aufträge / Tickets',
+  kva: 'Kostenvoranschlag / Preise',
+  workshop: 'Werkstatt / Ersatzteile',
   b2b: 'B2B-Portal',
   admin: 'Administration',
   general: 'Allgemein',
 };
+
+const CATEGORY_ORDER = ['tickets', 'kva', 'workshop', 'b2b', 'admin', 'general'];
 
 const ROLES_TO_DISPLAY: AppRole[] = ['ADMIN', 'THEKE', 'TECHNIKER', 'BUCHHALTUNG', 'FILIALLEITER'];
 
@@ -116,13 +114,21 @@ export default function PermissionSettings() {
     );
   }
 
-  // Group permissions by category
+  // Group permissions by category and sort by category order
   const permissionsByCategory = permissions?.reduce((acc, perm) => {
     const cat = perm.category || 'general';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(perm);
     return acc;
   }, {} as Record<string, Permission[]>) || {};
+
+  const sortedCategories = CATEGORY_ORDER.filter(cat => permissionsByCategory[cat]);
+  // Add any categories not in the order
+  Object.keys(permissionsByCategory).forEach(cat => {
+    if (!sortedCategories.includes(cat)) {
+      sortedCategories.push(cat);
+    }
+  });
 
   const hasRolePermission = (role: AppRole, permKey: string): boolean => {
     return rolePermissions?.some(rp => rp.role === role && rp.permission_key === permKey) || false;
@@ -151,52 +157,55 @@ export default function PermissionSettings() {
         </div>
       </div>
 
-      {Object.entries(permissionsByCategory).map(([category, perms]) => (
-        <Card key={category}>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">{CATEGORY_LABELS[category] || category}</CardTitle>
-            <CardDescription>
-              Berechtigungen für den Bereich {CATEGORY_LABELS[category] || category}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 pr-4 font-medium min-w-[200px]">Berechtigung</th>
-                    {ROLES_TO_DISPLAY.map(role => (
-                      <th key={role} className="text-center py-2 px-2 font-medium min-w-[100px]">
-                        {ROLE_LABELS[role]}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {perms.map(perm => (
-                    <tr key={perm.key} className="border-b last:border-b-0">
-                      <td className="py-3 pr-4">
-                        <div className="font-medium text-sm">{perm.description}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{perm.key}</div>
-                      </td>
+      {sortedCategories.map((category) => {
+        const perms = permissionsByCategory[category];
+        return (
+          <Card key={category}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">{CATEGORY_LABELS[category] || category}</CardTitle>
+              <CardDescription>
+                Berechtigungen für den Bereich {CATEGORY_LABELS[category] || category}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 font-medium min-w-[200px]">Berechtigung</th>
                       {ROLES_TO_DISPLAY.map(role => (
-                        <td key={role} className="text-center py-3 px-2">
-                          <Checkbox
-                            checked={hasRolePermission(role, perm.key)}
-                            onCheckedChange={() => handleToggle(role, perm.key)}
-                            disabled={role === 'ADMIN' || toggleMutation.isPending}
-                            className="mx-auto"
-                          />
-                        </td>
+                        <th key={role} className="text-center py-2 px-2 font-medium min-w-[100px]">
+                          {ROLE_LABELS[role]}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+                  </thead>
+                  <tbody>
+                    {perms.map(perm => (
+                      <tr key={perm.key} className="border-b last:border-b-0">
+                        <td className="py-3 pr-4">
+                          <div className="font-medium text-sm">{perm.description}</div>
+                          <div className="text-xs text-muted-foreground font-mono">{perm.key}</div>
+                        </td>
+                        {ROLES_TO_DISPLAY.map(role => (
+                          <td key={role} className="text-center py-3 px-2">
+                            <Checkbox
+                              checked={hasRolePermission(role, perm.key)}
+                              onCheckedChange={() => handleToggle(role, perm.key)}
+                              disabled={role === 'ADMIN' || toggleMutation.isPending}
+                              className="mx-auto"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
