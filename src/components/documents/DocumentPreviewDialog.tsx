@@ -24,6 +24,17 @@ import { de } from 'date-fns/locale';
 import telyaLogo from '@/assets/telya-logo.png';
 import { TELYA_ADDRESS } from '@/types/b2b';
 
+// Company Information
+const COMPANY_INFO = {
+  name: TELYA_ADDRESS.name,
+  fullAddress: `${TELYA_ADDRESS.street}, ${TELYA_ADDRESS.zip} ${TELYA_ADDRESS.city}`,
+  phone: TELYA_ADDRESS.phone,
+  email: TELYA_ADDRESS.email,
+  website: 'www.repariert.de',
+  hrb: TELYA_ADDRESS.hrb,
+  ust_id: TELYA_ADDRESS.vatId,
+};
+
 // Simple Markdown renderer for bold, bullets, and line breaks
 function renderMarkdown(text: string): React.ReactNode {
   if (!text) return null;
@@ -59,8 +70,8 @@ function renderMarkdown(text: string): React.ReactNode {
     
     if (bulletMatch) {
       return (
-        <div key={lineIndex} className="flex items-start gap-2 ml-4">
-          <span className="text-primary mt-1">•</span>
+        <div key={lineIndex} className="flex items-start gap-1 ml-2">
+          <span className="text-primary">•</span>
           <span>{processedContent}</span>
         </div>
       );
@@ -68,15 +79,15 @@ function renderMarkdown(text: string): React.ReactNode {
     
     if (numberedMatch) {
       return (
-        <div key={lineIndex} className="flex items-start gap-2 ml-4">
-          <span className="font-medium min-w-[1.5rem]">{numberedMatch[1]}.</span>
+        <div key={lineIndex} className="flex items-start gap-1 ml-2">
+          <span className="font-medium min-w-[1rem]">{numberedMatch[1]}.</span>
           <span>{processedContent}</span>
         </div>
       );
     }
     
     if (line.trim() === '') {
-      return <div key={lineIndex} className="h-2" />;
+      return <div key={lineIndex} className="h-1" />;
     }
     
     return <div key={lineIndex}>{processedContent}</div>;
@@ -150,6 +161,18 @@ export default function DocumentPreviewDialog({
   const handlePrint = () => {
     if (!previewRef.current) return;
 
+    // Set document title for PDF filename
+    const ticketNumber = ticket?.ticket_number || 'Dokument';
+    const typeMap: Record<string, string> = {
+      'EINGANGSBELEG': 'Eingangsbeleg',
+      'KVA': 'KVA',
+      'REPARATURBERICHT': 'Reparaturbericht',
+      'LIEFERSCHEIN': 'Lieferschein'
+    };
+    const docName = typeMap[type || ''] || 'Dokument';
+    const originalTitle = document.title;
+    document.title = `${docName}-${ticketNumber}`;
+
     let printRoot = document.getElementById(PRINT_ROOT_ID);
     if (!printRoot) {
       printRoot = document.createElement('div');
@@ -162,6 +185,7 @@ export default function DocumentPreviewDialog({
 
     const cleanup = () => {
       document.body.classList.remove('telya-printing');
+      document.title = originalTitle;
       const root = document.getElementById(PRINT_ROOT_ID);
       if (root) root.innerHTML = '';
     };
@@ -185,26 +209,29 @@ export default function DocumentPreviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <style>{`
         @media print {
-          @page { size: A4; margin: 10mm; }
-          html, body { height: initial !important; overflow: initial !important; }
+          @page { size: A4; margin: 8mm; }
+          html, body { height: initial !important; overflow: initial !important; font-size: 9px !important; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
           body.telya-printing > :not(#telya-print-root) { display: none !important; }
           body.telya-printing #telya-print-root { display: block !important; }
 
           body.telya-printing #telya-print-root { position: relative; width: 100%; }
-          body.telya-printing #telya-print-root .m-2 { margin: 0 !important; }
-          body.telya-printing #telya-print-root .document { padding: 0 !important; }
-          body.telya-printing #telya-print-root .conditions { 
-            font-size: 8px !important; 
-            line-height: 1.2 !important;
-            max-height: 100px !important;
-            overflow: hidden !important;
-            padding: 8px !important;
+          body.telya-printing #telya-print-root .document { padding: 4mm !important; }
+          body.telya-printing #telya-print-root .doc-header { 
+            margin-bottom: 3mm !important;
+            padding-bottom: 2mm !important;
           }
-          body.telya-printing #telya-print-root .footer { 
-            font-size: 8px !important;
-            margin-top: 12px !important;
+          body.telya-printing #telya-print-root .conditions { 
+            font-size: 7px !important; 
+            line-height: 1.2 !important;
+            max-height: 70px !important;
+            overflow: hidden !important;
+            padding: 4px !important;
+          }
+          body.telya-printing #telya-print-root .doc-footer { 
+            font-size: 7px !important;
+            margin-top: 4px !important;
           }
         }
       `}</style>
@@ -273,7 +300,7 @@ export default function DocumentPreviewDialog({
               {/* A4 Info Label */}
               <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
                 <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-medium">A4</span>
-                <span>Druckvorschau mit 10mm Rändern (gestrichelte Linie)</span>
+                <span>Druckvorschau mit 8mm Rändern (gestrichelte Linie)</span>
               </div>
               {/* A4 Page Container - 210mm x 297mm ratio, scaled to fit */}
               <div className="a4-page bg-white shadow-lg border border-gray-300 relative" 
@@ -283,97 +310,108 @@ export default function DocumentPreviewDialog({
                      maxWidth: '100%'
                    }}>
                 {/* A4 Margin Indicator */}
-                <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-blue-300 m-[10mm]" />
+                <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-blue-300 m-[8mm]" />
                 {/* Document Content */}
-                <div ref={previewRef} className="document p-[10mm]">
-              {/* Header */}
-              <div className="header flex justify-between items-start mb-6 pb-4 border-b-2 border-primary">
-                <div>
-                  <img src={telyaLogo} alt="Telya Logo" className="h-12" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {TELYA_ADDRESS.street}, {TELYA_ADDRESS.zip} {TELYA_ADDRESS.city}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-primary">{processedTitle}</div>
-                  <div className="text-lg font-semibold">{ticket.ticket_number}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Intro */}
-              {processedIntro && (
-                <div className="intro text-sm mb-6">
-                  {processedIntro}
-                </div>
-              )}
-
-              {/* Customer & Device Data */}
-              <div className="grid grid-cols-2 gap-6 mb-6">
-                <div className="section">
-                  <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
-                    Kundendaten
-                  </div>
-                  <div className="space-y-2">
-                    <div>
-                      <div className="text-xs text-muted-foreground">Name</div>
-                      <div className="font-medium">
-                        {ticket.customer?.first_name} {ticket.customer?.last_name}
+                <div ref={previewRef} className="document p-[8mm] text-[10px]">
+                  {/* Compact Header */}
+                  <div className="doc-header flex justify-between items-start mb-4 pb-3 border-b border-primary/30">
+                    <div className="flex items-start gap-3">
+                      <img src={telyaLogo} alt="Telya" className="h-10 w-10 object-contain rounded-full" />
+                      <div className="text-[9px] text-muted-foreground leading-tight">
+                        <div className="font-semibold text-foreground">{COMPANY_INFO.name}</div>
+                        <div>{COMPANY_INFO.fullAddress}</div>
+                        <div>Tel: {COMPANY_INFO.phone} · {COMPANY_INFO.email}</div>
+                        {ticket.location?.name && (
+                          <div className="font-medium text-primary">Filiale: {ticket.location.name}</div>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Telefon</div>
-                      <div className="font-medium">{ticket.customer?.phone}</div>
-                    </div>
-                    {ticket.customer?.email && (
-                      <div>
-                        <div className="text-xs text-muted-foreground">E-Mail</div>
-                        <div className="font-medium">{ticket.customer?.email}</div>
+                    <div className="text-right">
+                      <div className="text-base font-bold text-primary leading-tight">{processedTitle}</div>
+                      <div className="text-sm font-semibold">{ticket.ticket_number}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="section">
-                  <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 pb-2 border-b">
-                    Gerätedaten
-                  </div>
-                  <div className="space-y-2">
-                    <div>
-                      <div className="text-xs text-muted-foreground">Gerät</div>
-                      <div className="font-medium">
-                        {ticket.device?.brand} {ticket.device?.model}
-                      </div>
+                  {/* Intro */}
+                  {processedIntro && (
+                    <div className="text-[9px] text-muted-foreground mb-3">
+                      {processedIntro}
                     </div>
-                    {ticket.device?.imei_or_serial && (
-                      <div>
-                        <div className="text-xs text-muted-foreground">IMEI/Seriennummer</div>
-                        <div className="font-medium font-mono text-sm">
-                          {ticket.device?.imei_or_serial}
+                  )}
+
+                  {/* Customer & Device Data */}
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <div className="text-[9px] font-semibold text-primary uppercase tracking-wide mb-1.5 pb-1 border-b border-primary/20">
+                        Kundendaten
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="mb-0.5">
+                          <span className="text-[8px] text-muted-foreground">Name: </span>
+                          <span className="text-[10px] font-medium">
+                            {ticket.customer?.first_name} {ticket.customer?.last_name}
+                          </span>
                         </div>
+                        <div className="mb-0.5">
+                          <span className="text-[8px] text-muted-foreground">Telefon: </span>
+                          <span className="text-[10px] font-medium">{ticket.customer?.phone}</span>
+                        </div>
+                        {ticket.customer?.email && (
+                          <div className="mb-0.5">
+                            <span className="text-[8px] text-muted-foreground">E-Mail: </span>
+                            <span className="text-[10px] font-medium">{ticket.customer?.email}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+                    </div>
 
-              {/* Conditions - Fixed height to ensure single page */}
-              {processedConditions && (
-                <div className="conditions bg-muted/50 p-3 rounded-lg text-[9px] leading-tight max-h-[120px] overflow-hidden">
-                  <div className="space-y-0.5">
-                    {renderMarkdown(processedConditions)}
+                    <div>
+                      <div className="text-[9px] font-semibold text-primary uppercase tracking-wide mb-1.5 pb-1 border-b border-primary/20">
+                        Gerätedaten
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="mb-0.5">
+                          <span className="text-[8px] text-muted-foreground">Gerät: </span>
+                          <span className="text-[10px] font-medium">
+                            {ticket.device?.brand} {ticket.device?.model}
+                          </span>
+                        </div>
+                        {ticket.device?.imei_or_serial && (
+                          <div className="mb-0.5">
+                            <span className="text-[8px] text-muted-foreground">IMEI/SN: </span>
+                            <span className="text-[10px] font-medium font-mono">
+                              {ticket.device?.imei_or_serial}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Footer */}
-              {processedFooter && (
-                <div className="footer mt-6 pt-3 border-t text-center text-[10px] text-muted-foreground">
-                  {processedFooter}
-                </div>
-              )}
+                  {/* Conditions - Fixed height with header */}
+                  {processedConditions && (
+                    <div className="conditions bg-muted/20 p-2 rounded text-[8px] leading-[1.3] max-h-[70px] overflow-hidden mt-2">
+                      <div className="font-semibold text-[9px] mb-1">Wichtige Hinweise</div>
+                      <div className="space-y-0.5">
+                        {renderMarkdown(processedConditions)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer Text */}
+                  {processedFooter && (
+                    <p className="text-[8px] text-muted-foreground italic mt-2">
+                      {processedFooter}
+                    </p>
+                  )}
+
+                  {/* Compact Company Footer */}
+                  <div className="doc-footer mt-4 pt-2 border-t text-center text-[8px] text-muted-foreground leading-tight">
+                    {COMPANY_INFO.name} · {COMPANY_INFO.fullAddress} · {COMPANY_INFO.hrb} · USt-IdNr. {COMPANY_INFO.ust_id} · {COMPANY_INFO.website}
+                  </div>
                 </div>
               </div>
             </div>
