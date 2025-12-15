@@ -1,21 +1,56 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface B2BRegisterRequest {
-  companyName: string;
-  contactName: string;
-  email: string;
-  phone: string;
-  street: string;
-  zip: string;
-  city: string;
-  customerNumber?: string;
-  notes?: string;
-}
+// Server-side validation schema with sanitization
+const b2bRegisterSchema = z.object({
+  companyName: z.string()
+    .trim()
+    .min(2, 'Firmenname muss mindestens 2 Zeichen haben')
+    .max(200, 'Firmenname darf maximal 200 Zeichen haben'),
+  contactName: z.string()
+    .trim()
+    .min(2, 'Kontaktname muss mindestens 2 Zeichen haben')
+    .max(100, 'Kontaktname darf maximal 100 Zeichen haben'),
+  email: z.string()
+    .trim()
+    .email('Ungültige E-Mail-Adresse')
+    .max(255, 'E-Mail darf maximal 255 Zeichen haben'),
+  phone: z.string()
+    .trim()
+    .min(6, 'Telefonnummer muss mindestens 6 Zeichen haben')
+    .max(30, 'Telefonnummer darf maximal 30 Zeichen haben')
+    .regex(/^[+\d\s()\-/]+$/, 'Telefonnummer enthält ungültige Zeichen'),
+  street: z.string()
+    .trim()
+    .min(3, 'Straße muss mindestens 3 Zeichen haben')
+    .max(200, 'Straße darf maximal 200 Zeichen haben'),
+  zip: z.string()
+    .trim()
+    .min(4, 'PLZ muss mindestens 4 Zeichen haben')
+    .max(10, 'PLZ darf maximal 10 Zeichen haben')
+    .regex(/^[0-9A-Za-z\s\-]+$/, 'PLZ enthält ungültige Zeichen'),
+  city: z.string()
+    .trim()
+    .min(2, 'Stadt muss mindestens 2 Zeichen haben')
+    .max(100, 'Stadt darf maximal 100 Zeichen haben'),
+  customerNumber: z.string()
+    .trim()
+    .max(50, 'Kundennummer darf maximal 50 Zeichen haben')
+    .optional()
+    .nullable(),
+  notes: z.string()
+    .trim()
+    .max(1000, 'Bemerkungen dürfen maximal 1000 Zeichen haben')
+    .optional()
+    .nullable(),
+});
+
+type B2BRegisterRequest = z.infer<typeof b2bRegisterSchema>;
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -30,21 +65,38 @@ Deno.serve(async (req) => {
     // Use service role to bypass RLS
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body: B2BRegisterRequest = await req.json();
+    // Parse JSON body
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      console.error('Invalid JSON in request body');
+      return new Response(
+        JSON.stringify({ error: 'Ungültiges Anfrage-Format.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate and sanitize input using Zod schema
+    const validationResult = b2bRegisterSchema.safeParse(rawBody);
+    
+    if (!validationResult.success) {
+      const errorMessages = validationResult.error.errors
+        .map(err => err.message)
+        .join(', ');
+      console.error('Validation failed:', errorMessages);
+      return new Response(
+        JSON.stringify({ error: errorMessages }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const body: B2BRegisterRequest = validationResult.data;
     
     console.log('B2B registration request:', { 
       company: body.companyName, 
       email: body.email 
     });
-
-    // Validate required fields
-    if (!body.companyName || !body.contactName || !body.email || !body.phone || 
-        !body.street || !body.zip || !body.city) {
-      return new Response(
-        JSON.stringify({ error: 'Alle Pflichtfelder müssen ausgefüllt sein.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // Check if partner with same email already exists
     const { data: existing } = await supabase
@@ -61,6 +113,7 @@ Deno.serve(async (req) => {
     }
 
     // Insert new B2B partner with is_active = false (pending approval)
+    // All values are already sanitized/trimmed by Zod
     const { data: partner, error } = await supabase
       .from('b2b_partners')
       .insert({
@@ -100,10 +153,11 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
-    console.error('Error in b2b-register function:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Ein unerwarteter Fehler ist aufgetreten.';
+    console.error('Error in b2b-register function:', errorMessage);
     return new Response(
-      JSON.stringify({ error: error.message || 'Ein unerwarteter Fehler ist aufgetreten.' }),
+      JSON.stringify({ error: 'Ein unerwarteter Fehler ist aufgetreten.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
