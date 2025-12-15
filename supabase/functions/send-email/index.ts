@@ -28,9 +28,7 @@ interface TicketEmailData {
 }
 
 const getBaseUrl = () => {
-  // Use the VITE_SUPABASE_URL to derive the project URL
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-  // Extract project ID from Supabase URL
   const match = supabaseUrl.match(/https:\/\/([^.]+)/);
   const projectId = match ? match[1] : '';
   return `https://${projectId}.lovableproject.com`;
@@ -192,16 +190,84 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // === AUTHENTICATION CHECK ===
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error('Missing authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Nicht autorisiert - Authorization Header fehlt' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create client with user's auth token to verify identity
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Nicht autorisiert - Ungültiger Token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
+
+    // Use service role client for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify user has employee or B2B role
+    const { data: roles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    if (rolesError) {
+      console.error('Error fetching roles:', rolesError);
+      return new Response(
+        JSON.stringify({ error: 'Fehler beim Abrufen der Benutzerrolle' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!roles || roles.length === 0) {
+      console.error('User has no roles:', user.id);
+      return new Response(
+        JSON.stringify({ error: 'Keine Berechtigung - Keine Rolle zugewiesen' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const body: EmailRequest = await req.json();
     const { type, ticket_id, to_email, subject, body: customBody } = body;
 
-    console.log('Email request received:', { type, ticket_id, to_email });
+    console.log('Email request received:', { type, ticket_id, to_email, user_id: user.id });
 
-    // Handle custom email
+    // Handle custom email - ADMIN only
     if (type === 'custom' && to_email && subject && customBody) {
+      const hasAdmin = roles.some(r => r.role === 'ADMIN');
+      if (!hasAdmin) {
+        console.error('Non-admin tried to send custom email:', user.id);
+        return new Response(
+          JSON.stringify({ error: 'Keine Berechtigung - Nur Admins können benutzerdefinierte E-Mails senden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Log custom email for audit
+      await supabase.from('audit_logs').insert({
+        action: 'send_custom_email',
+        user_id: user.id,
+        entity_type: 'email',
+        meta: { to_email, subject }
+      });
+
       const { data, error } = await resend.emails.send({
         from: 'Telya Reparatur <noreply@telya.repariert.de>',
         to: [to_email],
@@ -240,6 +306,25 @@ Deno.serve(async (req) => {
     if (ticketError || !ticket) {
       console.error('Error fetching ticket:', ticketError);
       throw new Error('Ticket nicht gefunden');
+    }
+
+    // For B2B users, verify they own this ticket
+    const isB2BUser = roles.some(r => r.role === 'B2B_ADMIN' || r.role === 'B2B_USER');
+    if (isB2BUser) {
+      // Get user's B2B partner ID
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('b2b_partner_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.b2b_partner_id || ticket.b2b_partner_id !== profile.b2b_partner_id) {
+        console.error('B2B user tried to send email for ticket they do not own:', user.id, ticket_id);
+        return new Response(
+          JSON.stringify({ error: 'Keine Berechtigung für diesen Auftrag' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     if (!ticket.customer?.email) {
