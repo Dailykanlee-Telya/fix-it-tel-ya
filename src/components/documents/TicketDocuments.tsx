@@ -32,15 +32,27 @@ export default function TicketDocuments({
   const intakeRef = useRef<HTMLDivElement>(null);
   const deliveryRef = useRef<HTMLDivElement>(null);
   const kvaRef = useRef<HTMLDivElement>(null);
+  // HTML escape function to prevent XSS
+  const escapeHtml = (str: string): string => {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  };
+
   const handlePrint = (ref: React.RefObject<HTMLDivElement>, title: string) => {
     if (!ref.current) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+    
+    // Escape title and ticket number to prevent XSS
+    const safeTitle = escapeHtml(title);
+    const safeTicketNumber = escapeHtml(ticket.ticket_number || '');
+    
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${title} - ${ticket.ticket_number}</title>
+          <title>${safeTitle} - ${safeTicketNumber}</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #1a1a1a; }
