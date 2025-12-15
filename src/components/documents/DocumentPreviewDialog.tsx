@@ -185,7 +185,7 @@ export default function DocumentPreviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <style>{`
         @media print {
-          @page { size: A4; margin: 12mm; }
+          @page { size: A4; margin: 10mm; }
           html, body { height: initial !important; overflow: initial !important; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
@@ -194,6 +194,18 @@ export default function DocumentPreviewDialog({
 
           body.telya-printing #telya-print-root { position: relative; width: 100%; }
           body.telya-printing #telya-print-root .m-2 { margin: 0 !important; }
+          body.telya-printing #telya-print-root .document { padding: 0 !important; }
+          body.telya-printing #telya-print-root .conditions { 
+            font-size: 8px !important; 
+            line-height: 1.2 !important;
+            max-height: 100px !important;
+            overflow: hidden !important;
+            padding: 8px !important;
+          }
+          body.telya-printing #telya-print-root .footer { 
+            font-size: 8px !important;
+            margin-top: 12px !important;
+          }
         }
       `}</style>
 
@@ -331,10 +343,12 @@ export default function DocumentPreviewDialog({
                 </div>
               </div>
 
-              {/* Conditions */}
+              {/* Conditions - Fixed height to ensure single page */}
               {processedConditions && (
-                <div className="conditions bg-muted/50 p-4 rounded-lg text-sm space-y-1">
-                  {renderMarkdown(processedConditions)}
+                <div className="conditions bg-muted/50 p-3 rounded-lg text-[9px] leading-tight max-h-[120px] overflow-hidden">
+                  <div className="space-y-0.5">
+                    {renderMarkdown(processedConditions)}
+                  </div>
                 </div>
               )}
 

@@ -99,7 +99,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
     if (!text) return null;
     const processedText = replacePlaceholders(text, placeholderMap);
     return (
-      <div className="conditions-block mt-4 p-4 bg-muted/30 rounded-lg text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+      <div className="conditions-block mt-3 p-3 bg-muted/30 rounded-lg text-[9px] text-muted-foreground whitespace-pre-wrap leading-tight max-h-[100px] overflow-hidden">
         {processedText}
       </div>
     );
@@ -129,7 +129,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
     <>
       <style>{`
         @media print {
-          @page { size: A4; margin: 12mm; }
+          @page { size: A4; margin: 10mm; }
           html, body { height: initial !important; overflow: initial !important; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
@@ -137,6 +137,23 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
           body.telya-printing #telya-print-root { display: block !important; }
 
           body.telya-printing #telya-print-root { position: relative; width: 100%; }
+          body.telya-printing #telya-print-root .conditions-block { 
+            font-size: 8px !important; 
+            line-height: 1.2 !important;
+            max-height: 80px !important;
+            overflow: hidden !important;
+            padding: 6px !important;
+            margin-top: 8px !important;
+          }
+          body.telya-printing #telya-print-root .company-info { 
+            font-size: 8px !important;
+            margin-top: 8px !important;
+            padding-top: 8px !important;
+          }
+          body.telya-printing #telya-print-root .footer-text {
+            font-size: 8px !important;
+            margin-top: 8px !important;
+          }
         }
       `}</style>
       <div className="space-y-6">
