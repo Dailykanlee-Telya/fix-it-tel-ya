@@ -87,6 +87,41 @@ export default function UserManagement() {
     },
   });
 
+  // Delete/reject user mutation - removes profile and roles completely
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      // First delete user roles
+      const { error: rolesError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (rolesError) throw rolesError;
+
+      // Then delete profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (profileError) throw profileError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-management'] });
+      toast({
+        title: 'Benutzer gelöscht',
+        description: 'Der Benutzer wurde vollständig entfernt.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error.message,
+      });
+    },
+  });
+
   // Update role mutation
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
@@ -179,10 +214,11 @@ export default function UserManagement() {
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => approveUserMutation.mutate({ userId: user.id, approve: false })}
-                          disabled={approveUserMutation.isPending}
+                          variant="destructive"
+                          onClick={() => deleteUserMutation.mutate(user.id)}
+                          disabled={deleteUserMutation.isPending}
                         >
+                          <XCircle className="h-4 w-4 mr-1" />
                           Ablehnen
                         </Button>
                       </div>
@@ -258,15 +294,15 @@ export default function UserManagement() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {user.is_active && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => approveUserMutation.mutate({ userId: user.id, approve: false })}
-                          >
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteUserMutation.mutate(user.id)}
+                          disabled={deleteUserMutation.isPending}
+                          title="Benutzer löschen"
+                        >
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
