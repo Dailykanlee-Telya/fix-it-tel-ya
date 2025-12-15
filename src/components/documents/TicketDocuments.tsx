@@ -56,69 +56,32 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
   const report = getTemplate('REPARATURBERICHT', reportTemplate);
   const delivery = getTemplate('LIEFERSCHEIN', deliveryTemplate);
 
-  // HTML escape function to prevent XSS
-  const escapeHtml = (str: string): string => {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  };
+  // Unified print strategy - same as DocumentPreviewDialog
+  const PRINT_ROOT_ID = 'telya-print-root';
 
-  const handlePrint = (ref: React.RefObject<HTMLDivElement>, title: string) => {
+  const handlePrint = (ref: React.RefObject<HTMLDivElement>, _title: string) => {
     if (!ref.current) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    
-    const safeTitle = escapeHtml(title);
-    const safeTicketNumber = escapeHtml(ticket.ticket_number || '');
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${safeTitle} - ${safeTicketNumber}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #1a1a1a; }
-            .document { max-width: 800px; margin: 0 auto; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #1e40af; }
-            .logo { height: 48px; }
-            .doc-info { text-align: right; }
-            .doc-title { font-size: 24px; font-weight: bold; color: #1e40af; margin-bottom: 8px; }
-            .ticket-number { font-size: 18px; font-weight: 600; }
-            .date { color: #666; margin-top: 4px; }
-            .section { margin-bottom: 24px; }
-            .section-title { font-size: 14px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-            .field { margin-bottom: 12px; }
-            .field-label { font-size: 12px; color: #666; margin-bottom: 2px; }
-            .field-value { font-size: 14px; font-weight: 500; }
-            .table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            .table th, .table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-            .table th { background: #f3f4f6; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-            .table td { font-size: 14px; }
-            .table .amount { text-align: right; }
-            .total-row { font-weight: 600; background: #f9fafb; }
-            .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
-            .signature-area { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; }
-            .signature-line { border-top: 1px solid #333; padding-top: 8px; font-size: 12px; color: #666; }
-            .legal-notes { font-size: 11px; color: #666; margin-top: 20px; line-height: 1.5; }
-            .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #dbeafe; color: #1e40af; }
-            .company-info { font-size: 10px; color: #666; line-height: 1.4; text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
-            .intro-text { font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #333; }
-            .conditions-block { font-size: 12px; line-height: 1.6; margin: 20px 0; padding: 16px; background: #f9fafb; border-radius: 8px; white-space: pre-wrap; }
-            .footer-text { font-size: 11px; color: #666; line-height: 1.5; margin-top: 16px; font-style: italic; }
-            @media print { body { padding: 0; } .document { max-width: none; } }
-          </style>
-        </head>
-        <body>
-          ${ref.current.innerHTML}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
+
+    let printRoot = document.getElementById(PRINT_ROOT_ID);
+    if (!printRoot) {
+      printRoot = document.createElement('div');
+      printRoot.id = PRINT_ROOT_ID;
+      document.body.appendChild(printRoot);
+    }
+
+    printRoot.innerHTML = '';
+    printRoot.appendChild(ref.current.cloneNode(true));
+
+    const cleanup = () => {
+      document.body.classList.remove('telya-printing');
+      const root = document.getElementById(PRINT_ROOT_ID);
+      if (root) root.innerHTML = '';
+    };
+
+    window.addEventListener('afterprint', cleanup, { once: true });
+
+    document.body.classList.add('telya-printing');
+    window.print();
   };
 
   const totalPartsPrice = partUsage?.reduce((sum: number, p: any) => sum + (p.unit_sales_price || 0) * p.quantity, 0) || 0;
@@ -163,7 +126,20 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 12mm; }
+          html, body { height: initial !important; overflow: initial !important; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+          body.telya-printing > :not(#telya-print-root) { display: none !important; }
+          body.telya-printing #telya-print-root { display: block !important; }
+
+          body.telya-printing #telya-print-root { position: relative; width: 100%; }
+        }
+      `}</style>
+      <div className="space-y-6">
       {/* Eingangsbeleg (Intake Receipt) */}
       <Card className="card-elevated">
         <CardHeader className="flex flex-row items-center justify-between">
@@ -789,6 +765,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }
