@@ -338,14 +338,52 @@ export default function TicketDetail() {
         });
 
       if (historyError) throw historyError;
+
+      // Send notification emails based on new status
+      if (ticket?.email_opt_in && ticket?.customer?.email) {
+        try {
+          // KVA Ready email when status changes to WARTET_AUF_TEIL_ODER_FREIGABE and KVA is required
+          if (newStatus === 'WARTET_AUF_TEIL_ODER_FREIGABE' && ticket?.kva_required) {
+            await supabase.functions.invoke('send-email', {
+              body: {
+                type: 'kva_ready',
+                ticket_id: id,
+              },
+            });
+            console.log('KVA ready email sent');
+          }
+          
+          // Ready for pickup email
+          if (newStatus === 'FERTIG_ZUR_ABHOLUNG') {
+            await supabase.functions.invoke('send-email', {
+              body: {
+                type: 'ready_for_pickup',
+                ticket_id: id,
+              },
+            });
+            console.log('Ready for pickup email sent');
+          }
+        } catch (emailError) {
+          console.error('Error sending status email:', emailError);
+          // Don't fail the status change if email fails
+        }
+      }
+
+      return newStatus;
     },
-    onSuccess: () => {
+    onSuccess: (newStatus) => {
       queryClient.invalidateQueries({ queryKey: ['ticket', id] });
       queryClient.invalidateQueries({ queryKey: ['ticket-history', id] });
       setStatusNote('');
+      
+      const emailSent = ticket?.email_opt_in && ticket?.customer?.email && 
+        (newStatus === 'WARTET_AUF_TEIL_ODER_FREIGABE' && ticket?.kva_required || newStatus === 'FERTIG_ZUR_ABHOLUNG');
+      
       toast({
         title: 'Status aktualisiert',
-        description: 'Der Auftragsstatus wurde erfolgreich geändert.',
+        description: emailSent 
+          ? 'Der Auftragsstatus wurde geändert und der Kunde wurde per E-Mail benachrichtigt.'
+          : 'Der Auftragsstatus wurde erfolgreich geändert.',
       });
     },
     onError: (error: any) => {
