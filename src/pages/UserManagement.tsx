@@ -87,24 +87,24 @@ export default function UserManagement() {
     },
   });
 
-  // Delete/reject user mutation - removes profile and roles completely
+  // Delete/reject user mutation - removes profile, roles AND auth user completely
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // First delete user roles
-      const { error: rolesError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
+      // Call edge function to delete auth user (requires service role)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Nicht angemeldet');
 
-      if (rolesError) throw rolesError;
+      const response = await supabase.functions.invoke('delete-user', {
+        body: { userId },
+      });
 
-      // Then delete profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
+      if (response.error) {
+        throw new Error(response.error.message || 'Fehler beim Löschen des Benutzers');
+      }
 
-      if (profileError) throw profileError;
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-management'] });
