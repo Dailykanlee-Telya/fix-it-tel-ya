@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +12,8 @@ import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useRateLimiter, AUTH_RATE_LIMIT_CONFIG } from '@/hooks/useRateLimiter';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ReCaptcha, ReCaptchaRef, RECAPTCHA_ERRORS } from '@/components/ReCaptcha';
+import { isRecaptchaConfigured } from '@/lib/recaptcha';
 import { Separator } from '@/components/ui/separator';
 
 const loginSchema = z.object({
@@ -59,6 +61,10 @@ export default function Auth() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  
+  // reCAPTCHA
+  const recaptchaRef = useRef<ReCaptchaRef>(null);
+  const [recaptchaError, setRecaptchaError] = useState<string | null>(null);
 
   // Check URL params and hash for recovery flow
   useEffect(() => {
@@ -129,6 +135,7 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setRecaptchaError(null);
 
     // Check rate limit
     if (loginRateLimiter.isLocked) {
@@ -139,6 +146,16 @@ export default function Auth() {
       });
       return;
     }
+
+    // Verify reCAPTCHA if configured
+    if (isRecaptchaConfigured()) {
+      const recaptchaToken = recaptchaRef.current?.getToken();
+      if (!recaptchaToken) {
+        setRecaptchaError(RECAPTCHA_ERRORS.NOT_SOLVED);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const validated = loginSchema.parse({
@@ -562,6 +579,19 @@ export default function Auth() {
                 >
                   Passwort vergessen?
                 </button>
+              </div>
+
+              {/* reCAPTCHA */}
+              <div className="flex flex-col items-center">
+                <ReCaptcha 
+                  ref={recaptchaRef}
+                  onChange={() => setRecaptchaError(null)}
+                  onExpired={() => setRecaptchaError(RECAPTCHA_ERRORS.EXPIRED)}
+                  className="my-2"
+                />
+                {recaptchaError && (
+                  <p className="text-sm text-destructive mt-1">{recaptchaError}</p>
+                )}
               </div>
 
               <Button type="submit" className="w-full" disabled={loading || loginRateLimiter.isLocked}>

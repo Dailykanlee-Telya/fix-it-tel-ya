@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ import {
 import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { ReCaptcha, ReCaptchaRef, RECAPTCHA_ERRORS } from '@/components/ReCaptcha';
+import { isRecaptchaConfigured } from '@/lib/recaptcha';
 
 interface TicketData {
   ticket_number: string;
@@ -79,13 +81,24 @@ export default function TrackTicket() {
   const [customerMessage, setCustomerMessage] = useState('');
   const [disposalOption, setDisposalOption] = useState<'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN'>('ZURUECKSENDEN');
   const [autoSearchDone, setAutoSearchDone] = useState(false);
+  
+  // reCAPTCHA
+  const recaptchaRef = useRef<ReCaptchaRef>(null);
+  const [recaptchaError, setRecaptchaError] = useState<string | null>(null);
 
   const callTrackingApi = useCallback(async (action: string, extraData: Record<string, any> = {}, overrideTicket?: string, overrideToken?: string) => {
+    // Get reCAPTCHA token if configured
+    let recaptcha_token: string | undefined;
+    if (isRecaptchaConfigured() && recaptchaRef.current) {
+      recaptcha_token = recaptchaRef.current.getToken() || undefined;
+    }
+
     const response = await supabase.functions.invoke('track-ticket', {
       body: {
         action,
         ticket_number: overrideTicket || ticketNumber,
         tracking_token: overrideToken || trackingToken,
+        recaptcha_token,
         ...extraData
       }
     });
@@ -159,18 +172,32 @@ export default function TrackTicket() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    setRecaptchaError(null);
+
+    // Verify reCAPTCHA if configured
+    if (isRecaptchaConfigured()) {
+      const recaptchaToken = recaptchaRef.current?.getToken();
+      if (!recaptchaToken) {
+        setRecaptchaError(RECAPTCHA_ERRORS.NOT_SOLVED);
+        return;
+      }
+    }
+
     setLoading(true);
     setTicket(null);
 
     try {
       const data = await callTrackingApi('lookup');
       setTicket(data);
+      // Reset reCAPTCHA after successful lookup
+      recaptchaRef.current?.reset();
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Fehler',
         description: error.message,
       });
+      recaptchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -302,6 +329,20 @@ export default function TrackTicket() {
                   maxLength={8}
                 />
               </div>
+
+              {/* reCAPTCHA */}
+              <div className="flex flex-col items-center">
+                <ReCaptcha 
+                  ref={recaptchaRef}
+                  onChange={() => setRecaptchaError(null)}
+                  onExpired={() => setRecaptchaError(RECAPTCHA_ERRORS.EXPIRED)}
+                  className="my-2"
+                />
+                {recaptchaError && (
+                  <p className="text-sm text-destructive mt-1">{recaptchaError}</p>
+                )}
+              </div>
+
               <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
                 {loading ? (
                   <>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Building2, Mail, Phone, User, MapPin, FileText, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
+import { ReCaptcha, ReCaptchaRef, RECAPTCHA_ERRORS } from '@/components/ReCaptcha';
+import { isRecaptchaConfigured } from '@/lib/recaptcha';
 
 const b2bRegisterSchema = z
   .object({
@@ -50,10 +52,26 @@ export default function B2BRegister() {
   const [notes, setNotes] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // reCAPTCHA
+  const recaptchaRef = useRef<ReCaptchaRef>(null);
+  const [recaptchaError, setRecaptchaError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setRecaptchaError(null);
+
+    // Verify reCAPTCHA if configured
+    if (isRecaptchaConfigured()) {
+      const recaptchaToken = recaptchaRef.current?.getToken();
+      if (!recaptchaToken) {
+        setRecaptchaError(RECAPTCHA_ERRORS.NOT_SOLVED);
+        return;
+      }
+    }
+
+    setLoading(true);
     setLoading(true);
 
     try {
@@ -101,8 +119,9 @@ export default function B2BRegister() {
       console.log('B2B signup created user:', signUpData?.user?.id);
 
       // Schritt 2: B2B-Partner über Edge Function registrieren (bypasst RLS)
+      const recaptchaToken = recaptchaRef.current?.getToken() || undefined;
       const { data, error } = await supabase.functions.invoke('b2b-register', {
-        body: partnerPayload,
+        body: { ...partnerPayload, recaptcha_token: recaptchaToken },
       });
 
       if (error || data?.error) {
@@ -374,6 +393,19 @@ export default function B2BRegister() {
                   className="min-h-[80px]"
                   disabled={loading}
                 />
+              </div>
+
+              {/* reCAPTCHA */}
+              <div className="flex flex-col items-center">
+                <ReCaptcha 
+                  ref={recaptchaRef}
+                  onChange={() => setRecaptchaError(null)}
+                  onExpired={() => setRecaptchaError(RECAPTCHA_ERRORS.EXPIRED)}
+                  className="my-2"
+                />
+                {recaptchaError && (
+                  <p className="text-sm text-destructive mt-1">{recaptchaError}</p>
+                )}
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>
