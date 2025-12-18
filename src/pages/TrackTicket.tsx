@@ -90,10 +90,16 @@ export default function TrackTicket() {
       }
     });
     
+    // Handle edge function errors (non-2xx responses)
     if (response.error) {
-      throw new Error(response.error.message || 'Ein Fehler ist aufgetreten.');
+      // Try to extract error message from the response context
+      const errorMessage = response.data?.error 
+        || response.error.message 
+        || 'Ein Fehler ist aufgetreten.';
+      throw new Error(errorMessage);
     }
     
+    // Handle application-level errors in successful responses
     if (response.data?.error) {
       throw new Error(response.data.error);
     }
@@ -123,8 +129,12 @@ export default function TrackTicket() {
             }
           });
           
+          // Handle edge function errors (non-2xx responses)
           if (response.error) {
-            throw new Error(response.error.message || 'Ein Fehler ist aufgetreten.');
+            const errorMessage = response.data?.error 
+              || response.error.message 
+              || 'Ein Fehler ist aufgetreten.';
+            throw new Error(errorMessage);
           }
           
           if (response.data?.error) {
