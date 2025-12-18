@@ -9,9 +9,9 @@ import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
 import { ProtectedRoute as PermissionProtectedRoute } from "@/components/layout/ProtectedRoute";
 
-// Layouts
-import AppLayout from "@/components/layout/AppLayout";
-import B2BLayout from "@/components/layout/B2BLayout";
+// Layouts - lazy loaded to reduce initial bundle
+const AppLayout = lazy(() => import("@/components/layout/AppLayout"));
+const B2BLayout = lazy(() => import("@/components/layout/B2BLayout"));
 
 // Eager loaded pages (critical path)
 import Auth from "@/pages/Auth";
