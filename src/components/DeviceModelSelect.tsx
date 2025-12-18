@@ -65,12 +65,12 @@ export default function DeviceModelSelect({
   const [brandSearch, setBrandSearch] = useState('');
   const [modelSearch, setModelSearch] = useState('');
 
-  // Common brands per device type
+  // Common brands per device type - sorted alphabetically with most popular first
   const commonBrandsByType: Record<string, string[]> = {
-    'HANDY': ['Apple', 'Samsung', 'Xiaomi', 'Huawei', 'Sony', 'Motorola', 'Google', 'OnePlus'],
-    'TABLET': ['Apple', 'Samsung', 'Lenovo', 'Microsoft', 'Huawei'],
-    'LAPTOP': ['Apple', 'Lenovo', 'Dell', 'HP', 'ASUS', 'Acer', 'Microsoft'],
-    'SMARTWATCH': ['Apple', 'Samsung', 'Garmin', 'Huawei', 'Google', 'Xiaomi'],
+    'HANDY': ['Apple', 'Samsung', 'Xiaomi', 'realme', 'Huawei', 'Sony', 'Motorola', 'Google', 'OnePlus', 'OPPO', 'Vivo', 'Honor', 'Nothing', 'Fairphone'],
+    'TABLET': ['Apple', 'Samsung', 'Lenovo', 'Microsoft', 'Huawei', 'Xiaomi'],
+    'LAPTOP': ['Apple', 'Lenovo', 'Dell', 'HP', 'ASUS', 'Acer', 'Microsoft', 'Huawei'],
+    'SMARTWATCH': ['Apple', 'Samsung', 'Garmin', 'Huawei', 'Google', 'Xiaomi', 'Fitbit'],
     'OTHER': [],
   };
 
