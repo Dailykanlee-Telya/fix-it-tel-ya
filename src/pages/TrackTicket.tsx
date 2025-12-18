@@ -294,7 +294,7 @@ export default function TrackTicket() {
           <img 
             src="/telya-logo.png" 
             alt="Telya Logo" 
-            className="h-16 w-16 rounded-2xl shadow-lg mb-4"
+            className="h-16 w-auto rounded-2xl shadow-lg mb-4"
           />
           <h1 className="text-3xl font-bold text-foreground text-center">Reparaturstatus abfragen</h1>
           <p className="text-muted-foreground mt-2 text-center">
