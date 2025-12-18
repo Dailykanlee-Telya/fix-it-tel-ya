@@ -48,15 +48,62 @@ const b2bRegisterSchema = z.object({
     .max(1000, 'Bemerkungen dürfen maximal 1000 Zeichen haben')
     .optional()
     .nullable(),
+  recaptcha_token: z.string().optional().nullable(),
 });
 
 type B2BRegisterRequest = z.infer<typeof b2bRegisterSchema>;
+
+// Verify reCAPTCHA token
+async function verifyRecaptcha(token: string, remoteIp?: string | null): Promise<boolean> {
+  const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY");
+  
+  if (!secretKey) {
+    console.warn("RECAPTCHA_SECRET_KEY not configured. Skipping verification.");
+    return true;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      secret: secretKey,
+      response: token,
+    });
+
+    if (remoteIp) {
+      params.append("remoteip", remoteIp);
+    }
+
+    const response = await fetch(
+      "https://www.google.com/recaptcha/api/siteverify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      }
+    );
+
+    if (!response.ok) {
+      console.error("reCAPTCHA API error:", response.status);
+      return false;
+    }
+
+    const data = await response.json();
+    console.log("reCAPTCHA result:", { success: data.success, score: data.score });
+    return data.success === true;
+  } catch (error) {
+    console.error("reCAPTCHA verification error:", error);
+    return false;
+  }
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
+    || req.headers.get('x-real-ip') 
+    || 'unknown';
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -92,6 +139,27 @@ Deno.serve(async (req) => {
     }
 
     const body: B2BRegisterRequest = validationResult.data;
+
+    // Verify reCAPTCHA
+    const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY");
+    if (secretKey) {
+      if (!body.recaptcha_token) {
+        console.log('Missing reCAPTCHA token for B2B registration from IP:', clientIP);
+        return new Response(
+          JSON.stringify({ error: 'Bitte bestätigen Sie, dass Sie kein Roboter sind.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const isValidRecaptcha = await verifyRecaptcha(body.recaptcha_token, clientIP);
+      if (!isValidRecaptcha) {
+        console.log('reCAPTCHA verification failed for B2B registration from IP:', clientIP);
+        return new Response(
+          JSON.stringify({ error: 'Die Sicherheitsprüfung ist fehlgeschlagen. Bitte versuchen Sie es erneut.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     
     console.log('B2B registration request:', { 
       company: body.companyName, 
