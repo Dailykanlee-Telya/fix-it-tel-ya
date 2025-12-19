@@ -5,6 +5,7 @@ import { DEVICE_TYPE_LABELS, DeviceType } from '@/types/database';
 import { TELYA_ADDRESS } from '@/types/b2b';
 import { BON_STYLES, generatePdfFilename } from '@/lib/pdf-styles';
 import { DOCUMENT_LOGOS } from '@/lib/document-logo';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface ThermalReceiptProps {
   ticket: any;
@@ -205,6 +206,32 @@ export default function ThermalReceipt({
                   <span className="bon-value" style={{ fontSize: '8px' }}>{ticket.location.address}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Data Security Warning */}
+          <div className="bon-warning">
+            <div className="bon-warning-icon">⚠️</div>
+            <div className="bon-warning-text">
+              Bitte sichern Sie Ihre Daten vor der Reparatur. Für Datenverlust übernehmen wir keine Haftung.
+            </div>
+          </div>
+
+          {/* QR Code for Status Tracking */}
+          {ticket.kva_token && (
+            <div className="bon-qr-section">
+              <div className="bon-qr-title">Status online abrufen:</div>
+              <div className="bon-qr-code">
+                <QRCodeSVG 
+                  value={`${window.location.origin}/track?ticket=${encodeURIComponent(ticket.ticket_number)}&token=${ticket.kva_token}`}
+                  size={80}
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+              <div className="bon-qr-hint">QR-Code scannen oder</div>
+              <div className="bon-qr-url">www.telya.de/track</div>
+              <div className="bon-qr-token">Code: {ticket.kva_token}</div>
             </div>
           )}
 
