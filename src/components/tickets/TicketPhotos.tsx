@@ -11,6 +11,21 @@ interface TicketPhotosProps {
   ticketId: string;
 }
 
+// Helper to extract file path from storage URL
+const extractFilePath = (storageUrl: string): string | null => {
+  try {
+    const url = new URL(storageUrl);
+    const pathMatch = url.pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/ticket-photos\/(.+)/);
+    return pathMatch ? pathMatch[1] : null;
+  } catch {
+    // If it's already just a path
+    if (storageUrl.includes('ticket-photos/')) {
+      return storageUrl.split('ticket-photos/')[1];
+    }
+    return null;
+  }
+};
+
 export default function TicketPhotos({ ticketId }: TicketPhotosProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
@@ -24,7 +39,22 @@ export default function TicketPhotos({ ticketId }: TicketPhotosProps) {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return data;
+      
+      // Generate signed URLs for each photo (bucket is now private)
+      const photosWithSignedUrls = await Promise.all(
+        (data || []).map(async (photo) => {
+          const filePath = extractFilePath(photo.storage_url);
+          if (filePath) {
+            const { data: signedData } = await supabase.storage
+              .from('ticket-photos')
+              .createSignedUrl(filePath, 3600); // 1 hour expiry
+            return { ...photo, signedUrl: signedData?.signedUrl || photo.storage_url };
+          }
+          return { ...photo, signedUrl: photo.storage_url };
+        })
+      );
+      
+      return photosWithSignedUrls;
     },
   });
 
@@ -60,7 +90,7 @@ export default function TicketPhotos({ ticketId }: TicketPhotosProps) {
                     onClick={() => setSelectedPhoto(photo.storage_url)}
                   >
                     <img
-                      src={photo.storage_url}
+                      src={photo.signedUrl}
                       alt={photo.file_name}
                       className="w-full h-full object-cover"
                       loading="lazy"
@@ -75,7 +105,7 @@ export default function TicketPhotos({ ticketId }: TicketPhotosProps) {
                 <DialogContent className="max-w-3xl p-0 overflow-hidden">
                   <div className="relative">
                     <img
-                      src={photo.storage_url}
+                      src={photo.signedUrl}
                       alt={photo.file_name}
                       className="w-full h-auto max-h-[80vh] object-contain"
                     />
