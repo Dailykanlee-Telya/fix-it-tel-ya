@@ -473,6 +473,72 @@ export const BON_STYLES = `
     color: ${TELYA_COLORS.textMuted};
   }
   
+  /* Data Security Warning */
+  .bon-warning {
+    margin: 3mm 0;
+    padding: 2mm;
+    background: #ffebee;
+    border: 1px solid #ef5350;
+    border-radius: 2mm;
+    text-align: center;
+    font-size: 7px;
+  }
+  
+  .bon-warning-icon {
+    font-size: 10px;
+    margin-bottom: 1mm;
+  }
+  
+  .bon-warning-text {
+    color: #c62828;
+    line-height: 1.3;
+  }
+  
+  /* QR Code Section */
+  .bon-qr-section {
+    margin: 3mm 0;
+    padding: 2.5mm;
+    border: 1px dashed ${TELYA_COLORS.textLight};
+    border-radius: 2mm;
+    text-align: center;
+  }
+  
+  .bon-qr-title {
+    font-size: 8px;
+    font-weight: 600;
+    margin-bottom: 2mm;
+    color: ${TELYA_COLORS.primaryBlue};
+  }
+  
+  .bon-qr-code {
+    display: flex;
+    justify-content: center;
+    margin: 2mm 0;
+  }
+  
+  .bon-qr-code svg {
+    width: 80px !important;
+    height: 80px !important;
+  }
+  
+  .bon-qr-hint {
+    font-size: 7px;
+    color: ${TELYA_COLORS.textMuted};
+  }
+  
+  .bon-qr-url {
+    font-size: 8px;
+    font-weight: 600;
+    color: ${TELYA_COLORS.primaryBlue};
+  }
+  
+  .bon-qr-token {
+    font-size: 7px;
+    font-family: 'Courier New', monospace;
+    color: ${TELYA_COLORS.textMuted};
+    margin-top: 1mm;
+  }
+  
   .bon-footer {
     text-align: center;
     font-size: 8px;
