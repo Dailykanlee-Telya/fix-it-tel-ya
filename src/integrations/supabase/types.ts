@@ -583,40 +583,55 @@ export type Database = {
         Row: {
           brand: string | null
           created_at: string
+          device_type: string | null
           id: string
+          is_active: boolean | null
           min_stock_quantity: number
           model: string | null
           name: string
+          part_category: string | null
           purchase_price: number
           sales_price: number
           sku: string | null
           stock_quantity: number
+          storage_location: string | null
+          supplier_sku: string | null
           updated_at: string
         }
         Insert: {
           brand?: string | null
           created_at?: string
+          device_type?: string | null
           id?: string
+          is_active?: boolean | null
           min_stock_quantity?: number
           model?: string | null
           name: string
+          part_category?: string | null
           purchase_price?: number
           sales_price?: number
           sku?: string | null
           stock_quantity?: number
+          storage_location?: string | null
+          supplier_sku?: string | null
           updated_at?: string
         }
         Update: {
           brand?: string | null
           created_at?: string
+          device_type?: string | null
           id?: string
+          is_active?: boolean | null
           min_stock_quantity?: number
           model?: string | null
           name?: string
+          part_category?: string | null
           purchase_price?: number
           sales_price?: number
           sku?: string | null
           stock_quantity?: number
+          storage_location?: string | null
+          supplier_sku?: string | null
           updated_at?: string
         }
         Relationships: []

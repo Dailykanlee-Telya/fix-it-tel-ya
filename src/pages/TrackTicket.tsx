@@ -44,6 +44,8 @@ interface TicketData {
   endcustomer_price: number | null;
   endcustomer_price_released: boolean;
   is_b2b: boolean;
+  // KVA should only show when ticket is in specific statuses that indicate KVA is ready
+  price_mode: string;
   device: { brand: string; model: string; device_type: string } | null;
   location: { name: string } | null;
   status_history: Array<{
@@ -284,7 +286,17 @@ export default function TrackTicket() {
   };
 
   const displayPrice = getDisplayPrice();
-  const shouldShowKVA = ticket?.kva_required && (!ticket.is_b2b || ticket.endcustomer_price_released);
+  
+  // KVA should only show when:
+  // 1. kva_required is true
+  // 2. Ticket is in WARTET_AUF_TEIL_ODER_FREIGABE status (KVA is ready for customer decision)
+  // 3. For B2B: also check endcustomer_price_released
+  // 4. KVA is NOT in draft - only show when it's ready for customer decision
+  const isKvaReady = ticket?.status === 'WARTET_AUF_TEIL_ODER_FREIGABE';
+  const shouldShowKVA = ticket?.kva_required && 
+    isKvaReady && 
+    (!ticket.is_b2b || ticket.endcustomer_price_released) &&
+    (displayPrice != null || ticket.kva_approved !== null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 py-8 px-4">

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { escapeLikePattern } from '@/lib/utils';
+import { splitName } from '@/lib/name-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +29,7 @@ import {
   Plus,
   Check,
   ExternalLink,
+  Printer,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DocumentScanner } from '@/components/intake/DocumentScanner';
@@ -43,6 +45,7 @@ import DeviceModelSelect from '@/components/DeviceModelSelect';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { validateIMEI } from '@/lib/imei-validation';
 import PhotoUpload, { UploadedPhoto, usePhotoUpload } from '@/components/intake/PhotoUpload';
+import PickupReceipt from '@/components/documents/PickupReceipt';
 
 const ACCESSORIES = [
   { id: 'case', label: 'Hülle' },
@@ -61,6 +64,7 @@ export default function Intake() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState(''); // Combined name field for smart splitting
   const [newCustomer, setNewCustomer] = useState({
     first_name: '',
     last_name: '',
@@ -69,6 +73,10 @@ export default function Intake() {
     address: '',
     marketing_consent: false,
   });
+  
+  // Auto-print state for Abholschein
+  const [createdTicket, setCreatedTicket] = useState<any>(null);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
 
   // Notification opt-ins
   const [emailOptIn, setEmailOptIn] = useState(true);
@@ -309,12 +317,30 @@ export default function Intake() {
 
       return ticketData;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast({
         title: 'Auftrag erstellt',
         description: `Auftragsnummer: ${data.ticket_number}`,
       });
-      navigate(`/tickets/${data.id}`);
+      
+      // Fetch full ticket data for the Abholschein
+      const { data: fullTicket } = await supabase
+        .from('repair_tickets')
+        .select(`
+          *,
+          customer:customers(*),
+          device:devices(*),
+          location:locations(*)
+        `)
+        .eq('id', data.id)
+        .single();
+      
+      if (fullTicket) {
+        setCreatedTicket(fullTicket);
+        setShowPrintDialog(true);
+      } else {
+        navigate(`/tickets/${data.id}`);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -580,21 +606,43 @@ export default function Intake() {
                   </Button>
                 </div>
                 
+                {/* Smart name input field */}
+                <div className="space-y-2">
+                  <Label>Name (Vor- und Nachname) *</Label>
+                  <Input
+                    placeholder="z.B. Ali Can Yilmaz"
+                    value={newCustomerName}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNewCustomerName(value);
+                      // Auto-split name as user types
+                      const { first_name, last_name } = splitName(value);
+                      setNewCustomer(prev => ({ ...prev, first_name, last_name }));
+                    }}
+                    className="text-lg"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {newCustomer.first_name && (
+                      <>Vorname: <strong>{newCustomer.first_name}</strong>{newCustomer.last_name && <> • Nachname: <strong>{newCustomer.last_name}</strong></>}</>
+                    )}
+                  </p>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Vorname *</Label>
+                    <Label>Vorname</Label>
                     <Input
                       value={newCustomer.first_name}
                       onChange={(e) => setNewCustomer({ ...newCustomer, first_name: e.target.value })}
-                      required
+                      placeholder="Wird automatisch ausgefüllt"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Nachname *</Label>
+                    <Label>Nachname</Label>
                     <Input
                       value={newCustomer.last_name}
                       onChange={(e) => setNewCustomer({ ...newCustomer, last_name: e.target.value })}
-                      required
+                      placeholder="Wird automatisch ausgefüllt"
                     />
                   </div>
                 </div>
@@ -1078,6 +1126,56 @@ export default function Intake() {
           </Button>
         </div>
       </form>
+
+      {/* Print Dialog for Abholschein */}
+      {showPrintDialog && createdTicket && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-md shadow-2xl">
+            <CardHeader className="text-center pb-2">
+              <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mx-auto mb-2">
+                <Check className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <CardTitle>Auftrag erfolgreich erstellt</CardTitle>
+              <CardDescription>
+                Auftragsnummer: <strong className="text-foreground">{createdTicket.ticket_number}</strong>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-muted/50 rounded-lg text-center">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Möchten Sie jetzt den Abholschein für den Bondrucker drucken?
+                </p>
+                <PickupReceipt 
+                  ticket={createdTicket} 
+                  autoPrint={false}
+                  onPrintComplete={() => {}}
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowPrintDialog(false);
+                    navigate(`/tickets/${createdTicket.id}`);
+                  }}
+                >
+                  Überspringen
+                </Button>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={() => {
+                    setShowPrintDialog(false);
+                    navigate(`/tickets/${createdTicket.id}`);
+                  }}
+                >
+                  Zur Auftragsdetails
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

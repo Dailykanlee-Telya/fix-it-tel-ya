@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -31,7 +32,32 @@ import {
   AlertTriangle,
   Edit,
   Loader2,
+  Filter,
+  X,
 } from 'lucide-react';
+
+// Part categories for smartphones/tablets
+const PART_CATEGORIES = [
+  { value: 'DISPLAY', label: 'Display' },
+  { value: 'AKKU', label: 'Akku' },
+  { value: 'LADEBUCHSE', label: 'Ladebuchse' },
+  { value: 'KAMERA', label: 'Kamera' },
+  { value: 'BACKCOVER', label: 'Backcover' },
+  { value: 'RAHMEN', label: 'Rahmen' },
+  { value: 'LAUTSPRECHER', label: 'Lautsprecher' },
+  { value: 'MIKROFON', label: 'Mikrofon' },
+  { value: 'BUTTON', label: 'Button/Tasten' },
+  { value: 'FLEXKABEL', label: 'Flexkabel' },
+  { value: 'SONSTIGES', label: 'Sonstiges' },
+];
+
+const DEVICE_TYPES = [
+  { value: 'HANDY', label: 'Smartphone' },
+  { value: 'TABLET', label: 'Tablet' },
+  { value: 'LAPTOP', label: 'Laptop' },
+  { value: 'SMARTWATCH', label: 'Smartwatch' },
+  { value: 'OTHER', label: 'Sonstiges' },
+];
 
 export default function Parts() {
   const queryClient = useQueryClient();
@@ -39,11 +65,22 @@ export default function Parts() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<any>(null);
+  
+  // Filter states
+  const [filterBrand, setFilterBrand] = useState<string>('all');
+  const [filterDeviceType, setFilterDeviceType] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterLowStock, setFilterLowStock] = useState(false);
+  
   const [formData, setFormData] = useState({
     name: '',
     brand: '',
     model: '',
+    device_type: 'HANDY',
+    part_category: 'SONSTIGES',
     sku: '',
+    supplier_sku: '',
+    storage_location: '',
     purchase_price: '',
     sales_price: '',
     stock_quantity: '',
@@ -56,12 +93,21 @@ export default function Parts() {
       const { data, error } = await supabase
         .from('parts')
         .select('*')
-        .order('name');
+        .order('brand', { ascending: true })
+        .order('model', { ascending: true })
+        .order('name', { ascending: true });
 
       if (error) throw error;
       return data;
     },
   });
+
+  // Get unique brands from parts
+  const uniqueBrands = useMemo(() => {
+    if (!parts) return [];
+    const brands = [...new Set(parts.map((p: any) => p.brand).filter(Boolean))];
+    return brands.sort();
+  }, [parts]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -69,7 +115,11 @@ export default function Parts() {
         name: formData.name,
         brand: formData.brand || null,
         model: formData.model || null,
+        device_type: formData.device_type,
+        part_category: formData.part_category,
         sku: formData.sku || null,
+        supplier_sku: formData.supplier_sku || null,
+        storage_location: formData.storage_location || null,
         purchase_price: parseFloat(formData.purchase_price) || 0,
         sales_price: parseFloat(formData.sales_price) || 0,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
@@ -113,7 +163,11 @@ export default function Parts() {
       name: '',
       brand: '',
       model: '',
+      device_type: 'HANDY',
+      part_category: 'SONSTIGES',
       sku: '',
+      supplier_sku: '',
+      storage_location: '',
       purchase_price: '',
       sales_price: '',
       stock_quantity: '',
@@ -127,7 +181,11 @@ export default function Parts() {
       name: part.name,
       brand: part.brand || '',
       model: part.model || '',
+      device_type: part.device_type || 'HANDY',
+      part_category: part.part_category || 'SONSTIGES',
       sku: part.sku || '',
+      supplier_sku: part.supplier_sku || '',
+      storage_location: part.storage_location || '',
       purchase_price: part.purchase_price?.toString() || '',
       sales_price: part.sales_price?.toString() || '',
       stock_quantity: part.stock_quantity?.toString() || '',
@@ -136,14 +194,44 @@ export default function Parts() {
     setDialogOpen(true);
   };
 
-  const filteredParts = parts?.filter((part: any) =>
-    part.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    part.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    part.model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    part.sku?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Apply all filters
+  const filteredParts = useMemo(() => {
+    if (!parts) return [];
+    
+    return parts.filter((part: any) => {
+      // Search filter
+      const matchesSearch = !searchQuery || 
+        part.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        part.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        part.model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        part.sku?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      // Brand filter
+      const matchesBrand = filterBrand === 'all' || part.brand === filterBrand;
+      
+      // Device type filter
+      const matchesDeviceType = filterDeviceType === 'all' || part.device_type === filterDeviceType;
+      
+      // Category filter
+      const matchesCategory = filterCategory === 'all' || part.part_category === filterCategory;
+      
+      // Low stock filter
+      const matchesLowStock = !filterLowStock || part.stock_quantity <= part.min_stock_quantity;
+      
+      return matchesSearch && matchesBrand && matchesDeviceType && matchesCategory && matchesLowStock;
+    });
+  }, [parts, searchQuery, filterBrand, filterDeviceType, filterCategory, filterLowStock]);
 
   const lowStockCount = parts?.filter((p: any) => p.stock_quantity <= p.min_stock_quantity).length || 0;
+  const hasActiveFilters = filterBrand !== 'all' || filterDeviceType !== 'all' || filterCategory !== 'all' || filterLowStock;
+
+  const clearFilters = () => {
+    setFilterBrand('all');
+    setFilterDeviceType('all');
+    setFilterCategory('all');
+    setFilterLowStock(false);
+    setSearchQuery('');
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -168,7 +256,7 @@ export default function Parts() {
               Neues Teil
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingPart ? 'Teil bearbeiten' : 'Neues Ersatzteil'}</DialogTitle>
               <DialogDescription>
@@ -177,20 +265,56 @@ export default function Parts() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label>Name *</Label>
+                <Label>Bezeichnung *</Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="z.B. iPhone 14 Pro Display"
+                  placeholder="z.B. Display OLED Original"
                 />
               </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Marke</Label>
+                  <Label>Gerätetyp</Label>
+                  <Select
+                    value={formData.device_type}
+                    onValueChange={(v) => setFormData({ ...formData, device_type: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DEVICE_TYPES.map((dt) => (
+                        <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Teilkategorie</Label>
+                  <Select
+                    value={formData.part_category}
+                    onValueChange={(v) => setFormData({ ...formData, part_category: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PART_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Hersteller</Label>
                   <Input
                     value={formData.brand}
                     onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    placeholder="z.B. Apple"
+                    placeholder="z.B. Apple, Samsung"
                   />
                 </div>
                 <div className="space-y-2">
@@ -202,14 +326,35 @@ export default function Parts() {
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Interne Art.-Nr. (SKU)</Label>
+                  <Input
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    placeholder="Optional"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Lieferanten Art.-Nr.</Label>
+                  <Input
+                    value={formData.supplier_sku}
+                    onChange={(e) => setFormData({ ...formData, supplier_sku: e.target.value })}
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label>Artikelnummer (SKU)</Label>
+                <Label>Lagerort (Regal/Fach)</Label>
                 <Input
-                  value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  placeholder="Optional"
+                  value={formData.storage_location}
+                  onChange={(e) => setFormData({ ...formData, storage_location: e.target.value })}
+                  placeholder="z.B. Regal A3, Fach 5"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Einkaufspreis (€)</Label>
@@ -230,9 +375,10 @@ export default function Parts() {
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Bestand</Label>
+                  <Label>Aktueller Bestand</Label>
                   <Input
                     type="number"
                     value={formData.stock_quantity}
@@ -262,20 +408,92 @@ export default function Parts() {
         </Dialog>
       </div>
 
-      {/* Search */}
+      {/* Search & Filters */}
       <Card className="card-elevated">
         <CardContent className="pt-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Suchen (Name, Marke, Modell, SKU)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Suchen (Name, Marke, Modell, SKU)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            
+            {/* Filter Row */}
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filter:</span>
+              </div>
+              
+              <Select value={filterBrand} onValueChange={setFilterBrand}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Hersteller" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle Hersteller</SelectItem>
+                  {uniqueBrands.map((brand: string) => (
+                    <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterDeviceType} onValueChange={setFilterDeviceType}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Gerätetyp" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle Typen</SelectItem>
+                  {DEVICE_TYPES.map((dt) => (
+                    <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Kategorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle Kategorien</SelectItem>
+                  {PART_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant={filterLowStock ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilterLowStock(!filterLowStock)}
+                className="gap-2"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Niedriger Bestand
+                {filterLowStock && <span>({lowStockCount})</span>}
+              </Button>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+                  <X className="h-4 w-4" />
+                  Filter zurücksetzen
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Results Info */}
+      {hasActiveFilters && (
+        <p className="text-sm text-muted-foreground">
+          {filteredParts.length} von {parts?.length || 0} Teilen angezeigt
+        </p>
+      )}
 
       {/* Parts Table */}
       <Card className="card-elevated">
@@ -285,8 +503,9 @@ export default function Parts() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Bezeichnung</TableHead>
-                  <TableHead>Marke/Modell</TableHead>
-                  <TableHead>SKU</TableHead>
+                  <TableHead>Hersteller / Modell</TableHead>
+                  <TableHead>Kategorie</TableHead>
+                  <TableHead>Lagerort</TableHead>
                   <TableHead className="text-right">EK</TableHead>
                   <TableHead className="text-right">VK</TableHead>
                   <TableHead className="text-right">Marge</TableHead>
@@ -297,15 +516,15 @@ export default function Parts() {
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
+                    <TableCell colSpan={9} className="text-center py-12">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                     </TableCell>
                   </TableRow>
                 )}
                 {filteredParts?.length === 0 && !isLoading && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                      Keine Ersatzteile gefunden
+                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                      {hasActiveFilters ? 'Keine Ersatzteile entsprechen den Filterkriterien' : 'Keine Ersatzteile gefunden'}
                     </TableCell>
                   </TableRow>
                 )}
@@ -315,23 +534,35 @@ export default function Parts() {
                     ? ((margin / part.purchase_price) * 100).toFixed(0) 
                     : 0;
                   const isLowStock = part.stock_quantity <= part.min_stock_quantity;
+                  const categoryLabel = PART_CATEGORIES.find(c => c.value === part.part_category)?.label || part.part_category;
 
                   return (
                     <TableRow key={part.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Package className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{part.name}</span>
+                          <div>
+                            <span className="font-medium">{part.name}</span>
+                            {part.sku && (
+                              <p className="text-xs font-mono text-muted-foreground">{part.sku}</p>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-muted-foreground">
-                          {part.brand} {part.model}
-                        </span>
+                        <div className="text-sm">
+                          <span className="font-medium">{part.brand || '-'}</span>
+                          {part.model && <span className="text-muted-foreground"> / {part.model}</span>}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm font-mono text-muted-foreground">
-                          {part.sku || '-'}
+                        <Badge variant="outline" className="text-xs">
+                          {categoryLabel}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {part.storage_location || '-'}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
