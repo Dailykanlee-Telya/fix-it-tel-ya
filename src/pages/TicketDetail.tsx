@@ -51,6 +51,7 @@ import TicketMessages from '@/components/tickets/TicketMessages';
 import TicketPhotos from '@/components/tickets/TicketPhotos';
 import TicketInternalNotes from '@/components/tickets/TicketInternalNotes';
 import { KvaFeeInput } from '@/components/tickets/KvaFeeInput';
+import PickupReceipt from '@/components/documents/PickupReceipt';
 
 const STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   NEU_EINGEGANGEN: ['IN_DIAGNOSE', 'STORNIERT'],
@@ -463,6 +464,7 @@ export default function TicketDetail() {
             Erstellt am {format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
           </p>
         </div>
+        <PickupReceipt ticket={ticket} />
       </div>
 
       {/* Quick Info Cards */}
