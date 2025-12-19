@@ -36,6 +36,8 @@ interface TicketData {
     imei_or_serial?: string;
     serial_number?: string;
     color?: string;
+    imei_unreadable?: boolean;
+    serial_unreadable?: boolean;
   };
   location?: {
     name: string;
@@ -172,6 +174,25 @@ export const PdfConditions = ({ title, text }: { title?: string; text: string })
   </div>
 );
 
+// Helper to get IMEI/Serial label based on device type
+const getDeviceIdentifier = (device?: TicketData['device']) => {
+  if (!device) return { label: 'IMEI/SN', value: '-', unreadable: false };
+  
+  const isPhone = device.device_type === 'HANDY';
+  
+  if (isPhone) {
+    if (device.imei_unreadable) {
+      return { label: 'IMEI', value: 'Nicht lesbar', unreadable: true };
+    }
+    return { label: 'IMEI', value: device.imei_or_serial || '-', unreadable: false };
+  } else {
+    if (device.serial_unreadable) {
+      return { label: 'Seriennummer', value: 'Nicht lesbar', unreadable: true };
+    }
+    return { label: 'Seriennummer', value: device.serial_number || device.imei_or_serial || '-', unreadable: false };
+  }
+};
+
 // ============= DOCUMENT: EINGANGSBELEG / REPARATURBEGLEITSCHEIN =============
 
 export const IntakeDocument = ({ 
@@ -184,6 +205,7 @@ export const IntakeDocument = ({
   const createdDate = format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', { locale: de });
   const deviceType = DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType] || ticket.device?.device_type;
   const errorLabel = ERROR_CODE_LABELS[ticket.error_code as ErrorCode] || ticket.error_code || 'Sonstiges';
+  const deviceId = getDeviceIdentifier(ticket.device);
   
   const priceModeLabel = ticket.price_mode === 'FIXPREIS' 
     ? 'Festpreis' 
@@ -195,7 +217,8 @@ export const IntakeDocument = ({
 • Kostenvoranschlag: Bei Nichtdurchführung der Reparatur fällt eine KVA-Gebühr von ${ticket.kva_fee_amount ? ticket.kva_fee_amount.toFixed(2) : '19,90'} € an.
 • Reparaturdauer: Die voraussichtliche Reparaturdauer hängt von der Art des Defekts und der Verfügbarkeit von Ersatzteilen ab.
 • Garantie: Auf verbaute Ersatzteile gewähren wir 6 Monate Garantie gemäß unseren AGB.
-• Abholung: Nicht abgeholte Geräte werden nach 8 Wochen als Auftragsreparatur behandelt.`;
+• Abholung: Nicht abgeholte Geräte werden nach 8 Wochen als Auftragsreparatur behandelt.
+• Benachrichtigung: ${ticket.email_opt_in ? '✓ E-Mail' : '☐ E-Mail'} ${ticket.sms_opt_in ? '✓ SMS' : '☐ SMS'}`;
 
   return (
     <div className="pdf-document">
@@ -206,7 +229,7 @@ export const IntakeDocument = ({
       />
 
       <div className="pdf-grid">
-        {/* Kundendaten */}
+        {/* A) Kundendaten */}
         <PdfBox title="A) Kundendaten">
           <PdfDataRow label="Name" value={`${ticket.customer?.first_name} ${ticket.customer?.last_name}`} />
           {ticket.customer?.address && <PdfDataRow label="Adresse" value={ticket.customer.address} />}
@@ -214,7 +237,7 @@ export const IntakeDocument = ({
           {ticket.customer?.email && <PdfDataRow label="E-Mail" value={ticket.customer.email} />}
         </PdfBox>
 
-        {/* Auftragsdaten */}
+        {/* B) Auftragsdaten */}
         <PdfBox title="B) Auftragsdaten">
           <PdfDataRow label="Datum/Uhrzeit" value={createdDate} />
           <PdfDataRow label="Filiale" value={ticket.location?.name || 'Hauptfiliale'} />
@@ -224,25 +247,23 @@ export const IntakeDocument = ({
           <PdfDataRow label="Status" value={STATUS_LABELS[ticket.status]} />
         </PdfBox>
 
-        {/* Gerätedaten */}
+        {/* C) Gerätedaten */}
         <PdfBox title="C) Gerätedaten">
           <PdfDataRow label="Gerätetyp" value={deviceType} />
           <PdfDataRow label="Hersteller" value={ticket.device?.brand} />
           <PdfDataRow label="Modell" value={ticket.device?.model} />
-          {ticket.device?.imei_or_serial && (
-            <PdfDataRow label="IMEI/SN" value={ticket.device.imei_or_serial} mono />
-          )}
+          <PdfDataRow label={deviceId.label} value={deviceId.value} mono={!deviceId.unreadable} />
           {ticket.device?.color && <PdfDataRow label="Farbe" value={ticket.device.color} />}
         </PdfBox>
 
-        {/* Zubehör */}
+        {/* D) Zubehör */}
         <PdfBox title="D) Zubehör bei Abgabe">
           <div className="pdf-text-block">
             {ticket.accessories || 'Kein Zubehör abgegeben'}
           </div>
         </PdfBox>
 
-        {/* Fehlerbeschreibung - Full width */}
+        {/* E) Fehlerbeschreibung - Full width */}
         <PdfBox title="E) Fehlerbeschreibung & Zustand bei Annahme" className="pdf-grid-full">
           <PdfDataRow label="Fehlertyp" value={errorLabel} />
           <div className="pdf-text-block" style={{ marginTop: '2mm' }}>
@@ -250,7 +271,7 @@ export const IntakeDocument = ({
           </div>
         </PdfBox>
 
-        {/* Kostenvoranschlag - Only if applicable */}
+        {/* F) Kostenvoranschlag - Only if applicable */}
         {(ticket.estimated_price || ticket.price_mode === 'KVA') && (
           <PdfBox title="F) Kostenvoranschlag" className="pdf-grid-full">
             <div className="pdf-grid" style={{ marginTop: '1mm' }}>
@@ -267,14 +288,17 @@ export const IntakeDocument = ({
                     value={`${(ticket.kva_fee_amount || 19.90).toFixed(2)} €`} 
                   />
                 )}
+                <PdfDataRow label="Kostenlose Entsorgung" value="Optional möglich" />
               </div>
             </div>
           </PdfBox>
         )}
       </div>
 
-      <PdfConditions text={conditions} />
+      {/* G) Wichtige Hinweise */}
+      <PdfConditions title="G) Wichtige Hinweise & Einverständnis" text={conditions} />
 
+      {/* H) Unterschriften */}
       <PdfSignatures />
 
       <PdfFooter />
@@ -294,6 +318,7 @@ export const KvaDocument = ({
   const today = format(new Date(), 'dd.MM.yyyy', { locale: de });
   const deviceType = DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType] || ticket.device?.device_type;
   const errorLabel = ERROR_CODE_LABELS[ticket.error_code as ErrorCode] || ticket.error_code || 'Sonstiges';
+  const deviceId = getDeviceIdentifier(ticket.device);
   
   const totalPartsPrice = partUsage?.reduce((sum, p) => sum + (p.unit_sales_price || 0) * p.quantity, 0) || 0;
   const repairPrice = ticket.estimated_price || 0;
@@ -301,19 +326,19 @@ export const KvaDocument = ({
 
   const statusBadge = ticket.kva_approved === true 
     ? 'pdf-status-approved' 
-    : ticket.kva_approved === false 
-      ? 'pdf-status-pending' 
-      : 'pdf-status-pending';
+    : 'pdf-status-pending';
   
   const statusText = ticket.kva_approved === true 
     ? 'Freigegeben' 
     : 'Ausstehend';
 
+  const kvaFee = (ticket.kva_fee_amount || 19.90).toFixed(2);
+
   const conditions = `Dieser Kostenvoranschlag ist 14 Tage gültig. Preise inkl. MwSt.
 
 Bitte wählen Sie eine der folgenden Optionen:
 ☐ Reparatur durchführen (zum angegebenen Preis)
-☐ Gerät unrepariert zurückgeben (KVA-Gebühr: ${(ticket.kva_fee_amount || 19.90).toFixed(2)} €)
+☐ Gerät unrepariert zurückgeben (KVA-Gebühr: ${kvaFee} €)
 ☐ Gerät zur kostenlosen Entsorgung überlassen
 
 Mit der Freigabe stimme ich der Durchführung der Reparatur zu den oben genannten Bedingungen zu.`;
@@ -340,9 +365,7 @@ Mit der Freigabe stimme ich der Durchführung der Reparatur zu den oben genannte
         <PdfBox title="Gerät">
           <PdfDataRow label="Gerätetyp" value={deviceType} />
           <PdfDataRow label="Modell" value={`${ticket.device?.brand} ${ticket.device?.model}`} />
-          {ticket.device?.imei_or_serial && (
-            <PdfDataRow label="IMEI/SN" value={ticket.device.imei_or_serial} mono />
-          )}
+          <PdfDataRow label={deviceId.label} value={deviceId.value} mono={!deviceId.unreadable} />
         </PdfBox>
 
         <PdfBox title="Diagnose / Geplante Arbeiten" className="pdf-grid-full">
@@ -408,6 +431,7 @@ export const RepairReportDocument = ({
   const deviceType = DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType] || ticket.device?.device_type;
   const errorLabel = ERROR_CODE_LABELS[ticket.error_code as ErrorCode] || ticket.error_code || 'Sonstiges';
   const statusLabel = STATUS_LABELS[ticket.status] || ticket.status;
+  const deviceId = getDeviceIdentifier(ticket.device);
   
   const totalPartsPrice = partUsage?.reduce((sum, p) => sum + (p.unit_sales_price || 0) * p.quantity, 0) || 0;
   const finalPrice = ticket.final_price || ticket.estimated_price || 0;
@@ -439,9 +463,7 @@ export const RepairReportDocument = ({
         <PdfBox title="Gerät">
           <PdfDataRow label="Gerätetyp" value={deviceType} />
           <PdfDataRow label="Modell" value={`${ticket.device?.brand} ${ticket.device?.model}`} />
-          {ticket.device?.imei_or_serial && (
-            <PdfDataRow label="IMEI/SN" value={ticket.device.imei_or_serial} mono />
-          )}
+          <PdfDataRow label={deviceId.label} value={deviceId.value} mono={!deviceId.unreadable} />
         </PdfBox>
 
         <PdfBox title="Durchgeführte Arbeiten" className="pdf-grid-full">
@@ -509,6 +531,7 @@ export const DeliveryNoteDocument = ({
 }) => {
   const today = format(new Date(), 'dd.MM.yyyy', { locale: de });
   const deviceType = DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType] || ticket.device?.device_type;
+  const deviceId = getDeviceIdentifier(ticket.device);
   
   const totalPartsPrice = partUsage?.reduce((sum, p) => sum + (p.unit_sales_price || 0) * p.quantity, 0) || 0;
   const finalPrice = ticket.final_price || ticket.estimated_price || 0;
@@ -546,9 +569,7 @@ Eventuelle Transportschäden sind sofort beim Zusteller zu reklamieren.`;
               <PdfDataRow label="Modell" value={ticket.device?.model} />
             </div>
             <div>
-              {ticket.device?.imei_or_serial && (
-                <PdfDataRow label="IMEI/SN" value={ticket.device.imei_or_serial} mono />
-              )}
+              <PdfDataRow label={deviceId.label} value={deviceId.value} mono={!deviceId.unreadable} />
               {ticket.device?.color && <PdfDataRow label="Farbe" value={ticket.device.color} />}
             </div>
           </div>

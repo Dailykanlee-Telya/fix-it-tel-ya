@@ -15,7 +15,7 @@ export interface PlaceholderDefinition {
 
 export const AVAILABLE_PLACEHOLDERS: PlaceholderDefinition[] = [
   // Auftrag
-  { key: 'auftragsnummer', label: '{{auftragsnummer}}', description: 'Auftragsnummer (z.B. TE-GE-25-0100)' },
+  { key: 'auftragsnummer', label: '{{auftragsnummer}}', description: 'Auftragsnummer (z.B. TEBO250100)' },
   { key: 'datum', label: '{{datum}}', description: 'Aktuelles Datum (TT.MM.JJJJ)' },
   { key: 'datum_uhrzeit', label: '{{datum_uhrzeit}}', description: 'Datum und Uhrzeit' },
   { key: 'erstelldatum', label: '{{erstelldatum}}', description: 'Erstellungsdatum des Auftrags' },

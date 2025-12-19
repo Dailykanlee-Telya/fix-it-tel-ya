@@ -88,10 +88,25 @@ export default function ThermalReceipt({
 
   const deviceType = DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType] || ticket.device?.device_type;
   const isPhone = ticket.device?.device_type === 'HANDY';
-  const identNumber = isPhone 
-    ? ticket.device?.imei_or_serial 
-    : (ticket.device?.serial_number || ticket.device?.imei_or_serial);
-  const identLabel = isPhone ? 'IMEI' : 'Seriennr.';
+  
+  // Handle IMEI/Serial with unreadable flags
+  let identNumber = '-';
+  let identLabel = isPhone ? 'IMEI' : 'Seriennr.';
+  
+  if (isPhone) {
+    if (ticket.device?.imei_unreadable) {
+      identNumber = 'Nicht lesbar';
+    } else {
+      identNumber = ticket.device?.imei_or_serial || '-';
+    }
+  } else {
+    if (ticket.device?.serial_unreadable) {
+      identNumber = 'Nicht lesbar';
+    } else {
+      identNumber = ticket.device?.serial_number || ticket.device?.imei_or_serial || '-';
+    }
+  }
+  
   const createdDate = format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', { locale: de });
 
   return (
@@ -113,7 +128,7 @@ export default function ThermalReceipt({
             <div className="bon-subtitle">Reparieren statt ersetzen</div>
           </div>
 
-          {/* Order Number - Prominent */}
+          {/* Order Number - Prominent (neues Format ohne Bindestriche) */}
           <div className="bon-order-number">
             {ticket.ticket_number}
           </div>
@@ -159,12 +174,10 @@ export default function ThermalReceipt({
                 <span className="bon-value">{ticket.device.color}</span>
               </div>
             )}
-            {identNumber && (
-              <div className="bon-row">
-                <span className="bon-label">{identLabel}:</span>
-                <span className="bon-value bon-mono">{identNumber}</span>
-              </div>
-            )}
+            <div className="bon-row">
+              <span className="bon-label">{identLabel}:</span>
+              <span className={`bon-value ${identNumber !== 'Nicht lesbar' ? 'bon-mono' : ''}`}>{identNumber}</span>
+            </div>
           </div>
 
           {/* Error Section */}
