@@ -1,10 +1,10 @@
 import React, { useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import telyaLogo from '@/assets/telya-logo.png';
 import { DEVICE_TYPE_LABELS, DeviceType } from '@/types/database';
 import { TELYA_ADDRESS } from '@/types/b2b';
 import { BON_STYLES, generatePdfFilename } from '@/lib/pdf-styles';
+import { DOCUMENT_LOGOS } from '@/lib/document-logo';
 
 interface ThermalReceiptProps {
   ticket: any;
@@ -99,9 +99,16 @@ export default function ThermalReceipt({
       {/* Hidden receipt for printing */}
       <div ref={receiptRef} style={{ display: 'none' }}>
         <div className="bon-receipt">
-          {/* Header */}
+          {/* Header mit zentralem Logo-Handling */}
           <div className="bon-header">
-            <img src={telyaLogo} alt="Telya" className="bon-logo" />
+            <div className="bon-logo-container">
+              <img 
+                src={DOCUMENT_LOGOS.thermal} 
+                alt="Telya" 
+                className="bon-logo"
+                crossOrigin="anonymous"
+              />
+            </div>
             <div className="bon-title">ABHOLSCHEIN</div>
             <div className="bon-subtitle">Reparieren statt ersetzen</div>
           </div>
@@ -203,7 +210,7 @@ export default function ThermalReceipt({
           <div className="bon-footer">
             <div className="bon-footer-company">{TELYA_ADDRESS.name}</div>
             <div>Tel: {TELYA_ADDRESS.phone}</div>
-            <div>www.repariert.de</div>
+            <div>www.telya.de</div>
           </div>
         </div>
       </div>

@@ -48,6 +48,20 @@ export const PDF_STYLES = `
     background: ${TELYA_COLORS.white};
   }
   
+  /* Logo Styles */
+  .pdf-logo-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 2mm;
+  }
+  
+  .pdf-logo {
+    height: 14mm;
+    max-height: 14mm;
+    width: auto;
+    object-fit: contain;
+  }
+  
   /* Header Section */
   .pdf-header {
     display: flex;
@@ -346,12 +360,17 @@ export const BON_STYLES = `
     margin-bottom: 3mm;
   }
   
+  .bon-logo-container {
+    text-align: center;
+    margin-bottom: 2mm;
+  }
+  
   .bon-logo {
-    width: 14mm;
-    height: 14mm;
-    border-radius: 50%;
-    margin: 0 auto 2mm;
+    max-width: 30mm;
+    height: auto;
+    object-fit: contain;
     display: block;
+    margin: 0 auto;
   }
   
   .bon-title {

@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { TELYA_ADDRESS } from '@/types/b2b';
 import { STATUS_LABELS, TicketStatus, DEVICE_TYPE_LABELS, DeviceType, ERROR_CODE_LABELS, ErrorCode } from '@/types/database';
+import { DOCUMENT_LOGOS } from '@/lib/document-logo';
 
 interface TicketData {
   ticket_number: string;
@@ -64,7 +65,7 @@ const COMPANY = {
   fullAddress: `${TELYA_ADDRESS.street}, ${TELYA_ADDRESS.zip} ${TELYA_ADDRESS.city}`,
   phone: TELYA_ADDRESS.phone,
   email: TELYA_ADDRESS.email,
-  website: 'www.repariert.de',
+  website: 'www.telya.de',
   hrb: TELYA_ADDRESS.hrb,
   vatId: TELYA_ADDRESS.vatId,
   managingDirector: TELYA_ADDRESS.managingDirector,
@@ -88,6 +89,15 @@ export const PdfHeader = ({
 }) => (
   <div className="pdf-header">
     <div className="pdf-header-left">
+      {/* Logo Integration - zentral verwaltet */}
+      <div className="pdf-logo-container">
+        <img 
+          src={DOCUMENT_LOGOS.a4} 
+          alt="Telya Logo" 
+          className="pdf-logo"
+          crossOrigin="anonymous"
+        />
+      </div>
       <div className="pdf-header-title">{title}</div>
       <div className="pdf-header-subtitle">{COMPANY.name} · {TAGLINE}</div>
     </div>
