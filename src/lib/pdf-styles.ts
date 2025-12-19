@@ -498,7 +498,8 @@ export const generatePdfFilename = (docType: string, ticketNumber: string): stri
   };
   
   const typeName = typeMap[docType] || docType;
-  const cleanTicketNumber = ticketNumber.replace(/[^a-zA-Z0-9-]/g, '');
   
-  return `Telya_${typeName}_${cleanTicketNumber}`;
+  // Format: Telya_[Dokumenttyp]_[Auftragsnummer].pdf
+  // Ticket number already comes without dashes from DB
+  return `Telya_${typeName}_${ticketNumber}.pdf`;
 };
