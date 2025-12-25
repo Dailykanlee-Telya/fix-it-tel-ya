@@ -9,7 +9,6 @@ interface TrackRequest {
   action: 'lookup' | 'kva_decision' | 'send_message';
   ticket_number: string;
   tracking_token: string;
-  recaptcha_token?: string;
   kva_approved?: boolean;
   disposal_option?: 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN';
   message?: string;
@@ -47,48 +46,6 @@ function cleanupRateLimitMap() {
   }
 }
 
-// Verify reCAPTCHA token
-async function verifyRecaptcha(token: string, remoteIp?: string | null): Promise<boolean> {
-  const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY");
-  
-  if (!secretKey) {
-    console.warn("RECAPTCHA_SECRET_KEY not configured. Skipping verification.");
-    return true;
-  }
-
-  try {
-    const params = new URLSearchParams({
-      secret: secretKey,
-      response: token,
-    });
-
-    if (remoteIp) {
-      params.append("remoteip", remoteIp);
-    }
-
-    const response = await fetch(
-      "https://www.google.com/recaptcha/api/siteverify",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
-      }
-    );
-
-    if (!response.ok) {
-      console.error("reCAPTCHA API error:", response.status);
-      return false;
-    }
-
-    const data = await response.json();
-    console.log("reCAPTCHA result:", { success: data.success, score: data.score });
-    return data.success === true;
-  } catch (error) {
-    console.error("reCAPTCHA verification error:", error);
-    return false;
-  }
-}
-
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -122,29 +79,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: TrackRequest = await req.json();
-    const { action, ticket_number, tracking_token, recaptcha_token, kva_approved, message } = body;
-
-    // Verify reCAPTCHA for all actions
-    if (recaptcha_token) {
-      const isValidRecaptcha = await verifyRecaptcha(recaptcha_token, clientIP);
-      if (!isValidRecaptcha) {
-        console.log('reCAPTCHA verification failed for IP:', clientIP);
-        return new Response(
-          JSON.stringify({ error: 'Die Sicherheitsprüfung ist fehlgeschlagen. Bitte versuchen Sie es erneut.' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    } else {
-      // Only require reCAPTCHA if secret key is configured
-      const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY");
-      if (secretKey) {
-        console.log('Missing reCAPTCHA token for IP:', clientIP);
-        return new Response(
-          JSON.stringify({ error: 'Bitte bestätigen Sie, dass Sie kein Roboter sind.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
+    const { action, ticket_number, tracking_token, kva_approved, message } = body;
 
     // Validate required fields
     if (!ticket_number || !tracking_token) {
