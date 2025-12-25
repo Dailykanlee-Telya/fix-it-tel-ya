@@ -48,52 +48,9 @@ const b2bRegisterSchema = z.object({
     .max(1000, 'Bemerkungen dürfen maximal 1000 Zeichen haben')
     .optional()
     .nullable(),
-  recaptcha_token: z.string().optional().nullable(),
 });
 
 type B2BRegisterRequest = z.infer<typeof b2bRegisterSchema>;
-
-// Verify reCAPTCHA token
-async function verifyRecaptcha(token: string, remoteIp?: string | null): Promise<boolean> {
-  const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY");
-  
-  if (!secretKey) {
-    console.warn("RECAPTCHA_SECRET_KEY not configured. Skipping verification.");
-    return true;
-  }
-
-  try {
-    const params = new URLSearchParams({
-      secret: secretKey,
-      response: token,
-    });
-
-    if (remoteIp) {
-      params.append("remoteip", remoteIp);
-    }
-
-    const response = await fetch(
-      "https://www.google.com/recaptcha/api/siteverify",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
-      }
-    );
-
-    if (!response.ok) {
-      console.error("reCAPTCHA API error:", response.status);
-      return false;
-    }
-
-    const data = await response.json();
-    console.log("reCAPTCHA result:", { success: data.success, score: data.score });
-    return data.success === true;
-  } catch (error) {
-    console.error("reCAPTCHA verification error:", error);
-    return false;
-  }
-}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -139,26 +96,11 @@ Deno.serve(async (req) => {
     }
 
     const body: B2BRegisterRequest = validationResult.data;
-
-    // Verify reCAPTCHA if token is provided (frontend may not have site key configured)
-    const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY");
-    if (secretKey && body.recaptcha_token) {
-      const isValidRecaptcha = await verifyRecaptcha(body.recaptcha_token, clientIP);
-      if (!isValidRecaptcha) {
-        console.log('reCAPTCHA verification failed for B2B registration from IP:', clientIP);
-        return new Response(
-          JSON.stringify({ error: 'Die Sicherheitsprüfung ist fehlgeschlagen. Bitte versuchen Sie es erneut.' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      console.log('reCAPTCHA verified successfully for B2B registration');
-    } else if (!body.recaptcha_token) {
-      console.log('No reCAPTCHA token provided - skipping verification (frontend may not have site key)');
-    }
     
     console.log('B2B registration request:', { 
       company: body.companyName, 
-      email: body.email 
+      email: body.email,
+      ip: clientIP
     });
 
     // Check if partner with same email already exists

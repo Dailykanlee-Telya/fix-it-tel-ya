@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -28,8 +28,6 @@ import {
 import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { ReCaptcha, ReCaptchaRef, RECAPTCHA_ERRORS } from '@/components/ReCaptcha';
-import { isRecaptchaConfigured } from '@/lib/recaptcha';
 
 interface TicketData {
   ticket_number: string;
@@ -83,24 +81,13 @@ export default function TrackTicket() {
   const [customerMessage, setCustomerMessage] = useState('');
   const [disposalOption, setDisposalOption] = useState<'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN'>('ZURUECKSENDEN');
   const [autoSearchDone, setAutoSearchDone] = useState(false);
-  
-  // reCAPTCHA
-  const recaptchaRef = useRef<ReCaptchaRef>(null);
-  const [recaptchaError, setRecaptchaError] = useState<string | null>(null);
 
   const callTrackingApi = useCallback(async (action: string, extraData: Record<string, any> = {}, overrideTicket?: string, overrideToken?: string) => {
-    // Get reCAPTCHA token if configured
-    let recaptcha_token: string | undefined;
-    if (isRecaptchaConfigured() && recaptchaRef.current) {
-      recaptcha_token = recaptchaRef.current.getToken() || undefined;
-    }
-
     const response = await supabase.functions.invoke('track-ticket', {
       body: {
         action,
         ticket_number: overrideTicket || ticketNumber,
         tracking_token: overrideToken || trackingToken,
-        recaptcha_token,
         ...extraData
       }
     });
@@ -174,16 +161,6 @@ export default function TrackTicket() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRecaptchaError(null);
-
-    // Verify reCAPTCHA if configured
-    if (isRecaptchaConfigured()) {
-      const recaptchaToken = recaptchaRef.current?.getToken();
-      if (!recaptchaToken) {
-        setRecaptchaError(RECAPTCHA_ERRORS.NOT_SOLVED);
-        return;
-      }
-    }
 
     setLoading(true);
     setTicket(null);
@@ -191,15 +168,12 @@ export default function TrackTicket() {
     try {
       const data = await callTrackingApi('lookup');
       setTicket(data);
-      // Reset reCAPTCHA after successful lookup
-      recaptchaRef.current?.reset();
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Fehler',
         description: error.message,
       });
-      recaptchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -342,19 +316,6 @@ export default function TrackTicket() {
                 />
               </div>
 
-              {/* reCAPTCHA */}
-              <div className="flex flex-col items-center">
-                <ReCaptcha 
-                  ref={recaptchaRef}
-                  onChange={() => setRecaptchaError(null)}
-                  onExpired={() => setRecaptchaError(RECAPTCHA_ERRORS.EXPIRED)}
-                  className="my-2"
-                />
-                {recaptchaError && (
-                  <p className="text-sm text-destructive mt-1">{recaptchaError}</p>
-                )}
-              </div>
-
               <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
                 {loading ? (
                   <>
@@ -471,16 +432,17 @@ export default function TrackTicket() {
                   </CardContent>
                 </Card>
               )}
+
               {ticket.location && (
                 <Card className="shadow-lg border-0">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                        <MapPin className="h-5 w-5 text-emerald-500" />
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <MapPin className="h-5 w-5 text-primary" />
                       </div>
                       <div>
                         <p className="font-medium">{ticket.location.name}</p>
-                        <p className="text-sm text-muted-foreground">Abholstandort</p>
+                        <p className="text-sm text-muted-foreground">Standort</p>
                       </div>
                     </div>
                   </CardContent>
@@ -492,86 +454,119 @@ export default function TrackTicket() {
             {shouldShowKVA && (
               <Card className="shadow-xl border-0">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Euro className="h-5 w-5 text-amber-500" />
-                    Kostenvoranschlag (KVA)
+                  <CardTitle className="flex items-center gap-2">
+                    <Euro className="h-5 w-5 text-primary" />
+                    Kostenvoranschlag
                   </CardTitle>
+                  <CardDescription>
+                    Bitte entscheiden Sie, ob wir die Reparatur durchführen sollen
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent>
                   {ticket.kva_approved === null ? (
-                    <>
-                      <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                        <p className="text-sm mb-2">
-                          Für Ihre Reparatur liegt ein Kostenvoranschlag vor.
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-lg bg-muted/50 text-center">
+                        <p className="text-3xl font-bold text-primary">
+                          {displayPrice?.toFixed(2)} €
                         </p>
-                        {displayPrice != null && (
-                          <p className="text-2xl font-bold text-amber-600">
-                            {displayPrice.toFixed(2)} €
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Bitte bestätigen Sie, ob wir die Reparatur zu diesem Preis durchführen sollen.
-                        </p>
+                        <p className="text-sm text-muted-foreground">Geschätzter Reparaturpreis (inkl. MwSt.)</p>
                       </div>
 
-                      {/* Disposal options shown when rejecting */}
-                      <div className="p-4 rounded-lg bg-muted/50">
-                        <p className="text-sm font-medium mb-3">Falls Sie den KVA ablehnen möchten:</p>
-                        <RadioGroup 
-                          value={disposalOption} 
-                          onValueChange={(v) => setDisposalOption(v as 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN')}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="ZURUECKSENDEN" id="return" />
-                            <Label htmlFor="return" className="flex items-center gap-2 cursor-pointer">
-                              <Truck className="h-4 w-4" />
-                              Gerät zurücksenden
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2 mt-2">
-                            <RadioGroupItem value="KOSTENLOS_ENTSORGEN" id="dispose" />
-                            <Label htmlFor="dispose" className="flex items-center gap-2 cursor-pointer">
-                              <Trash2 className="h-4 w-4" />
-                              Gerät kostenlos entsorgen
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
+                      {ticket.error_description_text && (
+                        <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200">
+                          <p className="text-sm font-medium mb-1">Diagnose:</p>
+                          <p className="text-sm">{ticket.error_description_text}</p>
+                        </div>
+                      )}
+
+                      {/* Disposal options - shown before rejection */}
+                      <Card className="bg-muted/30 border-dashed">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                            Falls Sie ablehnen möchten
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <RadioGroup 
+                            value={disposalOption} 
+                            onValueChange={(v) => setDisposalOption(v as 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN')}
+                            className="space-y-2"
+                          >
+                            <div className="flex items-center space-x-3 p-3 rounded-lg border bg-background">
+                              <RadioGroupItem value="ZURUECKSENDEN" id="return" />
+                              <Label htmlFor="return" className="flex-1 cursor-pointer">
+                                <div className="flex items-center gap-2">
+                                  <Truck className="h-4 w-4 text-muted-foreground" />
+                                  <span>Gerät zurücksenden</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Wir senden Ihnen das Gerät unrepariert zurück
+                                </p>
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-3 p-3 rounded-lg border bg-background">
+                              <RadioGroupItem value="KOSTENLOS_ENTSORGEN" id="dispose" />
+                              <Label htmlFor="dispose" className="flex-1 cursor-pointer">
+                                <div className="flex items-center gap-2">
+                                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                                  <span>Kostenlos entsorgen</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Wir entsorgen das Gerät umweltgerecht für Sie
+                                </p>
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </CardContent>
+                      </Card>
 
                       <div className="flex gap-3">
-                        <Button
+                        <Button 
+                          onClick={() => handleKVADecision(true)} 
                           className="flex-1 gap-2"
-                          onClick={() => handleKVADecision(true)}
                           disabled={submitting}
                         >
-                          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsUp className="h-4 w-4" />}
-                          KVA annehmen
+                          {submitting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <ThumbsUp className="h-4 w-4" />
+                          )}
+                          Reparatur beauftragen
                         </Button>
-                        <Button
+                        <Button 
+                          onClick={() => handleKVADecision(false)} 
                           variant="outline"
                           className="flex-1 gap-2"
-                          onClick={() => handleKVADecision(false)}
                           disabled={submitting}
                         >
-                          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsDown className="h-4 w-4" />}
-                          KVA ablehnen
+                          {submitting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <ThumbsDown className="h-4 w-4" />
+                          )}
+                          Ablehnen
                         </Button>
                       </div>
-                    </>
+                    </div>
                   ) : (
-                    <div className={`p-4 rounded-lg ${ticket.kva_approved ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'} border`}>
-                      <div className="flex items-center gap-2">
+                    <div className={`p-4 rounded-lg text-center ${
+                      ticket.kva_approved 
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200' 
+                        : 'bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200'
+                    }`}>
+                      <div className="flex items-center justify-center gap-2 mb-2">
                         {ticket.kva_approved ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                          <ThumbsUp className="h-5 w-5" />
                         ) : (
-                          <AlertTriangle className="h-5 w-5 text-red-500" />
+                          <ThumbsDown className="h-5 w-5" />
                         )}
-                        <span className={`font-medium ${ticket.kva_approved ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <p className="font-semibold">
                           {ticket.kva_approved ? 'KVA angenommen' : 'KVA abgelehnt'}
-                        </span>
+                        </p>
                       </div>
                       {ticket.kva_approved_at && (
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-sm opacity-80">
                           am {format(new Date(ticket.kva_approved_at), 'dd.MM.yyyy HH:mm', { locale: de })}
                         </p>
                       )}
@@ -582,57 +577,93 @@ export default function TrackTicket() {
             )}
 
             {/* Message Section */}
-            <Card className="shadow-xl border-0">
+            <Card className="shadow-lg border-0">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-primary" />
                   Nachricht senden
                 </CardTitle>
                 <CardDescription>
-                  Haben Sie Fragen zu Ihrem Auftrag? Schreiben Sie uns.
+                  Haben Sie Fragen zu Ihrer Reparatur? Schreiben Sie uns eine Nachricht.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Textarea
-                  placeholder="Ihre Nachricht..."
-                  value={customerMessage}
-                  onChange={(e) => setCustomerMessage(e.target.value)}
-                  rows={3}
-                  maxLength={1000}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!customerMessage.trim() || submitting}
-                  className="w-full"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Senden...
-                    </>
-                  ) : (
-                    <>
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Nachricht senden
-                    </>
-                  )}
-                </Button>
+              <CardContent>
+                <div className="space-y-3">
+                  <Textarea
+                    placeholder="Ihre Nachricht..."
+                    value={customerMessage}
+                    onChange={(e) => setCustomerMessage(e.target.value)}
+                    className="min-h-[100px]"
+                    maxLength={1000}
+                  />
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">
+                      {customerMessage.length}/1000 Zeichen
+                    </span>
+                    <Button 
+                      onClick={handleSendMessage}
+                      disabled={!customerMessage.trim() || submitting}
+                    >
+                      {submitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                      )}
+                      Senden
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Footer */}
-            <p className="text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Telya GmbH · Alle Rechte vorbehalten
-            </p>
+            {/* History */}
+            {ticket.status_history && ticket.status_history.length > 0 && (
+              <Card className="shadow-lg border-0">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-primary" />
+                    Verlauf
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {ticket.status_history.map((entry, index) => (
+                      <div 
+                        key={entry.id} 
+                        className={`flex items-start gap-3 ${
+                          index !== ticket.status_history.length - 1 ? 'pb-3 border-b' : ''
+                        }`}
+                      >
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">
+                            {STATUS_LABELS[entry.new_status]}
+                          </p>
+                          {entry.note && (
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                              {entry.note}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(entry.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
-        {/* Footer when no ticket */}
-        {!ticket && (
-          <p className="text-center text-sm text-muted-foreground mt-8">
-            © {new Date().getFullYear()} Telya GmbH · Alle Rechte vorbehalten
-          </p>
-        )}
+        {/* Footer */}
+        <div className="mt-8 text-center text-sm text-muted-foreground">
+          <p>Bei Fragen erreichen Sie uns unter:</p>
+          <p className="font-medium">service@telya.de | +49 (0) 123 456789</p>
+        </div>
       </div>
     </div>
   );
