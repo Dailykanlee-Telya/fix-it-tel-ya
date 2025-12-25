@@ -140,17 +140,9 @@ Deno.serve(async (req) => {
 
     const body: B2BRegisterRequest = validationResult.data;
 
-    // Verify reCAPTCHA
+    // Verify reCAPTCHA if token is provided (frontend may not have site key configured)
     const secretKey = Deno.env.get("RECAPTCHA_SECRET_KEY");
-    if (secretKey) {
-      if (!body.recaptcha_token) {
-        console.log('Missing reCAPTCHA token for B2B registration from IP:', clientIP);
-        return new Response(
-          JSON.stringify({ error: 'Bitte bestätigen Sie, dass Sie kein Roboter sind.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+    if (secretKey && body.recaptcha_token) {
       const isValidRecaptcha = await verifyRecaptcha(body.recaptcha_token, clientIP);
       if (!isValidRecaptcha) {
         console.log('reCAPTCHA verification failed for B2B registration from IP:', clientIP);
@@ -159,6 +151,9 @@ Deno.serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      console.log('reCAPTCHA verified successfully for B2B registration');
+    } else if (!body.recaptcha_token) {
+      console.log('No reCAPTCHA token provided - skipping verification (frontend may not have site key)');
     }
     
     console.log('B2B registration request:', { 
