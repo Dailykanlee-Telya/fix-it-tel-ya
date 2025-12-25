@@ -71,11 +71,18 @@ Deno.serve(async (req) => {
     // Use service role client to delete auth user
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // First delete user roles
+    // Delete related data in correct order (respecting foreign keys)
+    // 1. notification_logs references user_id
+    await adminClient.from("notification_logs").delete().eq("user_id", userId);
+    
+    // 2. user_locations references user_id
+    await adminClient.from("user_locations").delete().eq("user_id", userId);
+    
+    // 3. user_roles references user_id
     await adminClient.from("user_roles").delete().eq("user_id", userId);
 
-    // Then delete profile
-    await adminClient.from("profiles").delete().eq("user_id", userId);
+    // 4. profiles uses id as the user id
+    await adminClient.from("profiles").delete().eq("id", userId);
 
     // Finally delete auth user
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
