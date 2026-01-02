@@ -60,6 +60,7 @@ interface Part {
   storage_location: string | null;
   manufacturer_id: string | null;
   model_id: string | null;
+  stock_location_id: string | null;
 }
 
 export default function TicketPartSelector({
@@ -210,7 +211,39 @@ export default function TicketPartSelector({
     filteredParts.manufacturerSpecific.length + 
     filteredParts.generic.length;
 
-  // Add part mutation
+  // Get ticket details for location
+  const { data: ticket } = useQuery({
+    queryKey: ['ticket-location', ticketId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('repair_tickets')
+        .select('id, location_id')
+        .eq('id', ticketId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Get default stock location for the ticket's location
+  const { data: defaultStockLocation } = useQuery({
+    queryKey: ['default-stock-location', ticket?.location_id],
+    queryFn: async () => {
+      if (!ticket?.location_id) return null;
+      const { data, error } = await supabase
+        .from('stock_locations')
+        .select('id')
+        .eq('location_id', ticket.location_id)
+        .eq('is_default', true)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!ticket?.location_id,
+  });
+
+  // Add part mutation using stock_movement RPC for revision-proof tracking
   const addPartMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPart) throw new Error('Kein Teil ausgewählt');
@@ -219,7 +252,14 @@ export default function TicketPartSelector({
         throw new Error(`Nur ${selectedPart.stock_quantity} Stück verfügbar`);
       }
 
-      // Add part usage
+      // Determine stock location: use part's location or fallback to ticket's default location
+      const stockLocationId = selectedPart.stock_location_id || defaultStockLocation?.id;
+      
+      if (!stockLocationId) {
+        throw new Error('Kein Lagerort gefunden. Bitte dem Teil einen Lagerort zuweisen.');
+      }
+
+      // Add part usage record
       const { error: usageError } = await supabase
         .from('ticket_part_usage')
         .insert({
@@ -232,17 +272,27 @@ export default function TicketPartSelector({
 
       if (usageError) throw usageError;
 
-      // Decrease stock
-      const { error: stockError } = await supabase
-        .from('parts')
-        .update({ stock_quantity: selectedPart.stock_quantity - quantity })
-        .eq('id', selectedPart.id);
+      // Create stock movement via RPC for revision-proof tracking
+      const { data: movementId, error: movementError } = await supabase
+        .rpc('create_stock_movement', {
+          _part_id: selectedPart.id,
+          _stock_location_id: stockLocationId,
+          _movement_type: 'CONSUMPTION',
+          _quantity: quantity,
+          _repair_ticket_id: ticketId,
+          _unit_price: selectedPart.purchase_price,
+          _notes: `Verbrauch für Auftrag`,
+        });
 
-      if (stockError) throw stockError;
+      if (movementError) throw movementError;
+      
+      return movementId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ticket-parts', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['context-parts'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['parts'] });
       onOpenChange(false);
       setSelectedPart(null);
       setQuantity(1);
