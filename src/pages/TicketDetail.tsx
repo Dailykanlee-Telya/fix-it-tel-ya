@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   ArrowLeft,
@@ -52,6 +52,7 @@ import TicketPhotos from '@/components/tickets/TicketPhotos';
 import TicketInternalNotes from '@/components/tickets/TicketInternalNotes';
 import { KvaFeeInput } from '@/components/tickets/KvaFeeInput';
 import PickupReceipt from '@/components/documents/PickupReceipt';
+import TicketPartSelector from '@/components/tickets/TicketPartSelector';
 
 const STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   NEU_EINGEGANGEN: ['IN_DIAGNOSE', 'STORNIERT'],
@@ -72,8 +73,6 @@ export default function TicketDetail() {
   const [statusNote, setStatusNote] = useState('');
   const [internalNote, setInternalNote] = useState('');
   const [partDialogOpen, setPartDialogOpen] = useState(false);
-  const [selectedPartId, setSelectedPartId] = useState('');
-  const [partQuantity, setPartQuantity] = useState(1);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', id],
@@ -129,19 +128,7 @@ export default function TicketDetail() {
     },
   });
 
-  const { data: availableParts } = useQuery({
-    queryKey: ['available-parts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('parts')
-        .select('*')
-        .gt('stock_quantity', 0)
-        .order('name');
-
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Removed: availableParts query - now handled by TicketPartSelector with context-based filtering
 
   // Fetch checklist templates and items
   const { data: checklistTemplates } = useQuery({
@@ -226,51 +213,7 @@ export default function TicketDetail() {
     },
   });
 
-  const addPartMutation = useMutation({
-    mutationFn: async () => {
-      const selectedPart = availableParts?.find(p => p.id === selectedPartId);
-      if (!selectedPart) throw new Error('Teil nicht gefunden');
-
-      // Add part usage
-      const { error: usageError } = await supabase
-        .from('ticket_part_usage')
-        .insert({
-          repair_ticket_id: id,
-          part_id: selectedPartId,
-          quantity: partQuantity,
-          unit_purchase_price: selectedPart.purchase_price,
-          unit_sales_price: selectedPart.sales_price,
-        });
-
-      if (usageError) throw usageError;
-
-      // Decrease stock
-      const { error: stockError } = await supabase
-        .from('parts')
-        .update({ stock_quantity: selectedPart.stock_quantity - partQuantity })
-        .eq('id', selectedPartId);
-
-      if (stockError) throw stockError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ticket-parts', id] });
-      queryClient.invalidateQueries({ queryKey: ['available-parts'] });
-      setPartDialogOpen(false);
-      setSelectedPartId('');
-      setPartQuantity(1);
-      toast({
-        title: 'Teil zugeordnet',
-        description: 'Das Teil wurde erfolgreich zum Auftrag hinzugefügt.',
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: 'destructive',
-        title: 'Fehler',
-        description: error.message,
-      });
-    },
-  });
+  // Removed: addPartMutation - now handled by TicketPartSelector component
 
   const removePartMutation = useMutation({
     mutationFn: async (usageId: string) => {
@@ -807,59 +750,19 @@ export default function TicketDetail() {
                 <Package className="h-5 w-5 text-primary" />
                 Verwendete Teile
               </CardTitle>
-              <Dialog open={partDialogOpen} onOpenChange={setPartDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Teil hinzufügen
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Teil zum Auftrag hinzufügen</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Teil auswählen</label>
-                      <Select value={selectedPartId} onValueChange={setSelectedPartId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Teil wählen..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableParts?.map((part: any) => (
-                            <SelectItem key={part.id} value={part.id}>
-                              {part.name} ({part.stock_quantity} verfügbar) - {part.sales_price.toFixed(2)} €
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Anzahl</label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={availableParts?.find(p => p.id === selectedPartId)?.stock_quantity || 1}
-                        value={partQuantity}
-                        onChange={(e) => setPartQuantity(parseInt(e.target.value) || 1)}
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setPartDialogOpen(false)}>
-                      Abbrechen
-                    </Button>
-                    <Button 
-                      onClick={() => addPartMutation.mutate()}
-                      disabled={!selectedPartId || addPartMutation.isPending}
-                    >
-                      {addPartMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                      Hinzufügen
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <Button size="sm" className="gap-2" onClick={() => setPartDialogOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Teil hinzufügen
+              </Button>
             </CardHeader>
+            <TicketPartSelector
+              ticketId={id!}
+              deviceBrand={ticket.device?.brand}
+              deviceModel={ticket.device?.model}
+              deviceType={ticket.device?.device_type}
+              open={partDialogOpen}
+              onOpenChange={setPartDialogOpen}
+            />
             <CardContent>
               {partUsage?.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
