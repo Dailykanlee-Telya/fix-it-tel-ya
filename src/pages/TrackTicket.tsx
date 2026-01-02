@@ -29,6 +29,27 @@ import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
+interface KvaData {
+  id: string;
+  version: number;
+  kva_type: string;
+  status: string;
+  repair_cost: number | null;
+  parts_cost: number | null;
+  total_cost: number | null;
+  min_cost: number | null;
+  max_cost: number | null;
+  kva_fee_amount: number | null;
+  kva_fee_waived: boolean;
+  valid_until: string | null;
+  diagnosis: string | null;
+  repair_description: string | null;
+  decision_at: string | null;
+  disposal_option: string | null;
+  endcustomer_price: number | null;
+  endcustomer_price_released: boolean;
+}
+
 interface TicketData {
   ticket_number: string;
   status: TicketStatus;
@@ -42,7 +63,6 @@ interface TicketData {
   endcustomer_price: number | null;
   endcustomer_price_released: boolean;
   is_b2b: boolean;
-  // KVA should only show when ticket is in specific statuses that indicate KVA is ready
   price_mode: string;
   device: { brand: string; model: string; device_type: string } | null;
   location: { name: string } | null;
@@ -52,6 +72,8 @@ interface TicketData {
     created_at: string;
     note: string | null;
   }>;
+  // New KVA data from kva_estimates table
+  kva?: KvaData | null;
 }
 
 // Status timeline steps (simplified for customer view)
@@ -262,15 +284,22 @@ export default function TrackTicket() {
   const displayPrice = getDisplayPrice();
   
   // KVA should only show when:
-  // 1. kva_required is true
-  // 2. Ticket is in WARTET_AUF_TEIL_ODER_FREIGABE status (KVA is ready for customer decision)
+  // 1. There is a KVA record OR kva_required is true
+  // 2. KVA status is GESENDET or WARTET_AUF_ANTWORT (ready for customer decision)
   // 3. For B2B: also check endcustomer_price_released
-  // 4. KVA is NOT in draft - only show when it's ready for customer decision
-  const isKvaReady = ticket?.status === 'WARTET_AUF_TEIL_ODER_FREIGABE';
-  const shouldShowKVA = ticket?.kva_required && 
-    isKvaReady && 
-    (!ticket.is_b2b || ticket.endcustomer_price_released) &&
-    (displayPrice != null || ticket.kva_approved !== null);
+  const kva = ticket?.kva;
+  const isKvaReady = kva && ['GESENDET', 'WARTET_AUF_ANTWORT'].includes(kva.status);
+  const shouldShowKVA = (ticket?.kva_required || kva) && 
+    (isKvaReady || ticket?.kva_approved !== null) &&
+    (!ticket?.is_b2b || (kva?.endcustomer_price_released ?? ticket?.endcustomer_price_released)) &&
+    (displayPrice != null || kva?.total_cost != null || ticket?.kva_approved !== null);
+  
+  // Get KVA display price (from new KVA system or fallback)
+  const kvaDisplayPrice = kva ? (
+    ticket?.is_b2b && kva.endcustomer_price_released 
+      ? kva.endcustomer_price 
+      : kva.total_cost
+  ) : displayPrice;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 py-8 px-4">
@@ -463,19 +492,60 @@ export default function TrackTicket() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {ticket.kva_approved === null ? (
+                  {ticket.kva_approved === null && kva?.status !== 'FREIGEGEBEN' && kva?.status !== 'ABGELEHNT' ? (
                     <div className="space-y-4">
+                      {/* KVA Price Display */}
                       <div className="p-4 rounded-lg bg-muted/50 text-center">
-                        <p className="text-3xl font-bold text-primary">
-                          {displayPrice?.toFixed(2)} €
+                        {kva?.kva_type === 'BIS_ZU' ? (
+                          <>
+                            <p className="text-3xl font-bold text-primary">
+                              bis {kvaDisplayPrice?.toFixed(2)} €
+                            </p>
+                            {kva?.min_cost && (
+                              <p className="text-sm text-muted-foreground">Mindestens: {kva.min_cost.toFixed(2)} €</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-3xl font-bold text-primary">
+                            {kvaDisplayPrice?.toFixed(2)} €
+                          </p>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                          {kva?.kva_type === 'FIXPREIS' ? 'Festpreis (inkl. MwSt.)' : 'Geschätzter Reparaturpreis (inkl. MwSt.)'}
                         </p>
-                        <p className="text-sm text-muted-foreground">Geschätzter Reparaturpreis (inkl. MwSt.)</p>
                       </div>
 
-                      {ticket.error_description_text && (
-                        <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200">
+                      {/* KVA Fee Info */}
+                      {kva && !kva.kva_fee_waived && kva.kva_fee_amount && (
+                        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                          <p className="text-sm text-amber-800 dark:text-amber-200">
+                            <AlertTriangle className="h-4 w-4 inline mr-1" />
+                            Bei Ablehnung: KVA-Gebühr von {kva.kva_fee_amount.toFixed(2)} €
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Validity Info */}
+                      {kva?.valid_until && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          <Clock className="h-3 w-3 inline mr-1" />
+                          Gültig bis: {format(new Date(kva.valid_until), 'dd.MM.yyyy', { locale: de })}
+                        </p>
+                      )}
+
+                      {/* Diagnosis */}
+                      {(kva?.diagnosis || ticket.error_description_text) && (
+                        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200">
                           <p className="text-sm font-medium mb-1">Diagnose:</p>
-                          <p className="text-sm">{ticket.error_description_text}</p>
+                          <p className="text-sm">{kva?.diagnosis || ticket.error_description_text}</p>
+                        </div>
+                      )}
+
+                      {/* Repair Description */}
+                      {kva?.repair_description && (
+                        <div className="p-4 rounded-lg bg-muted/30">
+                          <p className="text-sm font-medium mb-1">Geplante Arbeiten:</p>
+                          <p className="text-sm text-muted-foreground">{kva.repair_description}</p>
                         </div>
                       )}
 
