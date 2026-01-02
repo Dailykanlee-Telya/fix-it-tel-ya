@@ -31,6 +31,7 @@ const Workshop = lazy(() => import("@/pages/Workshop"));
 const Tickets = lazy(() => import("@/pages/Tickets"));
 const TicketDetail = lazy(() => import("@/pages/TicketDetail"));
 const Parts = lazy(() => import("@/pages/Parts"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
 const Customers = lazy(() => import("@/pages/Customers"));
 const Locations = lazy(() => import("@/pages/Locations"));
 const Reports = lazy(() => import("@/pages/Reports"));
@@ -164,6 +165,11 @@ function AppRoutes() {
             <Route path="parts" element={
               <PermissionProtectedRoute requiredPermission="VIEW_PARTS">
                 <Parts />
+              </PermissionProtectedRoute>
+            } />
+            <Route path="inventory" element={
+              <PermissionProtectedRoute requiredPermission="VIEW_PARTS">
+                <Inventory />
               </PermissionProtectedRoute>
             } />
             <Route path="customers" element={
