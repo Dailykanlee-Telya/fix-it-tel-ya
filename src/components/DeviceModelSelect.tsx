@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -24,9 +24,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DeviceType, DEVICE_TYPE_LABELS } from '@/types/database';
@@ -56,14 +55,18 @@ export default function DeviceModelSelect({
   onModelChange,
 }: DeviceModelSelectProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [brandOpen, setBrandOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addModelDialogOpen, setAddModelDialogOpen] = useState(false);
+  const [addBrandDialogOpen, setAddBrandDialogOpen] = useState(false);
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
   const [newDeviceType, setNewDeviceType] = useState<DeviceType>(deviceType);
+  const [selectedBrandForNewModel, setSelectedBrandForNewModel] = useState('');
   const [brandSearch, setBrandSearch] = useState('');
   const [modelSearch, setModelSearch] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Common brands per device type - sorted alphabetically with most popular first
   const commonBrandsByType: Record<string, string[]> = {
@@ -78,9 +81,24 @@ export default function DeviceModelSelect({
   const commonBrands = commonBrandsByType[catalogDeviceType] || commonBrandsByType['HANDY'];
   const isOtherType = deviceType === 'OTHER';
 
-  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  // Fetch all unique brands from the catalog (across all device types for suggestions)
+  const { data: allBrands, refetch: refetchBrands } = useQuery({
+    queryKey: ['device-catalog-all-brands'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('device_catalog')
+        .select('brand')
+        .order('brand');
+      
+      if (error) throw error;
+      const uniqueBrands = [...new Set(data.map(d => d.brand))];
+      return uniqueBrands;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
   // Fetch brands filtered by device type
-  const { data: brands, refetch: refetchBrands } = useQuery({
+  const { data: brands } = useQuery({
     queryKey: ['device-catalog-brands', catalogDeviceType],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -94,14 +112,10 @@ export default function DeviceModelSelect({
       return uniqueBrands;
     },
     staleTime: 1000 * 60 * 5,
-    enabled: !isOtherType, // Don't fetch for OTHER type
+    enabled: !isOtherType,
   });
 
   // Fetch models filtered by device type AND brand
-  // Sorting logic:
-  // - Apple: sort by sort_order ASC (newest iPhones first, oldest last)
-  // - Other brands: sort by sort_order ASC (alphabetical order by model name)
-  // - Fallback to model name if sort_order is null
   const { data: models, refetch: refetchModels } = useQuery({
     queryKey: ['device-catalog-models', catalogDeviceType, brand],
     queryFn: async () => {
@@ -143,57 +157,137 @@ export default function DeviceModelSelect({
     );
   }, [models, modelSearch]);
 
-  const handleAddDevice = async () => {
-    if (!newBrand.trim() || !newModel.trim()) {
+  // Check if brand exists (case-insensitive)
+  const checkBrandExists = (brandName: string): string | null => {
+    const normalizedName = brandName.toLowerCase().trim();
+    const existingBrand = allBrands?.find(b => b.toLowerCase() === normalizedName);
+    return existingBrand || null;
+  };
+
+  const handleAddBrand = async () => {
+    const trimmedBrand = newBrand.trim();
+    if (!trimmedBrand) {
       toast({
         variant: 'destructive',
         title: 'Fehler',
-        description: 'Bitte Marke und Modell eingeben',
+        description: 'Bitte Herstellername eingeben',
       });
       return;
     }
 
-    const { error } = await supabase
-      .from('device_catalog')
-      .insert({ 
-        brand: newBrand.trim(), 
-        model: newModel.trim(), 
-        device_type: DEVICE_TYPE_MAP[newDeviceType] 
+    // Check for duplicates (case-insensitive)
+    const existingBrand = checkBrandExists(trimmedBrand);
+    if (existingBrand) {
+      toast({
+        variant: 'destructive',
+        title: 'Hersteller existiert bereits',
+        description: `"${existingBrand}" ist bereits im System vorhanden.`,
       });
-
-    if (error) {
-      if (error.code === '23505') {
-        toast({
-          variant: 'destructive',
-          title: 'Gerät existiert bereits',
-          description: `${newBrand} ${newModel} ist bereits im Katalog.`,
-        });
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Fehler',
-          description: error.message,
-        });
-      }
       return;
     }
 
+    // Just set the new brand - it will be created when the first model is added
+    onBrandChange(trimmedBrand);
+    setNewBrand('');
+    setAddBrandDialogOpen(false);
+    
     toast({
-      title: 'Gerät hinzugefügt',
-      description: `${newBrand} ${newModel} wurde zum Katalog hinzugefügt.`,
+      title: 'Hersteller ausgewählt',
+      description: `${trimmedBrand} wurde ausgewählt. Fügen Sie jetzt ein Modell hinzu.`,
     });
 
-    onBrandChange(newBrand.trim());
-    onModelChange(newModel.trim());
-    setNewBrand('');
-    setNewModel('');
-    setNewDeviceType(deviceType);
-    setAddDialogOpen(false);
-    refetchBrands();
-    refetchModels();
+    // Open the model dialog
+    setSelectedBrandForNewModel(trimmedBrand);
+    setAddModelDialogOpen(true);
   };
 
-  const hasNoCatalogModels = brand && models && models.length === 0;
+  const handleAddModel = async () => {
+    const brandToUse = selectedBrandForNewModel || brand;
+    const trimmedModel = newModel.trim();
+
+    if (!brandToUse || !trimmedModel) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Bitte Hersteller und Modell eingeben',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Calculate sort_order based on brand
+      let sortOrder: number | null = null;
+      if (brandToUse.toLowerCase() === 'apple') {
+        // For Apple, we use negative sort_order so newer models (higher numbers) come first
+        // Extract model number if possible (e.g., "iPhone 17" -> 17)
+        const match = trimmedModel.match(/\d+/);
+        if (match) {
+          sortOrder = -parseInt(match[0], 10) * 100; // Multiply to leave room for variants
+        }
+      }
+
+      const { error } = await supabase
+        .from('device_catalog')
+        .insert({ 
+          brand: brandToUse, 
+          model: trimmedModel, 
+          device_type: DEVICE_TYPE_MAP[newDeviceType],
+          sort_order: sortOrder,
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast({
+            variant: 'destructive',
+            title: 'Modell existiert bereits',
+            description: `${brandToUse} ${trimmedModel} ist bereits im Katalog.`,
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      toast({
+        title: 'Modell hinzugefügt',
+        description: `${brandToUse} ${trimmedModel} wurde zum Katalog hinzugefügt.`,
+      });
+
+      // Update the form values
+      onBrandChange(brandToUse);
+      onModelChange(trimmedModel);
+      
+      // Reset dialog state
+      setNewBrand('');
+      setNewModel('');
+      setSelectedBrandForNewModel('');
+      setNewDeviceType(deviceType);
+      setAddModelDialogOpen(false);
+      
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['device-catalog-brands'] });
+      queryClient.invalidateQueries({ queryKey: ['device-catalog-models'] });
+      queryClient.invalidateQueries({ queryKey: ['device-catalog-all-brands'] });
+      refetchBrands();
+      refetchModels();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error.message,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openAddModelDialog = (presetBrand?: string) => {
+    setSelectedBrandForNewModel(presetBrand || brand);
+    setNewModel('');
+    setNewDeviceType(deviceType);
+    setAddModelDialogOpen(true);
+  };
 
   // For OTHER device type, show free text input
   if (isOtherType) {
@@ -224,6 +318,10 @@ export default function DeviceModelSelect({
     );
   }
 
+  const noBrandInSearch = brandSearch && filteredBrands.length === 0;
+  const noModelInSearch = modelSearch && filteredModels.length === 0;
+  const hasNoCatalogModels = brand && models && models.length === 0;
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -245,7 +343,7 @@ export default function DeviceModelSelect({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0 bg-popover" align="start">
+            <PopoverContent className="w-[250px] p-0 bg-popover" align="start">
               <div className="p-2 border-b border-border">
                 <Input 
                   placeholder="Marke suchen..." 
@@ -257,23 +355,59 @@ export default function DeviceModelSelect({
               <ScrollArea className="h-[200px]">
                 <div className="p-1">
                   {filteredBrands.length === 0 ? (
-                    <p className="py-2 px-2 text-sm text-muted-foreground">Keine Marke gefunden</p>
-                  ) : (
-                    filteredBrands.map((b) => (
-                      <button
-                        key={b}
+                    <div className="p-2 text-center space-y-2">
+                      <p className="text-sm text-muted-foreground">Keine Marke gefunden</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         type="button"
-                        className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
+                        className="w-full"
                         onClick={() => {
-                          onBrandChange(b);
                           setBrandOpen(false);
+                          setNewBrand(brandSearch);
                           setBrandSearch('');
+                          setAddBrandDialogOpen(true);
                         }}
                       >
-                        <Check className={cn("mr-2 h-4 w-4 flex-shrink-0", brand === b ? "opacity-100" : "opacity-0")} />
-                        {b}
-                      </button>
-                    ))
+                        <Plus className="h-4 w-4 mr-1" />
+                        "{brandSearch}" als neuen Hersteller anlegen
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {filteredBrands.map((b) => (
+                        <button
+                          key={b}
+                          type="button"
+                          className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
+                          onClick={() => {
+                            onBrandChange(b);
+                            onModelChange(''); // Reset model when brand changes
+                            setBrandOpen(false);
+                            setBrandSearch('');
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4 flex-shrink-0", brand === b ? "opacity-100" : "opacity-0")} />
+                          {b}
+                        </button>
+                      ))}
+                      {/* Add new brand option at the end */}
+                      <div className="border-t border-border mt-1 pt-1">
+                        <button
+                          type="button"
+                          className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left text-primary"
+                          onClick={() => {
+                            setBrandOpen(false);
+                            setBrandSearch('');
+                            setNewBrand('');
+                            setAddBrandDialogOpen(true);
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Neuen Hersteller anlegen...
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               </ScrollArea>
@@ -286,13 +420,25 @@ export default function DeviceModelSelect({
           <Label>Modell *</Label>
           {hasNoCatalogModels ? (
             <div className="space-y-2">
-              <Input
-                value={model}
-                onChange={(e) => onModelChange(e.target.value)}
-                placeholder="Modell manuell eingeben..."
-              />
+              <div className="flex gap-2">
+                <Input
+                  value={model}
+                  onChange={(e) => onModelChange(e.target.value)}
+                  placeholder="Modell eingeben..."
+                  className="flex-1"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => openAddModelDialog()}
+                  title="Modell zum Katalog hinzufügen"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Keine Modelle im Katalog. Bitte manuell eingeben.
+                Keine Modelle im Katalog. Sie können ein Modell manuell eingeben oder zum Katalog hinzufügen.
               </p>
             </div>
           ) : (
@@ -312,7 +458,7 @@ export default function DeviceModelSelect({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[200px] p-0 bg-popover" align="start">
+              <PopoverContent className="w-[250px] p-0 bg-popover" align="start">
                 <div className="p-2 border-b border-border">
                   <Input 
                     placeholder="Modell suchen..." 
@@ -324,39 +470,59 @@ export default function DeviceModelSelect({
                 <ScrollArea className="h-[200px]">
                   <div className="p-1">
                     {filteredModels.length === 0 ? (
-                      <div className="p-2 text-center">
-                        <p className="text-sm text-muted-foreground mb-2">Modell nicht gefunden</p>
+                      <div className="p-2 text-center space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          {modelSearch ? `"${modelSearch}" nicht gefunden` : 'Keine Modelle vorhanden'}
+                        </p>
                         <Button
                           variant="outline"
                           size="sm"
                           type="button"
+                          className="w-full"
                           onClick={() => {
                             setModelOpen(false);
+                            setNewModel(modelSearch);
                             setModelSearch('');
-                            setNewBrand(brand);
-                            setAddDialogOpen(true);
+                            openAddModelDialog();
                           }}
                         >
                           <Plus className="h-4 w-4 mr-1" />
-                          Neues Modell hinzufügen
+                          {modelSearch ? `"${modelSearch}" hinzufügen` : 'Neues Modell hinzufügen'}
                         </Button>
                       </div>
                     ) : (
-                      filteredModels.map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
-                          onClick={() => {
-                            onModelChange(m);
-                            setModelOpen(false);
-                            setModelSearch('');
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4 flex-shrink-0", model === m ? "opacity-100" : "opacity-0")} />
-                          {m}
-                        </button>
-                      ))
+                      <>
+                        {filteredModels.map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
+                            onClick={() => {
+                              onModelChange(m);
+                              setModelOpen(false);
+                              setModelSearch('');
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4 flex-shrink-0", model === m ? "opacity-100" : "opacity-0")} />
+                            {m}
+                          </button>
+                        ))}
+                        {/* Add new model option at the end */}
+                        <div className="border-t border-border mt-1 pt-1">
+                          <button
+                            type="button"
+                            className="w-full flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer text-left text-primary"
+                            onClick={() => {
+                              setModelOpen(false);
+                              setModelSearch('');
+                              openAddModelDialog();
+                            }}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Neues Modell hinzufügen...
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 </ScrollArea>
@@ -366,17 +532,57 @@ export default function DeviceModelSelect({
         </div>
       </div>
 
-      {/* Add New Device Button */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogTrigger asChild>
-          <Button type="button" variant="outline" size="sm" className="gap-1">
-            <Plus className="h-4 w-4" />
-            Neues Gerät zum Katalog hinzufügen
-          </Button>
-        </DialogTrigger>
+      {/* Quick Add Button */}
+      <Button 
+        type="button" 
+        variant="outline" 
+        size="sm" 
+        className="gap-1"
+        onClick={() => openAddModelDialog()}
+      >
+        <Plus className="h-4 w-4" />
+        Neues Gerät zum Katalog hinzufügen
+      </Button>
+
+      {/* Add New Brand Dialog */}
+      <Dialog open={addBrandDialogOpen} onOpenChange={setAddBrandDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Neues Gerät hinzufügen</DialogTitle>
+            <DialogTitle>Neuen Hersteller anlegen</DialogTitle>
+            <DialogDescription>
+              Fügen Sie einen neuen Gerätehersteller zum System hinzu.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Herstellername *</Label>
+              <Input
+                value={newBrand}
+                onChange={(e) => setNewBrand(e.target.value)}
+                placeholder="z.B. Fairphone, Nokia"
+                autoFocus
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Nach dem Anlegen des Herstellers können Sie Modelle hinzufügen.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddBrandDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleAddBrand} disabled={!newBrand.trim()}>
+              Hersteller anlegen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Model Dialog */}
+      <Dialog open={addModelDialogOpen} onOpenChange={setAddModelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Neues Modell hinzufügen</DialogTitle>
             <DialogDescription>
               Fügen Sie ein neues Gerätemodell zum Katalog hinzu.
             </DialogDescription>
@@ -398,27 +604,60 @@ export default function DeviceModelSelect({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Marke</Label>
-              <Input
-                value={newBrand}
-                onChange={(e) => setNewBrand(e.target.value)}
-                placeholder="z.B. Apple, Samsung"
-              />
+              <Label>Hersteller *</Label>
+              <Select 
+                value={selectedBrandForNewModel} 
+                onValueChange={setSelectedBrandForNewModel}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Hersteller wählen..." />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  {allBrands?.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {b}
+                    </SelectItem>
+                  ))}
+                  {/* Show the selected brand if it's new and not in the list */}
+                  {selectedBrandForNewModel && !allBrands?.includes(selectedBrandForNewModel) && (
+                    <SelectItem value={selectedBrandForNewModel}>
+                      {selectedBrandForNewModel} (neu)
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-primary p-0 h-auto"
+                onClick={() => {
+                  setAddModelDialogOpen(false);
+                  setAddBrandDialogOpen(true);
+                }}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Neuen Hersteller anlegen
+              </Button>
             </div>
             <div className="space-y-2">
-              <Label>Modell</Label>
+              <Label>Modellname *</Label>
               <Input
                 value={newModel}
                 onChange={(e) => setNewModel(e.target.value)}
-                placeholder="z.B. iPhone 15 Pro Max"
+                placeholder="z.B. iPhone 17 Pro Max"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setAddModelDialogOpen(false)}>
               Abbrechen
             </Button>
-            <Button onClick={handleAddDevice}>
+            <Button 
+              onClick={handleAddModel} 
+              disabled={isSaving || !selectedBrandForNewModel || !newModel.trim()}
+            >
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Hinzufügen
             </Button>
           </DialogFooter>
