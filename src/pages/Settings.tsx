@@ -39,9 +39,11 @@ import {
   AlertTriangle,
   Clock,
   Save,
+  Mail,
 } from 'lucide-react';
 import { AppRole, ROLE_LABELS, Profile } from '@/types/database';
 import { DataResetDialog } from '@/components/admin/DataResetDialog';
+import { NotificationTemplatesSettings } from '@/components/admin/NotificationTemplatesSettings';
 
 function SessionTimeoutSettings() {
   const { toast } = useToast();
@@ -228,6 +230,7 @@ export default function Settings() {
         <TabsList>
           <TabsTrigger value="profile">Mein Profil</TabsTrigger>
           {isAdmin && <TabsTrigger value="users">Benutzer</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="notifications">E-Mail-Vorlagen</TabsTrigger>}
           {isAdmin && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
 
@@ -377,6 +380,12 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="notifications" className="space-y-4">
+            <NotificationTemplatesSettings />
           </TabsContent>
         )}
 
