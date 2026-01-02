@@ -476,6 +476,24 @@ export type Database = {
         }
         Relationships: []
       }
+      manufacturers: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       notification_logs: {
         Row: {
           channel: Database["public"]["Enums"]["notification_channel"]
@@ -586,8 +604,10 @@ export type Database = {
           device_type: string | null
           id: string
           is_active: boolean | null
+          manufacturer_id: string | null
           min_stock_quantity: number
           model: string | null
+          model_id: string | null
           name: string
           part_category: string | null
           purchase_price: number
@@ -604,8 +624,10 @@ export type Database = {
           device_type?: string | null
           id?: string
           is_active?: boolean | null
+          manufacturer_id?: string | null
           min_stock_quantity?: number
           model?: string | null
+          model_id?: string | null
           name: string
           part_category?: string | null
           purchase_price?: number
@@ -622,8 +644,10 @@ export type Database = {
           device_type?: string | null
           id?: string
           is_active?: boolean | null
+          manufacturer_id?: string | null
           min_stock_quantity?: number
           model?: string | null
+          model_id?: string | null
           name?: string
           part_category?: string | null
           purchase_price?: number
@@ -634,7 +658,22 @@ export type Database = {
           supplier_sku?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "parts_manufacturer_id_fkey"
+            columns: ["manufacturer_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "device_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       permissions: {
         Row: {
@@ -1360,6 +1399,20 @@ export type Database = {
         | "REPAIR_IN_PROGRESS"
         | "READY_FOR_PICKUP"
         | "REMINDER_NOT_PICKED"
+      part_category_enum:
+        | "DISPLAY"
+        | "AKKU"
+        | "LADEBUCHSE"
+        | "KAMERA_VORNE"
+        | "KAMERA_HINTEN"
+        | "LAUTSPRECHER"
+        | "MIKROFON"
+        | "BACKCOVER"
+        | "RAHMEN"
+        | "FLEXKABEL"
+        | "BUTTONS"
+        | "VIBRATIONSMOTOR"
+        | "SONSTIGES"
       price_mode: "FIXPREIS" | "KVA" | "NACH_AUFWAND"
       ticket_status:
         | "NEU_EINGEGANGEN"
@@ -1542,6 +1595,21 @@ export const Constants = {
         "REPAIR_IN_PROGRESS",
         "READY_FOR_PICKUP",
         "REMINDER_NOT_PICKED",
+      ],
+      part_category_enum: [
+        "DISPLAY",
+        "AKKU",
+        "LADEBUCHSE",
+        "KAMERA_VORNE",
+        "KAMERA_HINTEN",
+        "LAUTSPRECHER",
+        "MIKROFON",
+        "BACKCOVER",
+        "RAHMEN",
+        "FLEXKABEL",
+        "BUTTONS",
+        "VIBRATIONSMOTOR",
+        "SONSTIGES",
       ],
       price_mode: ["FIXPREIS", "KVA", "NACH_AUFWAND"],
       ticket_status: [

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Search,
@@ -36,20 +35,22 @@ import {
   X,
 } from 'lucide-react';
 
-// Part categories for smartphones/tablets
+// Fixed part categories - no free text allowed
 const PART_CATEGORIES = [
   { value: 'DISPLAY', label: 'Display' },
   { value: 'AKKU', label: 'Akku' },
   { value: 'LADEBUCHSE', label: 'Ladebuchse' },
-  { value: 'KAMERA', label: 'Kamera' },
-  { value: 'BACKCOVER', label: 'Backcover' },
-  { value: 'RAHMEN', label: 'Rahmen' },
+  { value: 'KAMERA_VORNE', label: 'Kamera vorne' },
+  { value: 'KAMERA_HINTEN', label: 'Kamera hinten' },
   { value: 'LAUTSPRECHER', label: 'Lautsprecher' },
   { value: 'MIKROFON', label: 'Mikrofon' },
-  { value: 'BUTTON', label: 'Button/Tasten' },
+  { value: 'BACKCOVER', label: 'Backcover' },
+  { value: 'RAHMEN', label: 'Rahmen' },
   { value: 'FLEXKABEL', label: 'Flexkabel' },
+  { value: 'BUTTONS', label: 'Buttons' },
+  { value: 'VIBRATIONSMOTOR', label: 'Vibrationsmotor' },
   { value: 'SONSTIGES', label: 'Sonstiges' },
-];
+] as const;
 
 const DEVICE_TYPES = [
   { value: 'HANDY', label: 'Smartphone' },
@@ -57,27 +58,60 @@ const DEVICE_TYPES = [
   { value: 'LAPTOP', label: 'Laptop' },
   { value: 'SMARTWATCH', label: 'Smartwatch' },
   { value: 'OTHER', label: 'Sonstiges' },
-];
+] as const;
+
+interface Manufacturer {
+  id: string;
+  name: string;
+}
+
+interface DeviceModel {
+  id: string;
+  brand: string;
+  model: string;
+  device_type: string;
+}
+
+interface Part {
+  id: string;
+  name: string;
+  device_type: string;
+  part_category: string;
+  manufacturer_id: string | null;
+  model_id: string | null;
+  brand: string | null;
+  model: string | null;
+  sku: string | null;
+  supplier_sku: string | null;
+  storage_location: string | null;
+  purchase_price: number;
+  sales_price: number;
+  stock_quantity: number;
+  min_stock_quantity: number;
+  is_active: boolean;
+}
 
 export default function Parts() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingPart, setEditingPart] = useState<any>(null);
+  const [editingPart, setEditingPart] = useState<Part | null>(null);
   
-  // Filter states
-  const [filterBrand, setFilterBrand] = useState<string>('all');
+  // Filter states - cascading order
   const [filterDeviceType, setFilterDeviceType] = useState<string>('all');
+  const [filterManufacturer, setFilterManufacturer] = useState<string>('all');
+  const [filterModel, setFilterModel] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterLowStock, setFilterLowStock] = useState(false);
   
+  // Form state
   const [formData, setFormData] = useState({
     name: '',
-    brand: '',
-    model: '',
     device_type: 'HANDY',
-    part_category: 'SONSTIGES',
+    manufacturer_id: '',
+    model_id: '',
+    part_category: '',
     sku: '',
     supplier_sku: '',
     storage_location: '',
@@ -87,39 +121,98 @@ export default function Parts() {
     min_stock_quantity: '5',
   });
 
-  const { data: parts, isLoading } = useQuery({
+  // Fetch manufacturers
+  const { data: manufacturers = [] } = useQuery({
+    queryKey: ['manufacturers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('manufacturers')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data as Manufacturer[];
+    },
+  });
+
+  // Fetch device catalog for models
+  const { data: deviceCatalog = [] } = useQuery({
+    queryKey: ['device-catalog'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('device_catalog')
+        .select('*')
+        .order('brand')
+        .order('model');
+      if (error) throw error;
+      return data as DeviceModel[];
+    },
+  });
+
+  // Fetch parts with manufacturer and model info
+  const { data: parts = [], isLoading } = useQuery({
     queryKey: ['parts'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('parts')
-        .select('*')
-        .order('brand', { ascending: true })
-        .order('model', { ascending: true })
-        .order('name', { ascending: true });
-
+        .select(`
+          *,
+          manufacturers:manufacturer_id(id, name),
+          device_catalog:model_id(id, brand, model, device_type)
+        `)
+        .order('name');
       if (error) throw error;
       return data;
     },
   });
 
-  // Get unique brands from parts
-  const uniqueBrands = useMemo(() => {
-    if (!parts) return [];
-    const brands = [...new Set(parts.map((p: any) => p.brand).filter(Boolean))];
-    return brands.sort();
-  }, [parts]);
+  // Models filtered by selected manufacturer in form
+  const formModels = useMemo(() => {
+    if (!formData.manufacturer_id) return [];
+    const manufacturer = manufacturers.find(m => m.id === formData.manufacturer_id);
+    if (!manufacturer) return [];
+    
+    return deviceCatalog.filter(dc => 
+      dc.brand.toLowerCase() === manufacturer.name.toLowerCase() &&
+      (formData.device_type === 'all' || dc.device_type === formData.device_type)
+    );
+  }, [deviceCatalog, manufacturers, formData.manufacturer_id, formData.device_type]);
+
+  // Models for filter dropdown - based on selected manufacturer filter
+  const filterModels = useMemo(() => {
+    if (filterManufacturer === 'all') return [];
+    const manufacturer = manufacturers.find(m => m.id === filterManufacturer);
+    if (!manufacturer) return [];
+    
+    return deviceCatalog.filter(dc => 
+      dc.brand.toLowerCase() === manufacturer.name.toLowerCase() &&
+      (filterDeviceType === 'all' || dc.device_type === filterDeviceType)
+    );
+  }, [deviceCatalog, manufacturers, filterManufacturer, filterDeviceType]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Validate required fields
+      if (!formData.name.trim()) throw new Error('Bezeichnung ist erforderlich');
+      if (!formData.manufacturer_id) throw new Error('Hersteller ist erforderlich');
+      if (!formData.part_category) throw new Error('Kategorie ist erforderlich');
+      if (!formData.device_type) throw new Error('Gerätetyp ist erforderlich');
+
+      // Get manufacturer name for legacy brand field
+      const manufacturer = manufacturers.find(m => m.id === formData.manufacturer_id);
+      const model = deviceCatalog.find(m => m.id === formData.model_id);
+
       const partData = {
-        name: formData.name,
-        brand: formData.brand || null,
-        model: formData.model || null,
+        name: formData.name.trim(),
         device_type: formData.device_type,
+        manufacturer_id: formData.manufacturer_id,
+        model_id: formData.model_id || null,
         part_category: formData.part_category,
-        sku: formData.sku || null,
-        supplier_sku: formData.supplier_sku || null,
-        storage_location: formData.storage_location || null,
+        // Keep legacy fields for backward compatibility
+        brand: manufacturer?.name || null,
+        model: model?.model || null,
+        sku: formData.sku.trim() || null,
+        supplier_sku: formData.supplier_sku.trim() || null,
+        storage_location: formData.storage_location.trim() || null,
         purchase_price: parseFloat(formData.purchase_price) || 0,
         sales_price: parseFloat(formData.sales_price) || 0,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
@@ -148,7 +241,7 @@ export default function Parts() {
         description: 'Das Ersatzteil wurde erfolgreich gespeichert.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         variant: 'destructive',
         title: 'Fehler',
@@ -161,10 +254,10 @@ export default function Parts() {
     setEditingPart(null);
     setFormData({
       name: '',
-      brand: '',
-      model: '',
       device_type: 'HANDY',
-      part_category: 'SONSTIGES',
+      manufacturer_id: '',
+      model_id: '',
+      part_category: '',
       sku: '',
       supplier_sku: '',
       storage_location: '',
@@ -178,11 +271,11 @@ export default function Parts() {
   const handleEdit = (part: any) => {
     setEditingPart(part);
     setFormData({
-      name: part.name,
-      brand: part.brand || '',
-      model: part.model || '',
+      name: part.name || '',
       device_type: part.device_type || 'HANDY',
-      part_category: part.part_category || 'SONSTIGES',
+      manufacturer_id: part.manufacturer_id || '',
+      model_id: part.model_id || '',
+      part_category: part.part_category || '',
       sku: part.sku || '',
       supplier_sku: part.supplier_sku || '',
       storage_location: part.storage_location || '',
@@ -194,7 +287,7 @@ export default function Parts() {
     setDialogOpen(true);
   };
 
-  // Apply all filters
+  // Apply cascading filters
   const filteredParts = useMemo(() => {
     if (!parts) return [];
     
@@ -204,13 +297,17 @@ export default function Parts() {
         part.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         part.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         part.model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        part.sku?.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // Brand filter
-      const matchesBrand = filterBrand === 'all' || part.brand === filterBrand;
+        part.sku?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        part.storage_location?.toLowerCase().includes(searchQuery.toLowerCase());
       
       // Device type filter
       const matchesDeviceType = filterDeviceType === 'all' || part.device_type === filterDeviceType;
+      
+      // Manufacturer filter
+      const matchesManufacturer = filterManufacturer === 'all' || part.manufacturer_id === filterManufacturer;
+      
+      // Model filter
+      const matchesModel = filterModel === 'all' || part.model_id === filterModel;
       
       // Category filter
       const matchesCategory = filterCategory === 'all' || part.part_category === filterCategory;
@@ -218,19 +315,43 @@ export default function Parts() {
       // Low stock filter
       const matchesLowStock = !filterLowStock || part.stock_quantity <= part.min_stock_quantity;
       
-      return matchesSearch && matchesBrand && matchesDeviceType && matchesCategory && matchesLowStock;
+      return matchesSearch && matchesDeviceType && matchesManufacturer && matchesModel && matchesCategory && matchesLowStock;
     });
-  }, [parts, searchQuery, filterBrand, filterDeviceType, filterCategory, filterLowStock]);
+  }, [parts, searchQuery, filterDeviceType, filterManufacturer, filterModel, filterCategory, filterLowStock]);
 
   const lowStockCount = parts?.filter((p: any) => p.stock_quantity <= p.min_stock_quantity).length || 0;
-  const hasActiveFilters = filterBrand !== 'all' || filterDeviceType !== 'all' || filterCategory !== 'all' || filterLowStock;
+  const hasActiveFilters = filterDeviceType !== 'all' || filterManufacturer !== 'all' || filterModel !== 'all' || filterCategory !== 'all' || filterLowStock;
 
   const clearFilters = () => {
-    setFilterBrand('all');
     setFilterDeviceType('all');
+    setFilterManufacturer('all');
+    setFilterModel('all');
     setFilterCategory('all');
     setFilterLowStock(false);
     setSearchQuery('');
+  };
+
+  // Reset model filter when manufacturer changes
+  const handleManufacturerFilterChange = (value: string) => {
+    setFilterManufacturer(value);
+    setFilterModel('all');
+  };
+
+  // Reset model in form when manufacturer changes
+  const handleFormManufacturerChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      manufacturer_id: value,
+      model_id: '', // Reset model when manufacturer changes
+    }));
+  };
+
+  const getCategoryLabel = (value: string) => {
+    return PART_CATEGORIES.find(c => c.value === value)?.label || value;
+  };
+
+  const getDeviceTypeLabel = (value: string) => {
+    return DEVICE_TYPES.find(d => d.value === value)?.label || value;
   };
 
   return (
@@ -238,177 +359,21 @@ export default function Parts() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Ersatzteile</h1>
+          <h1 className="text-2xl font-bold text-foreground">Ersatzteilverwaltung</h1>
           <p className="text-muted-foreground">
             {parts?.length || 0} Teile im Lager
             {lowStockCount > 0 && (
-              <span className="text-warning ml-2">• {lowStockCount} mit niedrigem Bestand</span>
+              <span className="text-destructive ml-2">• {lowStockCount} mit niedrigem Bestand</span>
             )}
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Neues Teil
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingPart ? 'Teil bearbeiten' : 'Neues Ersatzteil'}</DialogTitle>
-              <DialogDescription>
-                Geben Sie die Details des Ersatzteils ein.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Bezeichnung *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="z.B. Display OLED Original"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Gerätetyp</Label>
-                  <Select
-                    value={formData.device_type}
-                    onValueChange={(v) => setFormData({ ...formData, device_type: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DEVICE_TYPES.map((dt) => (
-                        <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Teilkategorie</Label>
-                  <Select
-                    value={formData.part_category}
-                    onValueChange={(v) => setFormData({ ...formData, part_category: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PART_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Hersteller</Label>
-                  <Input
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    placeholder="z.B. Apple, Samsung"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Modell</Label>
-                  <Input
-                    value={formData.model}
-                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                    placeholder="z.B. iPhone 14 Pro"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Interne Art.-Nr. (SKU)</Label>
-                  <Input
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    placeholder="Optional"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Lieferanten Art.-Nr.</Label>
-                  <Input
-                    value={formData.supplier_sku}
-                    onChange={(e) => setFormData({ ...formData, supplier_sku: e.target.value })}
-                    placeholder="Optional"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Lagerort (Regal/Fach)</Label>
-                <Input
-                  value={formData.storage_location}
-                  onChange={(e) => setFormData({ ...formData, storage_location: e.target.value })}
-                  placeholder="z.B. Regal A3, Fach 5"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Einkaufspreis (€)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.purchase_price}
-                    onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Verkaufspreis (€)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.sales_price}
-                    onChange={(e) => setFormData({ ...formData, sales_price: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Aktueller Bestand</Label>
-                  <Input
-                    type="number"
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mindestbestand</Label>
-                  <Input
-                    type="number"
-                    value={formData.min_stock_quantity}
-                    onChange={(e) => setFormData({ ...formData, min_stock_quantity: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Abbrechen
-              </Button>
-              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !formData.name}>
-                {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Speichern
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setDialogOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Neues Teil anlegen
+        </Button>
       </div>
 
-      {/* Search & Filters */}
+      {/* Search & Cascading Filters */}
       <Card className="card-elevated">
         <CardContent className="pt-6">
           <div className="space-y-4">
@@ -416,32 +381,21 @@ export default function Parts() {
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Suchen (Name, Marke, Modell, SKU)..."
+                placeholder="Suchen (Name, Hersteller, Modell, SKU, Lagerort)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
               />
             </div>
             
-            {/* Filter Row */}
+            {/* Cascading Filter Row */}
             <div className="flex flex-wrap gap-3 items-center">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Filter:</span>
               </div>
               
-              <Select value={filterBrand} onValueChange={setFilterBrand}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Hersteller" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle Hersteller</SelectItem>
-                  {uniqueBrands.map((brand: string) => (
-                    <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+              {/* 1. Device Type */}
               <Select value={filterDeviceType} onValueChange={setFilterDeviceType}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Gerätetyp" />
@@ -454,8 +408,37 @@ export default function Parts() {
                 </SelectContent>
               </Select>
 
+              {/* 2. Manufacturer */}
+              <Select value={filterManufacturer} onValueChange={handleManufacturerFilterChange}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Hersteller" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle Hersteller</SelectItem>
+                  {manufacturers.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* 3. Model - only show if manufacturer is selected */}
+              {filterManufacturer !== 'all' && filterModels.length > 0 && (
+                <Select value={filterModel} onValueChange={setFilterModel}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Modell" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle Modelle</SelectItem>
+                    {filterModels.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.model}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* 4. Category */}
               <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Kategorie" />
                 </SelectTrigger>
                 <SelectContent>
@@ -466,6 +449,7 @@ export default function Parts() {
                 </SelectContent>
               </Select>
 
+              {/* Low Stock Toggle */}
               <Button
                 variant={filterLowStock ? 'default' : 'outline'}
                 size="sm"
@@ -474,7 +458,7 @@ export default function Parts() {
               >
                 <AlertTriangle className="h-4 w-4" />
                 Niedriger Bestand
-                {filterLowStock && <span>({lowStockCount})</span>}
+                {lowStockCount > 0 && <Badge variant="secondary" className="ml-1">{lowStockCount}</Badge>}
               </Button>
 
               {hasActiveFilters && (
@@ -488,121 +472,313 @@ export default function Parts() {
         </CardContent>
       </Card>
 
-      {/* Results Info */}
-      {hasActiveFilters && (
-        <p className="text-sm text-muted-foreground">
-          {filteredParts.length} von {parts?.length || 0} Teilen angezeigt
-        </p>
-      )}
-
       {/* Parts Table */}
       <Card className="card-elevated">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Bezeichnung</TableHead>
+                <TableHead>Gerätetyp</TableHead>
+                <TableHead>Hersteller / Modell</TableHead>
+                <TableHead>Kategorie</TableHead>
+                <TableHead>Lagerort</TableHead>
+                <TableHead className="text-right">EK</TableHead>
+                <TableHead className="text-right">VK</TableHead>
+                <TableHead className="text-center">Bestand</TableHead>
+                <TableHead className="w-[60px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
                 <TableRow>
-                  <TableHead>Bezeichnung</TableHead>
-                  <TableHead>Hersteller / Modell</TableHead>
-                  <TableHead>Kategorie</TableHead>
-                  <TableHead>Lagerort</TableHead>
-                  <TableHead className="text-right">EK</TableHead>
-                  <TableHead className="text-right">VK</TableHead>
-                  <TableHead className="text-right">Marge</TableHead>
-                  <TableHead className="text-right">Bestand</TableHead>
-                  <TableHead className="text-right">Aktionen</TableHead>
+                  <TableCell colSpan={9} className="h-24 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                    </TableCell>
-                  </TableRow>
-                )}
-                {filteredParts?.length === 0 && !isLoading && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
-                      {hasActiveFilters ? 'Keine Ersatzteile entsprechen den Filterkriterien' : 'Keine Ersatzteile gefunden'}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {filteredParts?.map((part: any) => {
-                  const margin = part.sales_price - part.purchase_price;
-                  const marginPercent = part.purchase_price > 0 
-                    ? ((margin / part.purchase_price) * 100).toFixed(0) 
-                    : 0;
+              ) : filteredParts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                    <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Keine Ersatzteile gefunden</p>
+                    {hasActiveFilters && (
+                      <Button variant="link" size="sm" onClick={clearFilters}>
+                        Filter zurücksetzen
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredParts.map((part: any) => {
                   const isLowStock = part.stock_quantity <= part.min_stock_quantity;
-                  const categoryLabel = PART_CATEGORIES.find(c => c.value === part.part_category)?.label || part.part_category;
-
+                  const manufacturerName = part.manufacturers?.name || part.brand || '-';
+                  const modelName = part.device_catalog?.model || part.model || null;
+                  
                   return (
-                    <TableRow key={part.id}>
+                    <TableRow key={part.id} className={isLowStock ? 'bg-destructive/5' : ''}>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <span className="font-medium">{part.name}</span>
-                            {part.sku && (
-                              <p className="text-xs font-mono text-muted-foreground">{part.sku}</p>
-                            )}
-                          </div>
-                        </div>
+                        <div className="font-medium">{part.name}</div>
+                        {part.sku && (
+                          <div className="text-xs text-muted-foreground">SKU: {part.sku}</div>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">
-                          <span className="font-medium">{part.brand || '-'}</span>
-                          {part.model && <span className="text-muted-foreground"> / {part.model}</span>}
-                        </div>
+                        <Badge variant="outline">{getDeviceTypeLabel(part.device_type)}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {categoryLabel}
-                        </Badge>
+                        <div className="font-medium">{manufacturerName}</div>
+                        {modelName && (
+                          <div className="text-sm text-muted-foreground">{modelName}</div>
+                        )}
+                        {!modelName && (
+                          <div className="text-xs text-muted-foreground italic">Generisch</div>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-muted-foreground">
-                          {part.storage_location || '-'}
-                        </span>
+                        <Badge variant="secondary">{getCategoryLabel(part.part_category)}</Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-sm text-muted-foreground">
+                        {part.storage_location || '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
                         {part.purchase_price?.toFixed(2)} €
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right font-mono text-sm">
                         {part.sales_price?.toFixed(2)} €
                       </TableCell>
-                      <TableCell className="text-right">
-                        <span className={margin > 0 ? 'text-success' : 'text-destructive'}>
-                          {margin.toFixed(2)} € ({marginPercent}%)
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {isLowStock && (
-                            <AlertTriangle className="h-4 w-4 text-warning" />
-                          )}
-                          <Badge variant={isLowStock ? 'destructive' : 'secondary'}>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className={`font-medium ${isLowStock ? 'text-destructive' : ''}`}>
                             {part.stock_quantity}
-                          </Badge>
+                          </span>
+                          {isLowStock && (
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Min: {part.min_stock_quantity}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(part)}
-                        >
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(part)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
                   );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                })
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
+
+      {/* Add/Edit Dialog with Guided Form */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => {
+        setDialogOpen(open);
+        if (!open) resetForm();
+      }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingPart ? 'Ersatzteil bearbeiten' : 'Neues Ersatzteil anlegen'}</DialogTitle>
+            <DialogDescription>
+              Wählen Sie die Zuordnung über die Dropdowns. Freie Texteingabe ist nicht erlaubt.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-6 py-4">
+            {/* Step 1: Device Type */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                1. Gerätetyp <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={formData.device_type}
+                onValueChange={(v) => setFormData({ ...formData, device_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Gerätetyp wählen..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEVICE_TYPES.map((dt) => (
+                    <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Step 2: Manufacturer */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                2. Hersteller <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={formData.manufacturer_id}
+                onValueChange={handleFormManufacturerChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Hersteller wählen..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {manufacturers.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Step 3: Model (Optional) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                3. Modell <span className="text-muted-foreground text-xs">(optional - leer = generisches Teil)</span>
+              </Label>
+              <Select
+                value={formData.model_id || 'none'}
+                onValueChange={(v) => setFormData({ ...formData, model_id: v === 'none' ? '' : v })}
+                disabled={!formData.manufacturer_id}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={formData.manufacturer_id ? "Modell wählen..." : "Erst Hersteller wählen"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Generisches Teil (kein Modell) —</SelectItem>
+                  {formModels.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.model}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Step 4: Category */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                4. Kategorie <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={formData.part_category}
+                onValueChange={(v) => setFormData({ ...formData, part_category: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Kategorie wählen..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {PART_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t pt-4">
+              <Label className="text-sm font-medium text-muted-foreground">Details</Label>
+            </div>
+
+            {/* Part Name */}
+            <div className="space-y-2">
+              <Label>Bezeichnung <span className="text-destructive">*</span></Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="z.B. Display OLED Original, Akku 3000mAh"
+              />
+            </div>
+
+            {/* SKU Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Interne Art.-Nr. (SKU)</Label>
+                <Input
+                  value={formData.sku}
+                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                  placeholder="z.B. DIS-IP14P-001"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Lieferanten Art.-Nr.</Label>
+                <Input
+                  value={formData.supplier_sku}
+                  onChange={(e) => setFormData({ ...formData, supplier_sku: e.target.value })}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
+            {/* Storage Location */}
+            <div className="space-y-2">
+              <Label>Lagerort (Regal/Fach)</Label>
+              <Input
+                value={formData.storage_location}
+                onChange={(e) => setFormData({ ...formData, storage_location: e.target.value })}
+                placeholder="z.B. Regal A3, Fach 5"
+              />
+            </div>
+
+            {/* Prices */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Einkaufspreis (€)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.purchase_price}
+                  onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Verkaufspreis (€)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.sales_price}
+                  onChange={(e) => setFormData({ ...formData, sales_price: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* Stock */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Aktueller Bestand</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.stock_quantity}
+                  onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Mindestbestand</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.min_stock_quantity}
+                  onChange={(e) => setFormData({ ...formData, min_stock_quantity: e.target.value })}
+                  placeholder="5"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button 
+              onClick={() => saveMutation.mutate()} 
+              disabled={saveMutation.isPending || !formData.name || !formData.manufacturer_id || !formData.part_category}
+            >
+              {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
