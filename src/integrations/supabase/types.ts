@@ -446,6 +446,257 @@ export type Database = {
           },
         ]
       }
+      kva_estimates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_question: string | null
+          decision: Database["public"]["Enums"]["kva_status"] | null
+          decision_at: string | null
+          decision_by_customer: boolean | null
+          decision_channel:
+            | Database["public"]["Enums"]["kva_approval_channel"]
+            | null
+          decision_note: string | null
+          diagnosis: string | null
+          disposal_option: string | null
+          endcustomer_price: number | null
+          endcustomer_price_released: boolean | null
+          expired_at: string | null
+          id: string
+          internal_price: number | null
+          is_current: boolean
+          kva_fee_amount: number | null
+          kva_fee_waived: boolean | null
+          kva_fee_waiver_by: string | null
+          kva_fee_waiver_reason: string | null
+          kva_type: Database["public"]["Enums"]["kva_type"]
+          max_cost: number | null
+          min_cost: number | null
+          notes: string | null
+          parent_kva_id: string | null
+          parts_cost: number | null
+          reminder_sent_at: string | null
+          repair_cost: number | null
+          repair_description: string | null
+          repair_ticket_id: string
+          sent_at: string | null
+          sent_via: Database["public"]["Enums"]["notification_channel"] | null
+          staff_answer: string | null
+          status: Database["public"]["Enums"]["kva_status"]
+          total_cost: number | null
+          updated_at: string
+          updated_by: string | null
+          valid_until: string | null
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_question?: string | null
+          decision?: Database["public"]["Enums"]["kva_status"] | null
+          decision_at?: string | null
+          decision_by_customer?: boolean | null
+          decision_channel?:
+            | Database["public"]["Enums"]["kva_approval_channel"]
+            | null
+          decision_note?: string | null
+          diagnosis?: string | null
+          disposal_option?: string | null
+          endcustomer_price?: number | null
+          endcustomer_price_released?: boolean | null
+          expired_at?: string | null
+          id?: string
+          internal_price?: number | null
+          is_current?: boolean
+          kva_fee_amount?: number | null
+          kva_fee_waived?: boolean | null
+          kva_fee_waiver_by?: string | null
+          kva_fee_waiver_reason?: string | null
+          kva_type?: Database["public"]["Enums"]["kva_type"]
+          max_cost?: number | null
+          min_cost?: number | null
+          notes?: string | null
+          parent_kva_id?: string | null
+          parts_cost?: number | null
+          reminder_sent_at?: string | null
+          repair_cost?: number | null
+          repair_description?: string | null
+          repair_ticket_id: string
+          sent_at?: string | null
+          sent_via?: Database["public"]["Enums"]["notification_channel"] | null
+          staff_answer?: string | null
+          status?: Database["public"]["Enums"]["kva_status"]
+          total_cost?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          valid_until?: string | null
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_question?: string | null
+          decision?: Database["public"]["Enums"]["kva_status"] | null
+          decision_at?: string | null
+          decision_by_customer?: boolean | null
+          decision_channel?:
+            | Database["public"]["Enums"]["kva_approval_channel"]
+            | null
+          decision_note?: string | null
+          diagnosis?: string | null
+          disposal_option?: string | null
+          endcustomer_price?: number | null
+          endcustomer_price_released?: boolean | null
+          expired_at?: string | null
+          id?: string
+          internal_price?: number | null
+          is_current?: boolean
+          kva_fee_amount?: number | null
+          kva_fee_waived?: boolean | null
+          kva_fee_waiver_by?: string | null
+          kva_fee_waiver_reason?: string | null
+          kva_type?: Database["public"]["Enums"]["kva_type"]
+          max_cost?: number | null
+          min_cost?: number | null
+          notes?: string | null
+          parent_kva_id?: string | null
+          parts_cost?: number | null
+          reminder_sent_at?: string | null
+          repair_cost?: number | null
+          repair_description?: string | null
+          repair_ticket_id?: string
+          sent_at?: string | null
+          sent_via?: Database["public"]["Enums"]["notification_channel"] | null
+          staff_answer?: string | null
+          status?: Database["public"]["Enums"]["kva_status"]
+          total_cost?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          valid_until?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kva_estimates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kva_estimates_kva_fee_waiver_by_fkey"
+            columns: ["kva_fee_waiver_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kva_estimates_parent_kva_id_fkey"
+            columns: ["parent_kva_id"]
+            isOneToOne: false
+            referencedRelation: "kva_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kva_estimates_repair_ticket_id_fkey"
+            columns: ["repair_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "repair_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kva_estimates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kva_fee_settings: {
+        Row: {
+          b2b_partner_id: string | null
+          created_at: string
+          device_type: Database["public"]["Enums"]["device_type"] | null
+          fee_amount: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          b2b_partner_id?: string | null
+          created_at?: string
+          device_type?: Database["public"]["Enums"]["device_type"] | null
+          fee_amount?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          b2b_partner_id?: string | null
+          created_at?: string
+          device_type?: Database["public"]["Enums"]["device_type"] | null
+          fee_amount?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kva_fee_settings_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kva_history: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          kva_estimate_id: string
+          new_values: Json | null
+          note: string | null
+          old_values: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          kva_estimate_id: string
+          new_values?: Json | null
+          note?: string | null
+          old_values?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          kva_estimate_id?: string
+          new_values?: Json | null
+          note?: string | null
+          old_values?: Json | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kva_history_kva_estimate_id_fkey"
+            columns: ["kva_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "kva_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kva_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null
@@ -1390,6 +1641,18 @@ export type Database = {
         | "LAUTSPRECHER"
         | "TASTATUR"
         | "SONSTIGES"
+      kva_approval_channel: "ONLINE" | "TELEFON" | "VOR_ORT" | "EMAIL" | "SMS"
+      kva_status:
+        | "ENTWURF"
+        | "ERSTELLT"
+        | "GESENDET"
+        | "WARTET_AUF_ANTWORT"
+        | "FREIGEGEBEN"
+        | "ABGELEHNT"
+        | "ENTSORGEN"
+        | "RUECKFRAGE"
+        | "ABGELAUFEN"
+      kva_type: "FIXPREIS" | "VARIABEL" | "BIS_ZU"
       notification_channel: "EMAIL" | "SMS" | "WHATSAPP"
       notification_trigger:
         | "TICKET_CREATED"
@@ -1586,6 +1849,19 @@ export const Constants = {
         "TASTATUR",
         "SONSTIGES",
       ],
+      kva_approval_channel: ["ONLINE", "TELEFON", "VOR_ORT", "EMAIL", "SMS"],
+      kva_status: [
+        "ENTWURF",
+        "ERSTELLT",
+        "GESENDET",
+        "WARTET_AUF_ANTWORT",
+        "FREIGEGEBEN",
+        "ABGELEHNT",
+        "ENTSORGEN",
+        "RUECKFRAGE",
+        "ABGELAUFEN",
+      ],
+      kva_type: ["FIXPREIS", "VARIABEL", "BIS_ZU"],
       notification_channel: ["EMAIL", "SMS", "WHATSAPP"],
       notification_trigger: [
         "TICKET_CREATED",

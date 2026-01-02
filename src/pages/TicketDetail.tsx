@@ -50,7 +50,7 @@ import TicketDocuments from '@/components/documents/TicketDocuments';
 import TicketMessages from '@/components/tickets/TicketMessages';
 import TicketPhotos from '@/components/tickets/TicketPhotos';
 import TicketInternalNotes from '@/components/tickets/TicketInternalNotes';
-import { KvaFeeInput } from '@/components/tickets/KvaFeeInput';
+import { KvaManager } from '@/components/tickets/KvaManager';
 import PickupReceipt from '@/components/documents/PickupReceipt';
 import TicketPartSelector from '@/components/tickets/TicketPartSelector';
 
@@ -812,75 +812,16 @@ export default function TicketDetail() {
         </TabsContent>
 
         <TabsContent value="communication" className="space-y-4">
-          {/* KVA Status Card */}
-          {ticket.kva_required && (
-            <Card className="card-elevated">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Euro className="h-5 w-5 text-amber-500" />
-                  KVA-Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`p-4 rounded-lg ${
-                  ticket.kva_approved === true 
-                    ? 'bg-success/10 border-success/30' 
-                    : ticket.kva_approved === false
-                    ? 'bg-destructive/10 border-destructive/30'
-                    : 'bg-warning/10 border-warning/30'
-                } border`}>
-                  <div className="flex items-center gap-2">
-                    {ticket.kva_approved === true ? (
-                      <>
-                        <CheckCircle2 className="h-5 w-5 text-success" />
-                        <span className="font-medium text-success">KVA angenommen</span>
-                      </>
-                    ) : ticket.kva_approved === false ? (
-                      <>
-                        <AlertTriangle className="h-5 w-5 text-destructive" />
-                        <span className="font-medium text-destructive">KVA abgelehnt</span>
-                      </>
-                    ) : (
-                      <>
-                        <Clock className="h-5 w-5 text-warning" />
-                        <span className="font-medium text-warning">KVA ausstehend</span>
-                      </>
-                    )}
-                  </div>
-                  {ticket.kva_approved_at && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Entschieden am {format(new Date(ticket.kva_approved_at), 'dd.MM.yyyy HH:mm', { locale: de })}
-                    </p>
-                  )}
-                  {ticket.estimated_price && (
-                    <p className="text-lg font-bold mt-2">{ticket.estimated_price.toFixed(2)} €</p>
-                  )}
-                  {ticket.disposal_option && (
-                    <p className="text-sm mt-2">
-                      <span className="text-muted-foreground">Entsorgung: </span>
-                      {ticket.disposal_option === 'KOSTENLOS_ENTSORGEN' ? 'Kostenlose Entsorgung' : 'Rücksendung'}
-                    </p>
-                  )}
-                  {ticket.kva_fee_applicable && ticket.kva_fee_amount && (
-                    <p className="text-sm mt-1">
-                      <span className="text-muted-foreground">KVA-Gebühr: </span>
-                      <span className="font-medium">{ticket.kva_fee_amount.toFixed(2)} €</span>
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* KVA Fee Input for Staff */}
-          {ticket.kva_required && (
-            <KvaFeeInput
-              ticketId={ticket.id}
-              currentFeeAmount={ticket.kva_fee_amount}
-              currentFeeApplicable={ticket.kva_fee_applicable}
-              onUpdate={() => queryClient.invalidateQueries({ queryKey: ['ticket', id] })}
-            />
-          )}
+          {/* KVA Manager - Full featured KVA management */}
+          <KvaManager 
+            ticketId={ticket.id}
+            ticket={ticket}
+            partUsage={partUsage}
+            onStatusChange={() => {
+              queryClient.invalidateQueries({ queryKey: ['ticket', id] });
+              queryClient.invalidateQueries({ queryKey: ['ticket-history', id] });
+            }}
+          />
 
           {/* Messages Component */}
           <TicketMessages ticketId={id!} />

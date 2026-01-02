@@ -149,6 +149,22 @@ Deno.serve(async (req) => {
         .eq('repair_ticket_id', ticket.id)
         .order('created_at', { ascending: true });
 
+      // Get current KVA estimate
+      const { data: kvaEstimate } = await supabase
+        .from('kva_estimates')
+        .select(`
+          id, version, kva_type, status,
+          repair_cost, parts_cost, total_cost,
+          min_cost, max_cost,
+          kva_fee_amount, kva_fee_waived,
+          valid_until, diagnosis, repair_description,
+          decision_at, disposal_option,
+          endcustomer_price, endcustomer_price_released
+        `)
+        .eq('repair_ticket_id', ticket.id)
+        .eq('is_current', true)
+        .maybeSingle();
+
       // Filter out internal notes - only show customer-relevant notes
       const filteredHistory = (statusHistory || []).map(entry => ({
         id: entry.id,
@@ -175,7 +191,28 @@ Deno.serve(async (req) => {
           is_b2b: ticket.is_b2b,
           device: device ? { brand: device.brand, model: device.model, device_type: device.device_type } : null,
           location: location ? { name: location.name } : null,
-          status_history: filteredHistory
+          status_history: filteredHistory,
+          // Include KVA data for new system
+          kva: kvaEstimate ? {
+            id: kvaEstimate.id,
+            version: kvaEstimate.version,
+            kva_type: kvaEstimate.kva_type,
+            status: kvaEstimate.status,
+            repair_cost: ticket.is_b2b ? null : kvaEstimate.repair_cost,
+            parts_cost: ticket.is_b2b ? null : kvaEstimate.parts_cost,
+            total_cost: ticket.is_b2b && !kvaEstimate.endcustomer_price_released ? null : kvaEstimate.total_cost,
+            min_cost: ticket.is_b2b ? null : kvaEstimate.min_cost,
+            max_cost: ticket.is_b2b ? null : kvaEstimate.max_cost,
+            kva_fee_amount: kvaEstimate.kva_fee_waived ? null : kvaEstimate.kva_fee_amount,
+            kva_fee_waived: kvaEstimate.kva_fee_waived,
+            valid_until: kvaEstimate.valid_until,
+            diagnosis: kvaEstimate.diagnosis,
+            repair_description: kvaEstimate.repair_description,
+            decision_at: kvaEstimate.decision_at,
+            disposal_option: kvaEstimate.disposal_option,
+            endcustomer_price: kvaEstimate.endcustomer_price_released ? kvaEstimate.endcustomer_price : null,
+            endcustomer_price_released: kvaEstimate.endcustomer_price_released
+          } : null
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -189,30 +226,84 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Get current KVA estimate
+      const { data: currentKva } = await supabase
+        .from('kva_estimates')
+        .select('id, status')
+        .eq('repair_ticket_id', ticket.id)
+        .eq('is_current', true)
+        .maybeSingle();
+
       // Check if KVA is required and not already decided
-      if (!ticket.kva_required) {
+      if (!ticket.kva_required && !currentKva) {
         return new Response(
           JSON.stringify({ error: 'Kein KVA für diesen Auftrag erforderlich.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      if (ticket.kva_approved !== null) {
+      // Check if already decided (in new system or legacy)
+      if (currentKva && ['FREIGEGEBEN', 'ABGELEHNT', 'ENTSORGEN'].includes(currentKva.status)) {
         return new Response(
           JSON.stringify({ error: 'KVA wurde bereits entschieden.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
+      if (ticket.kva_approved !== null && !currentKva) {
+        return new Response(
+          JSON.stringify({ error: 'KVA wurde bereits entschieden.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const decisionTime = new Date().toISOString();
+      const newKvaStatus = kva_approved ? 'FREIGEGEBEN' : (body.disposal_option === 'KOSTENLOS_ENTSORGEN' ? 'ENTSORGEN' : 'ABGELEHNT');
+
+      // Update kva_estimates if exists
+      if (currentKva) {
+        const { error: kvaError } = await supabase
+          .from('kva_estimates')
+          .update({
+            status: newKvaStatus,
+            decision: newKvaStatus,
+            decision_at: decisionTime,
+            decision_by_customer: true,
+            decision_channel: 'ONLINE',
+            disposal_option: !kva_approved ? body.disposal_option : null,
+          })
+          .eq('id', currentKva.id);
+
+        if (kvaError) {
+          console.error('Error updating KVA estimate:', kvaError);
+        }
+
+        // Add KVA history entry
+        await supabase.from('kva_history').insert({
+          kva_estimate_id: currentKva.id,
+          action: kva_approved ? 'KUNDE_FREIGEGEBEN' : 'KUNDE_ABGELEHNT',
+          new_values: { 
+            decision: newKvaStatus,
+            disposal_option: body.disposal_option 
+          },
+          note: kva_approved ? 'KVA online vom Kunden freigegeben' : `KVA online vom Kunden abgelehnt${body.disposal_option === 'KOSTENLOS_ENTSORGEN' ? ' (Entsorgung)' : ''}`,
+        });
+      }
+
       // Update ticket with KVA decision and disposal option
       const updateData: Record<string, any> = {
         kva_approved: kva_approved,
-        kva_approved_at: new Date().toISOString(),
+        kva_approved_at: decisionTime,
       };
       
       // Store disposal option if rejecting
       if (!kva_approved && body.disposal_option) {
         updateData.disposal_option = body.disposal_option;
+      }
+
+      // Auto-transition to IN_REPARATUR if approved
+      if (kva_approved) {
+        updateData.status = 'IN_REPARATUR';
       }
 
       const { error: updateError } = await supabase
@@ -232,8 +323,8 @@ Deno.serve(async (req) => {
       await supabase.from('status_history').insert({
         repair_ticket_id: ticket.id,
         old_status: ticket.status,
-        new_status: ticket.status,
-        note: kva_approved ? 'KVA vom Kunden angenommen' : 'KVA vom Kunden abgelehnt',
+        new_status: kva_approved ? 'IN_REPARATUR' : ticket.status,
+        note: kva_approved ? 'KVA vom Kunden angenommen - Reparatur startet' : `KVA vom Kunden abgelehnt${body.disposal_option === 'KOSTENLOS_ENTSORGEN' ? ' - Kostenlose Entsorgung gewählt' : ''}`,
       });
 
       // Create notifications for all employees with relevant roles (deduplicated)
