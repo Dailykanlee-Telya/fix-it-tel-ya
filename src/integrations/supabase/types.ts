@@ -2028,29 +2028,38 @@ export type Database = {
       }
       ticket_photos: {
         Row: {
+          category: string | null
           created_at: string
+          customer_visible: boolean | null
           file_name: string
           file_size: number | null
           file_type: string | null
           id: string
+          note: string | null
           repair_ticket_id: string
           storage_url: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
+          customer_visible?: boolean | null
           file_name: string
           file_size?: number | null
           file_type?: string | null
           id?: string
+          note?: string | null
           repair_ticket_id: string
           storage_url: string
         }
         Update: {
+          category?: string | null
           created_at?: string
+          customer_visible?: boolean | null
           file_name?: string
           file_size?: number | null
           file_type?: string | null
           id?: string
+          note?: string | null
           repair_ticket_id?: string
           storage_url?: string
         }
