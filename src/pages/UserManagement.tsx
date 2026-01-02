@@ -24,12 +24,15 @@ import {
   Pencil,
   MapPin,
   Globe,
+  Trash2,
+  UserX,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { AppRole, ROLE_LABELS } from '@/types/database';
 import { InviteUserDialog } from '@/components/admin/InviteUserDialog';
 import { UserEditDialog } from '@/components/admin/UserEditDialog';
+import { UserDeleteDialog } from '@/components/admin/UserDeleteDialog';
 
 interface UserWithDetails {
   id: string;
@@ -58,11 +61,13 @@ interface Location {
 }
 
 export default function UserManagement() {
-  const { hasRole } = useAuth();
+  const { hasRole, user: currentUser } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editingUser, setEditingUser] = useState<UserWithDetails | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<UserWithDetails | null>(null);
 
   const isAdmin = hasRole('ADMIN');
 
@@ -184,6 +189,34 @@ export default function UserManagement() {
         title: 'Benutzer gelöscht',
         description: 'Der Benutzer wurde vollständig entfernt.',
       });
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error.message,
+      });
+    },
+  });
+
+  // Deactivate user mutation (fallback when deletion is not possible)
+  const deactivateUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: false })
+        .eq('id', userId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-management'] });
+      toast({
+        title: 'Benutzer deaktiviert',
+        description: 'Der Benutzer wurde deaktiviert und kann sich nicht mehr anmelden.',
+      });
     },
     onError: (error: any) => {
       toast({
@@ -200,6 +233,25 @@ export default function UserManagement() {
       role: user.roles[0] || 'THEKE',
     } as any);
     setEditDialogOpen(true);
+  };
+
+  const handleDeleteClick = (user: UserWithDetails) => {
+    // Don't allow self-deletion
+    if (user.id === currentUser?.id) {
+      toast({
+        variant: 'destructive',
+        title: 'Nicht erlaubt',
+        description: 'Sie können sich nicht selbst löschen.',
+      });
+      return;
+    }
+    setUserToDelete(user);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete) return;
+    await deleteUserMutation.mutateAsync(userToDelete.id);
   };
 
   if (!isAdmin) {
@@ -362,15 +414,28 @@ export default function UserManagement() {
                           <Pencil className="h-4 w-4 mr-1" />
                           Bearbeiten
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => deleteUserMutation.mutate(user.id)}
-                          disabled={deleteUserMutation.isPending}
-                          title="Benutzer löschen"
-                        >
-                          <XCircle className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {user.id !== currentUser?.id && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => deactivateUserMutation.mutate(user.id)}
+                              disabled={deactivateUserMutation.isPending}
+                              title="Benutzer deaktivieren"
+                            >
+                              <UserX className="h-4 w-4 text-amber-600" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteClick(user)}
+                              disabled={deleteUserMutation.isPending}
+                              title="Benutzer löschen"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -387,6 +452,16 @@ export default function UserManagement() {
         onOpenChange={setEditDialogOpen}
         user={editingUser as any}
         locations={locations || []}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <UserDeleteDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        userName={userToDelete?.name || ''}
+        userEmail={userToDelete?.email || ''}
+        onConfirm={handleDeleteConfirm}
+        isPending={deleteUserMutation.isPending}
       />
     </div>
   );
