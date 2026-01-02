@@ -600,8 +600,7 @@ export default function TicketDetail() {
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        const tabsList = document.querySelector('[role="tablist"]');
-                        const commTab = tabsList?.querySelector('[value="communication"]') as HTMLButtonElement;
+                        const commTab = document.querySelector('[data-value="communication"]') as HTMLButtonElement;
                         commTab?.click();
                       }}
                     >
@@ -619,8 +618,7 @@ export default function TicketDetail() {
                       size="sm"
                       className="gap-2"
                       onClick={() => {
-                        const tabsList = document.querySelector('[role="tablist"]');
-                        const commTab = tabsList?.querySelector('[value="communication"]') as HTMLButtonElement;
+                        const commTab = document.querySelector('[data-value="communication"]') as HTMLButtonElement;
                         commTab?.click();
                       }}
                     >
