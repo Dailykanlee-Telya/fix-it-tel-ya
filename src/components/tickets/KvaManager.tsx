@@ -212,7 +212,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
 
       if (error) throw error;
 
-      // Add history entry
+      // Add KVA history entry
       await supabase.from('kva_history').insert({
         kva_estimate_id: data.id,
         action: 'ERSTELLT',
@@ -225,14 +225,25 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
         note: `KVA Version ${newVersion} erstellt`,
       });
 
-      // Update ticket to require KVA
+      // Update ticket to require KVA and set status
+      const oldStatus = ticket.status;
       await supabase
         .from('repair_tickets')
         .update({ 
           kva_required: true,
           estimated_price: totalCost,
+          status: 'WARTET_AUF_TEIL_ODER_FREIGABE',
         })
         .eq('id', ticketId);
+
+      // Add status history entry for ticket status change
+      await supabase.from('status_history').insert({
+        repair_ticket_id: ticketId,
+        old_status: oldStatus,
+        new_status: 'WARTET_AUF_TEIL_ODER_FREIGABE',
+        changed_by_user_id: profile?.id,
+        note: `KVA erstellt (Version ${newVersion})`,
+      });
 
       return data;
     },
@@ -240,9 +251,11 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
       queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['kva-all', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
       setCreateDialogOpen(false);
       resetForm();
-      toast.success('KVA erstellt');
+      toast.success('KVA erstellt - Auftragsstatus auf "Wartet auf Freigabe" gesetzt');
+      onStatusChange?.();
     },
     onError: (error: any) => {
       toast.error('Fehler beim Erstellen: ' + error.message);
@@ -267,7 +280,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
 
       if (error) throw error;
 
-      // Add history entry
+      // Add KVA history entry
       await supabase.from('kva_history').insert({
         kva_estimate_id: currentKva.id,
         action: 'GESENDET',
@@ -276,11 +289,23 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
         note: `KVA per ${channel} versendet`,
       });
 
-      // Update ticket status
-      await supabase
-        .from('repair_tickets')
-        .update({ status: 'WARTET_AUF_TEIL_ODER_FREIGABE' })
-        .eq('id', ticketId);
+      // Only update ticket status if not already waiting
+      const oldStatus = ticket.status;
+      if (oldStatus !== 'WARTET_AUF_TEIL_ODER_FREIGABE') {
+        await supabase
+          .from('repair_tickets')
+          .update({ status: 'WARTET_AUF_TEIL_ODER_FREIGABE' })
+          .eq('id', ticketId);
+
+        // Add status history entry
+        await supabase.from('status_history').insert({
+          repair_ticket_id: ticketId,
+          old_status: oldStatus,
+          new_status: 'WARTET_AUF_TEIL_ODER_FREIGABE',
+          changed_by_user_id: profile?.id,
+          note: `KVA per ${channel} versendet`,
+        });
+      }
 
       // Send email if channel is EMAIL and customer has email
       if (channel === 'EMAIL' && ticket.customer?.email) {
@@ -297,6 +322,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
       setSendDialogOpen(false);
       toast.success('KVA versendet');
       onStatusChange?.();
@@ -311,13 +337,15 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     mutationFn: async (approved: boolean) => {
       if (!currentKva) throw new Error('Kein KVA vorhanden');
 
-      const newStatus = approved ? 'FREIGEGEBEN' : 'ABGELEHNT';
+      const newKvaStatus = approved ? 'FREIGEGEBEN' : 'ABGELEHNT';
+      const oldTicketStatus = ticket.status;
+      const newTicketStatus = approved ? 'IN_REPARATUR' : 'WARTET_AUF_TEIL_ODER_FREIGABE';
 
       const { error } = await supabase
         .from('kva_estimates')
         .update({
-          status: newStatus,
-          decision: newStatus,
+          status: newKvaStatus,
+          decision: newKvaStatus,
           decision_at: new Date().toISOString(),
           decision_by_customer: false,
           decision_channel: approvalChannel,
@@ -328,7 +356,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
 
       if (error) throw error;
 
-      // Add history entry
+      // Add KVA history entry
       await supabase.from('kva_history').insert({
         kva_estimate_id: currentKva.id,
         action: approved ? 'MANUELL_FREIGEGEBEN' : 'MANUELL_ABGELEHNT',
@@ -340,24 +368,27 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
         note: `KVA manuell ${approved ? 'freigegeben' : 'abgelehnt'} (${approvalChannel})`,
       });
 
-      // Update ticket
-      if (approved) {
-        await supabase
-          .from('repair_tickets')
-          .update({ 
-            kva_approved: true,
-            kva_approved_at: new Date().toISOString(),
-            status: 'IN_REPARATUR',
-          })
-          .eq('id', ticketId);
-      } else {
-        await supabase
-          .from('repair_tickets')
-          .update({ 
-            kva_approved: false,
-            kva_approved_at: new Date().toISOString(),
-          })
-          .eq('id', ticketId);
+      // Update ticket status and approval
+      await supabase
+        .from('repair_tickets')
+        .update({ 
+          kva_approved: approved,
+          kva_approved_at: new Date().toISOString(),
+          status: newTicketStatus,
+        })
+        .eq('id', ticketId);
+
+      // Add status history entry
+      if (oldTicketStatus !== newTicketStatus) {
+        await supabase.from('status_history').insert({
+          repair_ticket_id: ticketId,
+          old_status: oldTicketStatus,
+          new_status: newTicketStatus,
+          changed_by_user_id: profile?.id,
+          note: approved 
+            ? `KVA freigegeben (${approvalChannel}): ${approvalNote}`
+            : `KVA abgelehnt (${approvalChannel}): ${approvalNote}`,
+        });
       }
 
       return { approved };
@@ -365,9 +396,12 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     onSuccess: ({ approved }) => {
       queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
       setApproveDialogOpen(false);
       setApprovalNote('');
-      toast.success(approved ? 'KVA manuell freigegeben' : 'KVA manuell abgelehnt');
+      toast.success(approved 
+        ? 'KVA freigegeben - Auftrag ist jetzt "In Reparatur"' 
+        : 'KVA abgelehnt');
       onStatusChange?.();
     },
     onError: (error: any) => {

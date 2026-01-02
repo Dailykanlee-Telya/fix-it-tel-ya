@@ -582,33 +582,42 @@ export default function TicketDetail() {
                 {/* KVA Status or Create Button */}
                 <Separator />
                 {ticket.kva_required ? (
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       {ticket.kva_approved ? (
                         <>
                           <CheckCircle2 className="h-4 w-4 text-success" />
                           <span className="text-sm text-success font-medium">KVA genehmigt</span>
                         </>
+                      ) : ticket.kva_approved === false ? (
+                        <>
+                          <AlertTriangle className="h-4 w-4 text-destructive" />
+                          <span className="text-sm text-destructive font-medium">KVA abgelehnt</span>
+                        </>
                       ) : (
                         <>
                           <Clock className="h-4 w-4 text-warning" />
-                          <span className="text-sm text-warning font-medium">KVA ausstehend</span>
+                          <span className="text-sm text-warning font-medium">KVA wartet auf Antwort</span>
                         </>
                       )}
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        const commTab = document.querySelector('[data-value="communication"]') as HTMLButtonElement;
-                        commTab?.click();
-                      }}
-                    >
-                      KVA anzeigen
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          const repairTab = document.querySelector('[data-value="repair"]') as HTMLButtonElement;
+                          repairTab?.click();
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        KVA bearbeiten
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">Kein KVA erforderlich</span>
@@ -616,10 +625,10 @@ export default function TicketDetail() {
                     <Button 
                       variant="default" 
                       size="sm"
-                      className="gap-2"
+                      className="w-full gap-2"
                       onClick={() => {
-                        const commTab = document.querySelector('[data-value="communication"]') as HTMLButtonElement;
-                        commTab?.click();
+                        const repairTab = document.querySelector('[data-value="repair"]') as HTMLButtonElement;
+                        repairTab?.click();
                       }}
                     >
                       <Plus className="h-4 w-4" />
@@ -674,7 +683,18 @@ export default function TicketDetail() {
         </TabsContent>
 
         <TabsContent value="repair" className="space-y-4">
-          {/* Internal Notes - Now using chronological component */}
+          {/* KVA Manager - Primary location for KVA management */}
+          <KvaManager 
+            ticketId={ticket.id}
+            ticket={ticket}
+            partUsage={partUsage}
+            onStatusChange={() => {
+              queryClient.invalidateQueries({ queryKey: ['ticket', id] });
+              queryClient.invalidateQueries({ queryKey: ['ticket-history', id] });
+            }}
+          />
+          
+          {/* Internal Notes - Chronological component */}
           <TicketInternalNotes ticketId={id!} />
         </TabsContent>
 
@@ -870,16 +890,6 @@ export default function TicketDetail() {
         </TabsContent>
 
         <TabsContent value="communication" className="space-y-4">
-          {/* KVA Manager - Full featured KVA management */}
-          <KvaManager 
-            ticketId={ticket.id}
-            ticket={ticket}
-            partUsage={partUsage}
-            onStatusChange={() => {
-              queryClient.invalidateQueries({ queryKey: ['ticket', id] });
-              queryClient.invalidateQueries({ queryKey: ['ticket-history', id] });
-            }}
-          />
 
           {/* Messages Component */}
           <TicketMessages ticketId={id!} />
