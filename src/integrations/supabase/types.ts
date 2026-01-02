@@ -1662,6 +1662,7 @@ export type Database = {
         | "REPAIR_IN_PROGRESS"
         | "READY_FOR_PICKUP"
         | "REMINDER_NOT_PICKED"
+        | "KVA_REMINDER"
       part_category_enum:
         | "DISPLAY"
         | "AKKU"
@@ -1871,6 +1872,7 @@ export const Constants = {
         "REPAIR_IN_PROGRESS",
         "READY_FOR_PICKUP",
         "REMINDER_NOT_PICKED",
+        "KVA_REMINDER",
       ],
       part_category_enum: [
         "DISPLAY",
