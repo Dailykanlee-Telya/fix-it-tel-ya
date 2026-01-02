@@ -44,6 +44,9 @@ interface TicketPartSelectorProps {
   deviceType: string | null | undefined;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreateNewPart?: () => void;
+  manufacturerId?: string | null;
+  modelId?: string | null;
 }
 
 interface Part {
@@ -70,6 +73,7 @@ export default function TicketPartSelector({
   deviceType,
   open,
   onOpenChange,
+  onCreateNewPart,
 }: TicketPartSelectorProps) {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -119,27 +123,30 @@ export default function TicketPartSelector({
     enabled: open && !!deviceBrand && !!deviceModel,
   });
 
-  // Fetch parts with context-based filtering (3-tier query)
+  // Fetch parts with STRICT context-based filtering (3-tier query)
+  // CRITICAL: Model-specific parts must EXACTLY match the device's model_id
   const { data: contextParts, isLoading: partsLoading } = useQuery({
     queryKey: ['context-parts', manufacturer?.id, catalogModel?.id, deviceType],
     queryFn: async () => {
       if (!manufacturer?.id) return { modelSpecific: [], manufacturerSpecific: [], generic: [] };
 
-      // 1. Model-specific parts
-      let modelSpecificQuery = supabase
-        .from('parts')
-        .select('*')
-        .eq('manufacturer_id', manufacturer.id)
-        .eq('is_active', true);
-      
+      // 1. Model-specific parts - ONLY if we have a catalogModel
+      // Must EXACTLY match manufacturer_id AND model_id
+      let modelSpecific: Part[] = [];
       if (catalogModel?.id) {
-        modelSpecificQuery = modelSpecificQuery.eq('model_id', catalogModel.id);
+        const { data, error } = await supabase
+          .from('parts')
+          .select('*')
+          .eq('manufacturer_id', manufacturer.id)
+          .eq('model_id', catalogModel.id)
+          .eq('is_active', true);
+        
+        if (error) throw error;
+        modelSpecific = data || [];
       }
-      
-      const { data: modelSpecific, error: modelError } = await modelSpecificQuery;
-      if (modelError) throw modelError;
 
-      // 2. Manufacturer-specific parts (model_id IS NULL)
+      // 2. Manufacturer-specific universal parts (model_id IS NULL)
+      // These parts work for ALL models of this manufacturer
       const { data: manufacturerSpecific, error: manuError } = await supabase
         .from('parts')
         .select('*')
@@ -148,7 +155,8 @@ export default function TicketPartSelector({
         .eq('is_active', true);
       if (manuError) throw manuError;
 
-      // 3. Generic parts (manufacturer_id IS NULL)
+      // 3. Generic parts (manufacturer_id IS NULL AND model_id IS NULL)
+      // These parts work for any device
       const { data: generic, error: genError } = await supabase
         .from('parts')
         .select('*')
@@ -157,15 +165,9 @@ export default function TicketPartSelector({
         .eq('is_active', true);
       if (genError) throw genError;
 
-      // Filter out duplicates (model-specific from manufacturer-specific)
-      const modelSpecificIds = new Set((modelSpecific || []).map(p => p.id));
-      const filteredManufacturerSpecific = (manufacturerSpecific || []).filter(
-        p => !modelSpecificIds.has(p.id)
-      );
-
       return {
-        modelSpecific: modelSpecific || [],
-        manufacturerSpecific: filteredManufacturerSpecific,
+        modelSpecific: modelSpecific,
+        manufacturerSpecific: manufacturerSpecific || [],
         generic: generic || [],
       };
     },
@@ -477,6 +479,19 @@ export default function TicketPartSelector({
                       ? 'Versuche andere Filtereinstellungen'
                       : `Keine Teile für ${deviceBrand} ${deviceModel || ''} im Lager`}
                   </p>
+                  {onCreateNewPart && (
+                    <Button 
+                      variant="outline" 
+                      className="mt-4 gap-2"
+                      onClick={() => {
+                        onOpenChange(false);
+                        onCreateNewPart();
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Neues Teil für dieses Modell anlegen
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <>

@@ -53,6 +53,7 @@ import TicketInternalNotes from '@/components/tickets/TicketInternalNotes';
 import { KvaManager } from '@/components/tickets/KvaManager';
 import PickupReceipt from '@/components/documents/PickupReceipt';
 import TicketPartSelector from '@/components/tickets/TicketPartSelector';
+import CreatePartFromTicketDialog from '@/components/tickets/CreatePartFromTicketDialog';
 
 const STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   NEU_EINGEGANGEN: ['IN_DIAGNOSE', 'STORNIERT'],
@@ -73,6 +74,7 @@ export default function TicketDetail() {
   const [statusNote, setStatusNote] = useState('');
   const [internalNote, setInternalNote] = useState('');
   const [partDialogOpen, setPartDialogOpen] = useState(false);
+  const [createPartDialogOpen, setCreatePartDialogOpen] = useState(false);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', id],
@@ -551,12 +553,12 @@ export default function TicketDetail() {
               </CardContent>
             </Card>
 
-            {/* Pricing */}
+            {/* Pricing & KVA */}
             <Card className="card-elevated">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Euro className="h-5 w-5 text-success" />
-                  Preisgestaltung
+                  Preisgestaltung & KVA
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -576,19 +578,55 @@ export default function TicketDetail() {
                     <span className="font-medium">{totalPartsPrice.toFixed(2)} €</span>
                   </div>
                 )}
-                {ticket.kva_required && (
-                  <div className="flex items-center gap-2 pt-2 border-t">
-                    {ticket.kva_approved ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-success" />
-                        <span className="text-sm text-success">KVA genehmigt</span>
-                      </>
-                    ) : (
-                      <>
-                        <Clock className="h-4 w-4 text-warning" />
-                        <span className="text-sm text-warning">KVA ausstehend</span>
-                      </>
-                    )}
+                
+                {/* KVA Status or Create Button */}
+                <Separator />
+                {ticket.kva_required ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {ticket.kva_approved ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 text-success" />
+                          <span className="text-sm text-success font-medium">KVA genehmigt</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="h-4 w-4 text-warning" />
+                          <span className="text-sm text-warning font-medium">KVA ausstehend</span>
+                        </>
+                      )}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const tabsList = document.querySelector('[role="tablist"]');
+                        const commTab = tabsList?.querySelector('[value="communication"]') as HTMLButtonElement;
+                        commTab?.click();
+                      }}
+                    >
+                      KVA anzeigen
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Kein KVA erforderlich</span>
+                    </div>
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => {
+                        const tabsList = document.querySelector('[role="tablist"]');
+                        const commTab = tabsList?.querySelector('[value="communication"]') as HTMLButtonElement;
+                        commTab?.click();
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      KVA erstellen
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -750,10 +788,21 @@ export default function TicketDetail() {
                 <Package className="h-5 w-5 text-primary" />
                 Verwendete Teile
               </CardTitle>
-              <Button size="sm" className="gap-2" onClick={() => setPartDialogOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Teil hinzufügen
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2" 
+                  onClick={() => setCreatePartDialogOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Neues Teil
+                </Button>
+                <Button size="sm" className="gap-2" onClick={() => setPartDialogOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Teil hinzufügen
+                </Button>
+              </div>
             </CardHeader>
             <TicketPartSelector
               ticketId={id!}
@@ -762,6 +811,17 @@ export default function TicketDetail() {
               deviceType={ticket.device?.device_type}
               open={partDialogOpen}
               onOpenChange={setPartDialogOpen}
+              onCreateNewPart={() => setCreatePartDialogOpen(true)}
+            />
+            <CreatePartFromTicketDialog
+              open={createPartDialogOpen}
+              onOpenChange={setCreatePartDialogOpen}
+              deviceBrand={ticket.device?.brand}
+              deviceModel={ticket.device?.model}
+              deviceType={ticket.device?.device_type}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['context-parts'] });
+              }}
             />
             <CardContent>
               {partUsage?.length === 0 ? (
