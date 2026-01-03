@@ -40,10 +40,14 @@ import {
   Clock,
   Save,
   Mail,
+  Building2,
+  MapPin,
 } from 'lucide-react';
 import { AppRole, ROLE_LABELS, Profile } from '@/types/database';
 import { DataResetDialog } from '@/components/admin/DataResetDialog';
 import { NotificationTemplatesSettings } from '@/components/admin/NotificationTemplatesSettings';
+import CompanySettingsTab from '@/components/admin/CompanySettingsTab';
+import LocationsSettingsTab from '@/components/admin/LocationsSettingsTab';
 
 function SessionTimeoutSettings() {
   const { toast } = useToast();
@@ -227,8 +231,10 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="profile">Mein Profil</TabsTrigger>
+          {isAdmin && <TabsTrigger value="company">Firmendaten</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="locations">Standorte</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Benutzer</TabsTrigger>}
           {isAdmin && <TabsTrigger value="notifications">E-Mail-Vorlagen</TabsTrigger>}
           {isAdmin && <TabsTrigger value="system">System</TabsTrigger>}
@@ -264,6 +270,18 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="company" className="space-y-4">
+            <CompanySettingsTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="locations" className="space-y-4">
+            <LocationsSettingsTab />
+          </TabsContent>
+        )}
 
         {isAdmin && (
           <TabsContent value="users" className="space-y-4">
