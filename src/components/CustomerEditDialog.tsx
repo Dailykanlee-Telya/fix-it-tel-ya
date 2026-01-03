@@ -30,12 +30,14 @@ interface CustomerEditDialogProps {
   customer: Customer | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
 export default function CustomerEditDialog({
   customer,
   open,
   onOpenChange,
+  onSuccess,
 }: CustomerEditDialogProps) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
@@ -86,6 +88,7 @@ export default function CustomerEditDialog({
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast.success('Kunde erfolgreich aktualisiert');
       onOpenChange(false);
+      onSuccess?.();
     },
     onError: (error) => {
       console.error('Update error:', error);

@@ -200,9 +200,12 @@ export default function Dashboard() {
         </Button>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards - All Clickable */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="card-elevated hover:shadow-lg transition-shadow border-l-4 border-l-primary">
+        <Card 
+          className="card-elevated hover:shadow-lg transition-shadow border-l-4 border-l-primary cursor-pointer"
+          onClick={() => navigate('/tickets')}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -216,7 +219,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="card-elevated hover:shadow-lg transition-shadow border-l-4 border-l-emerald-500">
+        <Card 
+          className="card-elevated hover:shadow-lg transition-shadow border-l-4 border-l-emerald-500 cursor-pointer"
+          onClick={() => navigate(`/tickets?created_after=${todayStr}`)}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -230,7 +236,10 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="card-elevated hover:shadow-lg transition-shadow border-l-4 border-l-cyan-500">
+        <Card 
+          className="card-elevated hover:shadow-lg transition-shadow border-l-4 border-l-cyan-500 cursor-pointer"
+          onClick={() => navigate('/tickets?status=ABGEHOLT')}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
@@ -244,10 +253,13 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className={cn(
-          "card-elevated hover:shadow-lg transition-shadow border-l-4",
-          stats.overdue > 0 ? "border-l-destructive" : "border-l-muted"
-        )}>
+        <Card 
+          className={cn(
+            "card-elevated hover:shadow-lg transition-shadow border-l-4 cursor-pointer",
+            stats.overdue > 0 ? "border-l-destructive" : "border-l-muted"
+          )}
+          onClick={() => navigate('/tickets?filter=overdue')}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>

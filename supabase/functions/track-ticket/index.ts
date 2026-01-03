@@ -6,9 +6,10 @@ const corsHeaders = {
 };
 
 interface TrackRequest {
-  action: 'lookup' | 'kva_decision' | 'send_message';
-  ticket_number: string;
-  tracking_token: string;
+  action: 'lookup' | 'lookup_by_email' | 'kva_decision' | 'send_message';
+  ticket_number?: string;
+  tracking_token?: string;
+  email?: string;
   kva_approved?: boolean;
   disposal_option?: 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN';
   message?: string;
@@ -79,9 +80,92 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: TrackRequest = await req.json();
-    const { action, ticket_number, tracking_token, kva_approved, message } = body;
+    const { action, ticket_number, tracking_token, email, kva_approved, message } = body;
 
-    // Validate required fields
+    // Handle email-based lookup (returns list of tickets for customer)
+    if (action === 'lookup_by_email') {
+      if (!email || !email.includes('@')) {
+        return new Response(
+          JSON.stringify({ error: 'Gültige E-Mail-Adresse erforderlich.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+
+      // Find customer by email
+      const { data: customers, error: customerError } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', cleanEmail);
+
+      if (customerError || !customers || customers.length === 0) {
+        console.log('No customer found for email:', cleanEmail, 'IP:', clientIP);
+        return new Response(
+          JSON.stringify({ error: 'Keine Aufträge für diese E-Mail-Adresse gefunden.' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const customerIds = customers.map(c => c.id);
+
+      // Find active tickets for this customer (not ABGEHOLT/STORNIERT)
+      const { data: tickets, error: ticketsError } = await supabase
+        .from('repair_tickets')
+        .select(`
+          id, ticket_number, status, created_at, kva_token,
+          device:devices(brand, model, device_type)
+        `)
+        .in('customer_id', customerIds)
+        .not('status', 'in', '("ABGEHOLT","STORNIERT")')
+        .order('created_at', { ascending: false });
+
+      if (ticketsError) {
+        console.error('Error fetching tickets by email:', ticketsError);
+        return new Response(
+          JSON.stringify({ error: 'Datenbankfehler.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!tickets || tickets.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'Keine aktiven Aufträge für diese E-Mail-Adresse gefunden.' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Return list of tickets (with masked tokens for security)
+      const ticketList = tickets.map(t => ({
+        id: t.id,
+        ticket_number: t.ticket_number,
+        status: t.status,
+        created_at: t.created_at,
+        device: t.device ? { brand: (t.device as any).brand, model: (t.device as any).model } : null,
+        has_token: !!t.kva_token,
+      }));
+
+      // If only one active ticket, auto-return the token for convenience
+      if (tickets.length === 1 && tickets[0].kva_token) {
+        return new Response(
+          JSON.stringify({ 
+            tickets: ticketList,
+            single_ticket: {
+              ticket_number: tickets[0].ticket_number,
+              tracking_token: tickets[0].kva_token
+            }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ tickets: ticketList }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate required fields for other actions
     if (!ticket_number || !tracking_token) {
       console.log('Missing required fields:', { ticket_number: !!ticket_number, tracking_token: !!tracking_token, ip: clientIP });
       return new Response(

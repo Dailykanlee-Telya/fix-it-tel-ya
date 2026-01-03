@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search,
@@ -24,6 +25,8 @@ import {
   AlertTriangle,
   Truck,
   Trash2,
+  Mail,
+  Ticket,
 } from 'lucide-react';
 import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { format } from 'date-fns';
@@ -72,8 +75,16 @@ interface TicketData {
     created_at: string;
     note: string | null;
   }>;
-  // New KVA data from kva_estimates table
   kva?: KvaData | null;
+}
+
+interface TicketListItem {
+  id: string;
+  ticket_number: string;
+  status: TicketStatus;
+  created_at: string;
+  device: { brand: string; model: string } | null;
+  has_token: boolean;
 }
 
 // Status timeline steps (simplified for customer view)
@@ -95,8 +106,17 @@ const getStatusIndex = (status: TicketStatus): number => {
 export default function TrackTicket() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  
+  // Search mode state
+  const [searchMode, setSearchMode] = useState<'email' | 'ticket'>('email');
+  const [email, setEmail] = useState('');
   const [ticketNumber, setTicketNumber] = useState('');
   const [trackingToken, setTrackingToken] = useState('');
+  
+  // Ticket list (for email search with multiple results)
+  const [ticketList, setTicketList] = useState<TicketListItem[]>([]);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [ticket, setTicket] = useState<TicketData | null>(null);
@@ -114,16 +134,13 @@ export default function TrackTicket() {
       }
     });
     
-    // Handle edge function errors (non-2xx responses)
     if (response.error) {
-      // Try to extract error message from the response context
       const errorMessage = response.data?.error 
         || response.error.message 
         || 'Ein Fehler ist aufgetreten.';
       throw new Error(errorMessage);
     }
     
-    // Handle application-level errors in successful responses
     if (response.data?.error) {
       throw new Error(response.data.error);
     }
@@ -137,11 +154,11 @@ export default function TrackTicket() {
     const tokenParam = searchParams.get('token');
     
     if (ticketParam && tokenParam && !autoSearchDone) {
+      setSearchMode('ticket');
       setTicketNumber(ticketParam);
       setTrackingToken(tokenParam.toUpperCase());
       setAutoSearchDone(true);
       
-      // Perform automatic lookup
       const performAutoSearch = async () => {
         setLoading(true);
         try {
@@ -153,7 +170,6 @@ export default function TrackTicket() {
             }
           });
           
-          // Handle edge function errors (non-2xx responses)
           if (response.error) {
             const errorMessage = response.data?.error 
               || response.error.message 
@@ -181,15 +197,66 @@ export default function TrackTicket() {
     }
   }, [searchParams, autoSearchDone, toast]);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  // Email-based search
+  const handleEmailSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setTicket(null);
+    setTicketList([]);
 
+    try {
+      const response = await supabase.functions.invoke('track-ticket', {
+        body: {
+          action: 'lookup_by_email',
+          email: email.toLowerCase().trim()
+        }
+      });
+
+      if (response.error || response.data?.error) {
+        throw new Error(response.data?.error || response.error?.message || 'Fehler bei der Suche');
+      }
+
+      const data = response.data;
+
+      // If only one ticket with auto-login
+      if (data.single_ticket) {
+        setTicketNumber(data.single_ticket.ticket_number);
+        setTrackingToken(data.single_ticket.tracking_token);
+        // Auto-fetch the ticket details
+        const ticketData = await callTrackingApi('lookup', {}, data.single_ticket.ticket_number, data.single_ticket.tracking_token);
+        setTicket(ticketData);
+      } else if (data.tickets && data.tickets.length > 0) {
+        setTicketList(data.tickets);
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Select ticket from list (requires token input)
+  const handleSelectTicket = async (ticketItem: TicketListItem) => {
+    setSelectedTicketId(ticketItem.id);
+    setTicketNumber(ticketItem.ticket_number);
+    // User needs to enter the token from their confirmation email
+    setSearchMode('ticket');
+  };
+
+  // Traditional ticket number + token search
+  const handleTicketSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setTicket(null);
 
     try {
       const data = await callTrackingApi('lookup');
       setTicket(data);
+      setTicketList([]); // Clear list when successfully loaded
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -244,11 +311,8 @@ export default function TrackTicket() {
 
     try {
       await callTrackingApi('send_message', { message: customerMessage.trim() });
-
-      // Refresh ticket data to get updated history
       const data = await callTrackingApi('lookup');
       setTicket(data);
-
       setCustomerMessage('');
       toast({
         title: 'Nachricht gesendet',
@@ -270,23 +334,17 @@ export default function TrackTicket() {
   // Determine which price to show
   const getDisplayPrice = (): number | null => {
     if (!ticket) return null;
-    // For B2B orders, only show price if explicitly released
     if (ticket.is_b2b) {
       if (ticket.endcustomer_price_released && ticket.endcustomer_price != null) {
         return ticket.endcustomer_price;
       }
-      return null; // Don't show any price for B2B if not released
+      return null;
     }
-    // For B2C, show estimated_price
     return ticket.estimated_price;
   };
 
   const displayPrice = getDisplayPrice();
   
-  // KVA should only show when:
-  // 1. There is a KVA record OR kva_required is true
-  // 2. KVA status is GESENDET or WARTET_AUF_ANTWORT (ready for customer decision)
-  // 3. For B2B: also check endcustomer_price_released
   const kva = ticket?.kva;
   const isKvaReady = kva && ['GESENDET', 'WARTET_AUF_ANTWORT'].includes(kva.status);
   const shouldShowKVA = (ticket?.kva_required || kva) && 
@@ -294,12 +352,19 @@ export default function TrackTicket() {
     (!ticket?.is_b2b || (kva?.endcustomer_price_released ?? ticket?.endcustomer_price_released)) &&
     (displayPrice != null || kva?.total_cost != null || ticket?.kva_approved !== null);
   
-  // Get KVA display price (from new KVA system or fallback)
   const kvaDisplayPrice = kva ? (
     ticket?.is_b2b && kva.endcustomer_price_released 
       ? kva.endcustomer_price 
       : kva.total_cost
   ) : displayPrice;
+
+  const resetSearch = () => {
+    setTicket(null);
+    setTicketList([]);
+    setTicketNumber('');
+    setTrackingToken('');
+    setSelectedTicketId(null);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 py-8 px-4">
@@ -313,58 +378,187 @@ export default function TrackTicket() {
           />
           <h1 className="text-3xl font-bold text-foreground text-center">Reparaturstatus abfragen</h1>
           <p className="text-muted-foreground mt-2 text-center">
-            Geben Sie Ihre Auftragsdaten ein, um den Status zu prüfen
+            Geben Sie Ihre Daten ein, um den Status Ihrer Reparatur zu prüfen
           </p>
         </div>
 
         {/* Search Form */}
-        <Card className="shadow-xl border-0 mb-6">
-          <CardContent className="pt-6">
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="ticket" className="text-base font-medium">Auftragsnummer</Label>
-                <Input
-                  id="ticket"
-                  placeholder="z.B. TELYA-20241210-0001"
-                  value={ticketNumber}
-                  onChange={(e) => setTicketNumber(e.target.value)}
-                  required
-                  className="h-12 text-lg"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="token" className="text-base font-medium">Tracking-Code</Label>
-                <Input
-                  id="token"
-                  placeholder="8-stelliger Code aus Ihrer Bestätigung"
-                  value={trackingToken}
-                  onChange={(e) => setTrackingToken(e.target.value.toUpperCase())}
-                  required
-                  className="h-12 text-lg uppercase"
-                  maxLength={8}
-                />
-              </div>
+        {!ticket && ticketList.length === 0 && (
+          <Card className="shadow-xl border-0 mb-6">
+            <CardContent className="pt-6">
+              <Tabs value={searchMode} onValueChange={(v) => setSearchMode(v as 'email' | 'ticket')}>
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="email" className="gap-2">
+                    <Mail className="h-4 w-4" />
+                    Per E-Mail
+                  </TabsTrigger>
+                  <TabsTrigger value="ticket" className="gap-2">
+                    <Ticket className="h-4 w-4" />
+                    Per Auftragsnummer
+                  </TabsTrigger>
+                </TabsList>
 
-              <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Suche...
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-5 w-5" />
+                <TabsContent value="email">
+                  <form onSubmit={handleEmailSearch} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-base font-medium">E-Mail-Adresse</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="ihre@email.de"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="h-12 text-lg"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Die E-Mail-Adresse, die Sie bei der Auftragsannahme angegeben haben
+                      </p>
+                    </div>
+
+                    <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Suche...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-5 w-5" />
+                          Aufträge suchen
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="ticket">
+                  <form onSubmit={handleTicketSearch} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket" className="text-base font-medium">Auftragsnummer</Label>
+                      <Input
+                        id="ticket"
+                        placeholder="z.B. TEBO250101"
+                        value={ticketNumber}
+                        onChange={(e) => setTicketNumber(e.target.value)}
+                        required
+                        className="h-12 text-lg"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="token" className="text-base font-medium">Tracking-Code</Label>
+                      <Input
+                        id="token"
+                        placeholder="8-stelliger Code aus Ihrer Bestätigung"
+                        value={trackingToken}
+                        onChange={(e) => setTrackingToken(e.target.value.toUpperCase())}
+                        required
+                        className="h-12 text-lg uppercase"
+                        maxLength={8}
+                      />
+                    </div>
+
+                    <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Suche...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-5 w-5" />
+                          Status anzeigen
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Ticket Selection List (multiple tickets found) */}
+        {ticketList.length > 0 && !ticket && (
+          <Card className="shadow-xl border-0 mb-6 animate-slide-up">
+            <CardHeader>
+              <CardTitle className="text-lg">Ihre Aufträge</CardTitle>
+              <CardDescription>
+                Wählen Sie einen Auftrag aus und geben Sie den Tracking-Code ein
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {ticketList.map((t) => (
+                <div
+                  key={t.id}
+                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                    selectedTicketId === t.id 
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                  }`}
+                  onClick={() => handleSelectTicket(t)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Smartphone className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-mono font-medium">{t.ticket_number}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t.device?.brand} {t.device?.model}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs px-2 py-1 rounded-full bg-muted">
+                        {STATUS_LABELS[t.status]}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {format(new Date(t.created_at), 'dd.MM.yyyy', { locale: de })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {selectedTicketId && (
+                <div className="pt-4 border-t space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="token-list" className="text-base font-medium">Tracking-Code eingeben</Label>
+                    <Input
+                      id="token-list"
+                      placeholder="8-stelliger Code aus Ihrer Bestätigung"
+                      value={trackingToken}
+                      onChange={(e) => setTrackingToken(e.target.value.toUpperCase())}
+                      className="h-12 text-lg uppercase"
+                      maxLength={8}
+                    />
+                  </div>
+                  <Button 
+                    className="w-full" 
+                    onClick={handleTicketSearch}
+                    disabled={!trackingToken || loading}
+                  >
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Status anzeigen
-                  </>
-                )}
+                  </Button>
+                </div>
+              )}
+
+              <Button variant="outline" className="w-full" onClick={resetSearch}>
+                Andere E-Mail verwenden
               </Button>
-            </form>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Result */}
         {ticket && (
           <div className="space-y-6 animate-slide-up">
+            {/* Back Button */}
+            <Button variant="ghost" onClick={resetSearch} className="gap-2">
+              ← Neue Suche
+            </Button>
+
             {/* Status Timeline */}
             <Card className="shadow-xl border-0">
               <CardHeader className="pb-2">
@@ -386,9 +580,7 @@ export default function TrackTicket() {
                 {/* Visual Timeline */}
                 {ticket.status !== 'STORNIERT' && (
                   <div className="relative">
-                    {/* Progress bar background */}
                     <div className="absolute top-5 left-0 right-0 h-1 bg-muted rounded-full" />
-                    {/* Progress bar filled */}
                     <div 
                       className="absolute top-5 left-0 h-1 bg-primary rounded-full transition-all duration-500"
                       style={{ 
@@ -396,7 +588,6 @@ export default function TrackTicket() {
                       }}
                     />
                     
-                    {/* Timeline steps */}
                     <div className="relative flex justify-between">
                       {STATUS_TIMELINE.map((step, index) => {
                         const isCompleted = index < currentStatusIndex;
@@ -481,207 +672,153 @@ export default function TrackTicket() {
 
             {/* KVA Section */}
             {shouldShowKVA && (
-              <Card className="shadow-xl border-0">
+              <Card className="shadow-xl border-0 border-l-4 border-l-amber-500">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Euro className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Euro className="h-5 w-5 text-amber-600" />
                     Kostenvoranschlag
                   </CardTitle>
-                  <CardDescription>
-                    Bitte entscheiden Sie, ob wir die Reparatur durchführen sollen
-                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {ticket.kva_approved === null && kva?.status !== 'FREIGEGEBEN' && kva?.status !== 'ABGELEHNT' ? (
-                    <div className="space-y-4">
-                      {/* KVA Price Display */}
-                      <div className="p-4 rounded-lg bg-muted/50 text-center">
-                        {kva?.kva_type === 'BIS_ZU' ? (
+                <CardContent className="space-y-4">
+                  {/* Already decided */}
+                  {ticket.kva_approved !== null && (
+                    <div className={`p-4 rounded-lg ${ticket.kva_approved ? 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800'}`}>
+                      <div className="flex items-center gap-2">
+                        {ticket.kva_approved ? (
                           <>
-                            <p className="text-3xl font-bold text-primary">
-                              bis {kvaDisplayPrice?.toFixed(2)} €
-                            </p>
-                            {kva?.min_cost && (
-                              <p className="text-sm text-muted-foreground">Mindestens: {kva.min_cost.toFixed(2)} €</p>
-                            )}
+                            <ThumbsUp className="h-5 w-5 text-emerald-600" />
+                            <span className="font-medium text-emerald-700 dark:text-emerald-400">KVA angenommen</span>
                           </>
                         ) : (
-                          <p className="text-3xl font-bold text-primary">
-                            {kvaDisplayPrice?.toFixed(2)} €
-                          </p>
+                          <>
+                            <ThumbsDown className="h-5 w-5 text-red-600" />
+                            <span className="font-medium text-red-700 dark:text-red-400">KVA abgelehnt</span>
+                          </>
                         )}
-                        <p className="text-sm text-muted-foreground">
-                          {kva?.kva_type === 'FIXPREIS' ? 'Festpreis (inkl. MwSt.)' : 'Geschätzter Reparaturpreis (inkl. MwSt.)'}
-                        </p>
-                      </div>
-
-                      {/* KVA Fee Info */}
-                      {kva && !kva.kva_fee_waived && kva.kva_fee_amount && (
-                        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                          <p className="text-sm text-amber-800 dark:text-amber-200">
-                            <AlertTriangle className="h-4 w-4 inline mr-1" />
-                            Bei Ablehnung: KVA-Gebühr von {kva.kva_fee_amount.toFixed(2)} €
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Validity Info */}
-                      {kva?.valid_until && (
-                        <p className="text-xs text-muted-foreground text-center">
-                          <Clock className="h-3 w-3 inline mr-1" />
-                          Gültig bis: {format(new Date(kva.valid_until), 'dd.MM.yyyy', { locale: de })}
-                        </p>
-                      )}
-
-                      {/* Diagnosis */}
-                      {(kva?.diagnosis || ticket.error_description_text) && (
-                        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200">
-                          <p className="text-sm font-medium mb-1">Diagnose:</p>
-                          <p className="text-sm">{kva?.diagnosis || ticket.error_description_text}</p>
-                        </div>
-                      )}
-
-                      {/* Repair Description */}
-                      {kva?.repair_description && (
-                        <div className="p-4 rounded-lg bg-muted/30">
-                          <p className="text-sm font-medium mb-1">Geplante Arbeiten:</p>
-                          <p className="text-sm text-muted-foreground">{kva.repair_description}</p>
-                        </div>
-                      )}
-
-                      {/* Disposal options - shown before rejection */}
-                      <Card className="bg-muted/30 border-dashed">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-amber-500" />
-                            Falls Sie ablehnen möchten
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <RadioGroup 
-                            value={disposalOption} 
-                            onValueChange={(v) => setDisposalOption(v as 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN')}
-                            className="space-y-2"
-                          >
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border bg-background">
-                              <RadioGroupItem value="ZURUECKSENDEN" id="return" />
-                              <Label htmlFor="return" className="flex-1 cursor-pointer">
-                                <div className="flex items-center gap-2">
-                                  <Truck className="h-4 w-4 text-muted-foreground" />
-                                  <span>Gerät zurücksenden</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Wir senden Ihnen das Gerät unrepariert zurück
-                                </p>
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-3 p-3 rounded-lg border bg-background">
-                              <RadioGroupItem value="KOSTENLOS_ENTSORGEN" id="dispose" />
-                              <Label htmlFor="dispose" className="flex-1 cursor-pointer">
-                                <div className="flex items-center gap-2">
-                                  <Trash2 className="h-4 w-4 text-muted-foreground" />
-                                  <span>Kostenlos entsorgen</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Wir entsorgen das Gerät umweltgerecht für Sie
-                                </p>
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                        </CardContent>
-                      </Card>
-
-                      <div className="flex gap-3">
-                        <Button 
-                          onClick={() => handleKVADecision(true)} 
-                          className="flex-1 gap-2"
-                          disabled={submitting}
-                        >
-                          {submitting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <ThumbsUp className="h-4 w-4" />
-                          )}
-                          Reparatur beauftragen
-                        </Button>
-                        <Button 
-                          onClick={() => handleKVADecision(false)} 
-                          variant="outline"
-                          className="flex-1 gap-2"
-                          disabled={submitting}
-                        >
-                          {submitting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <ThumbsDown className="h-4 w-4" />
-                          )}
-                          Ablehnen
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={`p-4 rounded-lg text-center ${
-                      ticket.kva_approved 
-                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200' 
-                        : 'bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200'
-                    }`}>
-                      <div className="flex items-center justify-center gap-2 mb-2">
-                        {ticket.kva_approved ? (
-                          <ThumbsUp className="h-5 w-5" />
-                        ) : (
-                          <ThumbsDown className="h-5 w-5" />
-                        )}
-                        <p className="font-semibold">
-                          {ticket.kva_approved ? 'KVA angenommen' : 'KVA abgelehnt'}
-                        </p>
                       </div>
                       {ticket.kva_approved_at && (
-                        <p className="text-sm opacity-80">
+                        <p className="text-sm text-muted-foreground mt-1">
                           am {format(new Date(ticket.kva_approved_at), 'dd.MM.yyyy HH:mm', { locale: de })}
                         </p>
                       )}
                     </div>
                   )}
+
+                  {/* Pending decision */}
+                  {ticket.kva_approved === null && kvaDisplayPrice != null && (
+                    <>
+                      {kva?.diagnosis && (
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-muted-foreground">Diagnose</p>
+                          <p className="text-sm">{kva.diagnosis}</p>
+                        </div>
+                      )}
+
+                      {kva?.repair_description && (
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-muted-foreground">Geplante Reparatur</p>
+                          <p className="text-sm">{kva.repair_description}</p>
+                        </div>
+                      )}
+
+                      <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-center">
+                        <p className="text-sm text-muted-foreground">Geschätzte Kosten</p>
+                        <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">
+                          {kvaDisplayPrice.toFixed(2)} €
+                        </p>
+                        {kva?.kva_fee_amount && !kva.kva_fee_waived && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            inkl. {kva.kva_fee_amount.toFixed(2)} € KVA-Gebühr bei Ablehnung
+                          </p>
+                        )}
+                      </div>
+
+                      {kva?.valid_until && (
+                        <p className="text-sm text-center text-muted-foreground">
+                          Gültig bis: {format(new Date(kva.valid_until), 'dd.MM.yyyy', { locale: de })}
+                        </p>
+                      )}
+
+                      <div className="flex gap-3 pt-2">
+                        <Button
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                          onClick={() => handleKVADecision(true)}
+                          disabled={submitting}
+                        >
+                          {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ThumbsUp className="h-4 w-4 mr-2" />}
+                          Annehmen
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => handleKVADecision(false)}
+                          disabled={submitting}
+                        >
+                          {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ThumbsDown className="h-4 w-4 mr-2" />}
+                          Ablehnen
+                        </Button>
+                      </div>
+
+                      {/* Disposal options when rejecting */}
+                      <div className="p-4 rounded-lg bg-muted/50 space-y-3">
+                        <p className="text-sm font-medium">Bei Ablehnung:</p>
+                        <RadioGroup
+                          value={disposalOption}
+                          onValueChange={(v) => setDisposalOption(v as typeof disposalOption)}
+                          className="space-y-2"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="ZURUECKSENDEN" id="return" />
+                            <Label htmlFor="return" className="flex items-center gap-2 cursor-pointer">
+                              <Truck className="h-4 w-4" />
+                              Gerät zurücksenden
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="KOSTENLOS_ENTSORGEN" id="dispose" />
+                            <Label htmlFor="dispose" className="flex items-center gap-2 cursor-pointer">
+                              <Trash2 className="h-4 w-4" />
+                              Kostenlos entsorgen
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            {/* Message Section */}
-            <Card className="shadow-lg border-0">
+            {/* Contact / Message Section */}
+            <Card className="shadow-xl border-0">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="text-lg flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-primary" />
                   Nachricht senden
                 </CardTitle>
                 <CardDescription>
-                  Haben Sie Fragen zu Ihrer Reparatur? Schreiben Sie uns eine Nachricht.
+                  Haben Sie eine Frage zu Ihrer Reparatur?
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <Textarea
-                    placeholder="Ihre Nachricht..."
-                    value={customerMessage}
-                    onChange={(e) => setCustomerMessage(e.target.value)}
-                    className="min-h-[100px]"
-                    maxLength={1000}
-                  />
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">
-                      {customerMessage.length}/1000 Zeichen
-                    </span>
-                    <Button 
-                      onClick={handleSendMessage}
-                      disabled={!customerMessage.trim() || submitting}
-                    >
-                      {submitting ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                      )}
-                      Senden
-                    </Button>
-                  </div>
+              <CardContent className="space-y-4">
+                <Textarea
+                  placeholder="Ihre Nachricht..."
+                  value={customerMessage}
+                  onChange={(e) => setCustomerMessage(e.target.value)}
+                  rows={3}
+                  maxLength={1000}
+                />
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">
+                    {customerMessage.length}/1000 Zeichen
+                  </span>
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!customerMessage.trim() || submitting}
+                  >
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Absenden
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -690,33 +827,19 @@ export default function TrackTicket() {
             {ticket.status_history && ticket.status_history.length > 0 && (
               <Card className="shadow-lg border-0">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-primary" />
-                    Verlauf
-                  </CardTitle>
+                  <CardTitle className="text-lg">Verlauf</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {ticket.status_history.map((entry, index) => (
-                      <div 
-                        key={entry.id} 
-                        className={`flex items-start gap-3 ${
-                          index !== ticket.status_history.length - 1 ? 'pb-3 border-b' : ''
-                        }`}
-                      >
-                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">
-                            {STATUS_LABELS[entry.new_status]}
-                          </p>
+                    {ticket.status_history.map((entry) => (
+                      <div key={entry.id} className="flex items-start gap-3 text-sm">
+                        <div className="h-2 w-2 rounded-full bg-primary mt-2" />
+                        <div className="flex-1">
+                          <p className="font-medium">{STATUS_LABELS[entry.new_status]}</p>
                           {entry.note && (
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                              {entry.note}
-                            </p>
+                            <p className="text-muted-foreground">{entry.note}</p>
                           )}
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground">
                             {format(new Date(entry.created_at), 'dd.MM.yyyy HH:mm', { locale: de })}
                           </p>
                         </div>
@@ -730,9 +853,9 @@ export default function TrackTicket() {
         )}
 
         {/* Footer */}
-        <div className="mt-8 text-center text-sm text-muted-foreground">
-          <p>Bei Fragen erreichen Sie uns unter:</p>
-          <p className="font-medium">service@telya.de | +49 (0) 123 456789</p>
+        <div className="text-center mt-8 text-sm text-muted-foreground">
+          <p>Telya GmbH • Schalker Str. 59, 45881 Gelsenkirchen</p>
+          <p className="mt-1">Tel: 0209 88307161 • service@telya.de</p>
         </div>
       </div>
     </div>
