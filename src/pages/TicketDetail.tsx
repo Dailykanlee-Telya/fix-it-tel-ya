@@ -55,14 +55,37 @@ import PickupReceipt from '@/components/documents/PickupReceipt';
 import TicketPartSelector from '@/components/tickets/TicketPartSelector';
 import CreatePartFromTicketDialog from '@/components/tickets/CreatePartFromTicketDialog';
 
-const STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
-  NEU_EINGEGANGEN: ['IN_DIAGNOSE', 'STORNIERT'],
-  IN_DIAGNOSE: ['WARTET_AUF_TEIL_ODER_FREIGABE', 'IN_REPARATUR', 'STORNIERT'],
-  WARTET_AUF_TEIL_ODER_FREIGABE: ['IN_REPARATUR', 'STORNIERT'],
-  IN_REPARATUR: ['FERTIG_ZUR_ABHOLUNG', 'WARTET_AUF_TEIL_ODER_FREIGABE', 'STORNIERT'],
-  FERTIG_ZUR_ABHOLUNG: ['ABGEHOLT', 'IN_REPARATUR'],
-  ABGEHOLT: [],
-  STORNIERT: [],
+// Status order for determining forward/backward changes
+const STATUS_ORDER: TicketStatus[] = [
+  'NEU_EINGEGANGEN',
+  'IN_DIAGNOSE', 
+  'WARTET_AUF_TEIL_ODER_FREIGABE',
+  'IN_REPARATUR',
+  'FERTIG_ZUR_ABHOLUNG',
+  'ABGEHOLT',
+];
+
+// Closed statuses that cannot be changed
+const CLOSED_STATUSES: TicketStatus[] = ['ABGEHOLT', 'STORNIERT'];
+
+// All possible transitions (forward transitions are always allowed, backward with reason)
+const getAllowedTransitions = (currentStatus: TicketStatus): TicketStatus[] => {
+  // Closed statuses cannot be changed
+  if (CLOSED_STATUSES.includes(currentStatus)) {
+    return [];
+  }
+  
+  // All non-closed statuses can be targets (except current)
+  return ['NEU_EINGEGANGEN', 'IN_DIAGNOSE', 'WARTET_AUF_TEIL_ODER_FREIGABE', 'IN_REPARATUR', 'FERTIG_ZUR_ABHOLUNG', 'STORNIERT']
+    .filter(s => s !== currentStatus) as TicketStatus[];
+};
+
+// Check if a status change is backwards
+const isBackwardTransition = (from: TicketStatus, to: TicketStatus): boolean => {
+  if (to === 'STORNIERT') return false; // Cancel is never "backward"
+  const fromIndex = STATUS_ORDER.indexOf(from);
+  const toIndex = STATUS_ORDER.indexOf(to);
+  return toIndex < fromIndex;
 };
 
 export default function TicketDetail() {
@@ -257,6 +280,16 @@ export default function TicketDetail() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: TicketStatus) => {
+      const currentStatus = ticket?.status as TicketStatus;
+      
+      // Check if this is a backward transition
+      const isBackward = isBackwardTransition(currentStatus, newStatus);
+      
+      // Backward transitions require a reason
+      if (isBackward && !statusNote.trim()) {
+        throw new Error('Bei Rückwärts-Statusänderungen ist eine Begründung erforderlich.');
+      }
+      
       // Check if checklist is complete before allowing FERTIG_ZUR_ABHOLUNG
       if (newStatus === 'FERTIG_ZUR_ABHOLUNG' && ticketChecklistItems && ticketChecklistItems.length > 0) {
         const allChecked = ticketChecklistItems.every((item: any) => item.checked);
@@ -379,7 +412,7 @@ export default function TicketDetail() {
     );
   }
 
-  const allowedTransitions = STATUS_TRANSITIONS[ticket.status as TicketStatus] || [];
+  const allowedTransitions = getAllowedTransitions(ticket.status as TicketStatus);
   const totalPartsPrice = partUsage?.reduce(
     (sum: number, p: any) => sum + (p.unit_sales_price || 0) * p.quantity,
     0
@@ -654,24 +687,41 @@ export default function TicketDetail() {
               ) : (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    {allowedTransitions.map((status) => (
-                      <Button
-                        key={status}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateStatusMutation.mutate(status)}
-                        disabled={updateStatusMutation.isPending}
-                        className={status === 'STORNIERT' ? 'text-destructive border-destructive' : ''}
-                      >
-                        {updateStatusMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : null}
-                        {STATUS_LABELS[status]}
-                      </Button>
-                    ))}
+                    {allowedTransitions.map((status) => {
+                      const isBackward = isBackwardTransition(ticket.status as TicketStatus, status);
+                      return (
+                        <Button
+                          key={status}
+                          variant={isBackward ? 'secondary' : 'outline'}
+                          size="sm"
+                          onClick={() => updateStatusMutation.mutate(status)}
+                          disabled={updateStatusMutation.isPending || (isBackward && !statusNote.trim())}
+                          className={`${status === 'STORNIERT' ? 'text-destructive border-destructive' : ''} ${isBackward ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : ''}`}
+                          title={isBackward ? 'Rückwärts-Änderung - Begründung erforderlich' : undefined}
+                        >
+                          {updateStatusMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : isBackward ? (
+                            <span className="mr-1">←</span>
+                          ) : null}
+                          {STATUS_LABELS[status]}
+                        </Button>
+                      );
+                    })}
                   </div>
+                  
+                  {/* Check if any backward transitions exist */}
+                  {allowedTransitions.some(s => isBackwardTransition(ticket.status as TicketStatus, s)) && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Für Rückwärts-Statusänderungen (← markiert) ist eine Begründung erforderlich
+                    </p>
+                  )}
+                  
                   <Textarea
-                    placeholder="Optionale Notiz zur Statusänderung..."
+                    placeholder={allowedTransitions.some(s => isBackwardTransition(ticket.status as TicketStatus, s)) 
+                      ? "Begründung (Pflicht für Rückwärts-Änderungen)..." 
+                      : "Optionale Notiz zur Statusänderung..."}
                     value={statusNote}
                     onChange={(e) => setStatusNote(e.target.value)}
                     rows={2}

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import {
   Eye,
   MoreHorizontal,
   Smartphone,
+  User,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -30,13 +31,33 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { STATUS_LABELS, STATUS_COLORS, TicketStatus, DEVICE_TYPE_LABELS, DeviceType } from '@/types/database';
-import { format } from 'date-fns';
+import { format, subDays, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { CustomerDetailDialog } from '@/components/CustomerDetailDialog';
 
 export default function Tickets() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Initialize filters from URL params
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get('status') || 'all');
+  const [overdueFilter, setOverdueFilter] = useState(searchParams.get('filter') === 'overdue');
+  const [createdAfter, setCreatedAfter] = useState(searchParams.get('created_after') || '');
+  
+  // Customer detail dialog
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+
+  // Sync URL params when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('search', searchQuery);
+    if (statusFilter !== 'all') params.set('status', statusFilter);
+    if (overdueFilter) params.set('filter', 'overdue');
+    if (createdAfter) params.set('created_after', createdAfter);
+    setSearchParams(params, { replace: true });
+  }, [searchQuery, statusFilter, overdueFilter, createdAfter, setSearchParams]);
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ['all-tickets'],
@@ -56,19 +77,31 @@ export default function Tickets() {
     },
   });
 
+  const sevenDaysAgo = subDays(new Date(), 7);
+
   const filteredTickets = tickets?.filter((ticket: any) => {
     const matchesSearch = 
       ticket.ticket_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.customer?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.customer?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.customer?.phone?.includes(searchQuery) ||
+      ticket.customer?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.device?.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.device?.model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.device?.imei_or_serial?.includes(searchQuery);
 
     const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    // Overdue filter: older than 7 days and not completed
+    const isOverdue = new Date(ticket.created_at) < sevenDaysAgo && 
+      !['ABGEHOLT', 'STORNIERT'].includes(ticket.status);
+    const matchesOverdue = !overdueFilter || isOverdue;
+
+    // Created after filter
+    const matchesCreatedAfter = !createdAfter || 
+      new Date(ticket.created_at) >= new Date(createdAfter);
+
+    return matchesSearch && matchesStatus && matchesOverdue && matchesCreatedAfter;
   });
 
   const getStatusBadge = (status: TicketStatus) => {
@@ -80,6 +113,21 @@ export default function Tickets() {
     );
   };
 
+  const handleCustomerClick = (e: React.MouseEvent, customerId: string) => {
+    e.stopPropagation();
+    setSelectedCustomerId(customerId);
+    setCustomerDialogOpen(true);
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setOverdueFilter(false);
+    setCreatedAfter('');
+  };
+
+  const hasActiveFilters = searchQuery || statusFilter !== 'all' || overdueFilter || createdAfter;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -88,6 +136,7 @@ export default function Tickets() {
           <h1 className="text-2xl font-bold text-foreground">Alle Aufträge</h1>
           <p className="text-muted-foreground">
             {filteredTickets?.length || 0} Aufträge gefunden
+            {overdueFilter && ' (Überfällig)'}
           </p>
         </div>
         <Button onClick={() => navigate('/intake')} className="gap-2">
@@ -103,7 +152,7 @@ export default function Tickets() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Suchen (Auftrag, Kunde, Telefon, Gerät, IMEI)..."
+                placeholder="Suchen (Auftrag, Kunde, Telefon, E-Mail, Gerät, IMEI)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -121,7 +170,20 @@ export default function Tickets() {
                 ))}
               </SelectContent>
             </Select>
+            {hasActiveFilters && (
+              <Button variant="outline" onClick={clearFilters}>
+                Filter zurücksetzen
+              </Button>
+            )}
           </div>
+          {overdueFilter && (
+            <div className="mt-3">
+              <Badge variant="destructive" className="gap-1">
+                Nur überfällige Aufträge (&gt;7 Tage)
+                <button onClick={() => setOverdueFilter(false)} className="ml-1">×</button>
+              </Badge>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -168,14 +230,22 @@ export default function Tickets() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">
-                          {ticket.customer?.first_name} {ticket.customer?.last_name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {ticket.customer?.phone}
-                        </p>
-                      </div>
+                      <button
+                        className="text-left hover:underline flex items-center gap-2 group"
+                        onClick={(e) => handleCustomerClick(e, ticket.customer?.id)}
+                      >
+                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                          <User className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium group-hover:text-primary transition-colors">
+                            {ticket.customer?.first_name} {ticket.customer?.last_name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {ticket.customer?.phone}
+                          </p>
+                        </div>
+                      </button>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -224,6 +294,13 @@ export default function Tickets() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Customer Detail Dialog */}
+      <CustomerDetailDialog
+        customerId={selectedCustomerId}
+        open={customerDialogOpen}
+        onOpenChange={setCustomerDialogOpen}
+      />
     </div>
   );
 }
