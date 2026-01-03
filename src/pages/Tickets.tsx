@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   Smartphone,
   User,
+  FileText,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -283,6 +284,13 @@ export default function Tickets() {
                           }}>
                             <Eye className="mr-2 h-4 w-4" />
                             Details anzeigen
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/tickets/${ticket.id}?tab=repair`);
+                          }}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            KVA anzeigen
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
