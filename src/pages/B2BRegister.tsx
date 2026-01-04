@@ -10,26 +10,18 @@ import { Building2, Mail, Phone, User, MapPin, FileText, Loader2, ArrowLeft, Che
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 
-const b2bRegisterSchema = z
-  .object({
-    companyName: z.string().min(2, 'Firmenname muss mindestens 2 Zeichen haben'),
-    contactName: z.string().min(2, 'Ansprechpartner muss mindestens 2 Zeichen haben'),
-    email: z.string().email('Ungültige E-Mail-Adresse'),
-    phone: z.string().min(6, 'Telefonnummer muss mindestens 6 Zeichen haben'),
-    street: z.string().min(3, 'Straße muss mindestens 3 Zeichen haben'),
-    zip: z.string().min(4, 'PLZ muss mindestens 4 Zeichen haben'),
-    city: z.string().min(2, 'Stadt muss mindestens 2 Zeichen haben'),
-    customerNumber: z.string().optional(),
-    notes: z.string().optional(),
-    password: z
-      .string()
-      .min(8, 'Passwort muss mindestens 8 Zeichen haben'),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    path: ['confirmPassword'],
-    message: 'Passwörter stimmen nicht überein',
-  });
+// Schema without password fields - admin creates accounts after approval
+const b2bRegisterSchema = z.object({
+  companyName: z.string().min(2, 'Firmenname muss mindestens 2 Zeichen haben'),
+  contactName: z.string().min(2, 'Ansprechpartner muss mindestens 2 Zeichen haben'),
+  email: z.string().email('Ungültige E-Mail-Adresse'),
+  phone: z.string().min(6, 'Telefonnummer muss mindestens 6 Zeichen haben'),
+  street: z.string().min(3, 'Straße muss mindestens 3 Zeichen haben'),
+  zip: z.string().min(4, 'PLZ muss mindestens 4 Zeichen haben'),
+  city: z.string().min(2, 'Stadt muss mindestens 2 Zeichen haben'),
+  customerNumber: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 export default function B2BRegister() {
   const navigate = useNavigate();
@@ -38,7 +30,7 @@ export default function B2BRegister() {
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Form state
+  // Form state - no password fields
   const [companyName, setCompanyName] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
@@ -48,8 +40,6 @@ export default function B2BRegister() {
   const [city, setCity] = useState('');
   const [customerNumber, setCustomerNumber] = useState('');
   const [notes, setNotes] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,42 +58,12 @@ export default function B2BRegister() {
         city,
         customerNumber,
         notes,
-        password,
-        confirmPassword,
       });
 
-      const { password: pw, confirmPassword: _cpw, ...partnerPayload } = validated;
-
-      // Schritt 1: Auth-User anlegen, damit der Partner später ein Login hat
-      const redirectUrl = `${window.location.origin}/auth`;
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: validated.email,
-        password: pw,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            name: validated.contactName,
-            registration_type: 'B2B',
-          },
-        },
-      });
-
-      if (signUpError) {
-        console.error('B2B signup error:', signUpError);
-        toast({
-          variant: 'destructive',
-          title: 'Fehler bei der Kontoerstellung',
-          description:
-            signUpError.message || 'Das Benutzerkonto konnte nicht erstellt werden. Bitte versuchen Sie es erneut.',
-        });
-        return;
-      }
-
-      console.log('B2B signup created user:', signUpData?.user?.id);
-
-      // Schritt 2: B2B-Partner über Edge Function registrieren (bypasst RLS)
+      // Only create B2B partner record via Edge Function (no auth account)
+      // Admin will create auth account after approval using admin-invite-user
       const { data, error } = await supabase.functions.invoke('b2b-register', {
-        body: partnerPayload,
+        body: validated,
       });
 
       if (error || data?.error) {
@@ -119,7 +79,7 @@ export default function B2BRegister() {
         toast({
           title: 'Anfrage gesendet',
           description:
-            'Ihre B2B-Partner-Anfrage wurde erfolgreich übermittelt. Ihr Zugang wird nach Freigabe aktiviert.',
+            'Ihre B2B-Partner-Anfrage wurde erfolgreich übermittelt. Nach Freigabe erhalten Sie Ihre Zugangsdaten per E-Mail.',
         });
       }
     } catch (error) {
@@ -334,36 +294,6 @@ export default function B2BRegister() {
                 </div>
               </div>
 
-              {/* Password */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Passwort *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
-                  />
-                  {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Passwort wiederholen *</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    disabled={loading}
-                  />
-                  {errors.confirmPassword && (
-                    <p className="text-sm text-destructive">{errors.confirmPassword}</p>
-                  )}
-                </div>
-              </div>
-
               {/* Notes */}
               <div className="space-y-2">
                 <Label htmlFor="notes">Anmerkungen</Label>
@@ -376,6 +306,10 @@ export default function B2BRegister() {
                   disabled={loading}
                 />
               </div>
+
+              <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                Nach Prüfung und Freigabe Ihrer Anfrage erhalten Sie Ihre Zugangsdaten per E-Mail.
+              </p>
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? (

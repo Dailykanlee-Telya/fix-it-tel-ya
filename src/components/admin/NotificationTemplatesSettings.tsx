@@ -31,6 +31,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import DOMPurify from 'dompurify';
+
+// Configure DOMPurify for safe email HTML rendering
+const sanitizeHtml = (html: string): string => {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'img', 'style'],
+    ALLOWED_ATTR: ['href', 'style', 'class', 'src', 'alt', 'width', 'height', 'border', 'cellpadding', 'cellspacing'],
+    ALLOW_DATA_ATTR: false,
+  });
+};
 
 interface NotificationTemplate {
   id: string;
@@ -334,7 +344,7 @@ export function NotificationTemplatesSettings() {
             </div>
             <div
               className="email-preview"
-              dangerouslySetInnerHTML={{ __html: getPreviewHtml() }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(getPreviewHtml()) }}
             />
           </div>
 
