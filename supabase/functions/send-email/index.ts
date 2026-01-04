@@ -1,11 +1,21 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@2.0.0';
+import DOMPurify from 'https://esm.sh/isomorphic-dompurify@2.21.0';
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Sanitize HTML to prevent XSS in emails
+const sanitizeHtml = (html: string): string => {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'img', 'style'],
+    ALLOWED_ATTR: ['href', 'style', 'class', 'src', 'alt', 'width', 'height', 'border', 'cellpadding', 'cellspacing'],
+    ALLOW_DATA_ATTR: false,
+  });
 };
 
 interface EmailRequest {
@@ -345,11 +355,14 @@ Deno.serve(async (req) => {
         meta: { to_email, subject }
       });
 
+      // Sanitize custom HTML to prevent XSS
+      const sanitizedBody = sanitizeHtml(customBody);
+      
       const { data, error } = await resend.emails.send({
         from: 'Telya Reparatur <noreply@telya.repariert.de>',
         to: [to_email],
         subject,
-        html: customBody,
+        html: sanitizedBody,
       });
 
       if (error) {
