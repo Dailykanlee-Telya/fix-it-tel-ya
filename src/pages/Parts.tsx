@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
+import PartsImportExport from '@/components/inventory/PartsImportExport';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +34,7 @@ import {
   Loader2,
   Filter,
   X,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 // Fixed part categories - no free text allowed
@@ -367,10 +369,13 @@ export default function Parts() {
             )}
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Neues Teil anlegen
-        </Button>
+        <div className="flex gap-2">
+          <PartsImportExport parts={parts} manufacturers={manufacturers} />
+          <Button onClick={() => setDialogOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Neues Teil anlegen
+          </Button>
+        </div>
       </div>
 
       {/* Search & Cascading Filters */}
