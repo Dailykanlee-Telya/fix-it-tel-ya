@@ -326,7 +326,7 @@ export const PDF_STYLES = `
 `;
 
 export const BON_STYLES = `
-  /* Thermal Printer Receipt (80mm width) */
+  /* Thermal Printer Receipt (80mm width) - HIGH CONTRAST */
   @page {
     size: 80mm auto;
     margin: 2mm;
@@ -341,22 +341,25 @@ export const BON_STYLES = `
   html, body {
     width: 80mm;
     font-family: 'Arial', 'Helvetica', sans-serif;
-    font-size: 10px;
-    line-height: 1.35;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     background: white;
+    color: #000000;
   }
   
   .bon-receipt {
     width: 76mm;
     padding: 2mm;
+    color: #000000;
   }
   
   .bon-header {
     text-align: center;
     padding-bottom: 3mm;
-    border-bottom: 2px dashed ${TELYA_COLORS.textDark};
+    border-bottom: 2px solid #000000;
     margin-bottom: 3mm;
   }
   
@@ -366,7 +369,7 @@ export const BON_STYLES = `
   }
   
   .bon-logo {
-    max-width: 30mm;
+    max-width: 32mm;
     height: auto;
     object-fit: contain;
     display: block;
@@ -374,140 +377,185 @@ export const BON_STYLES = `
   }
   
   .bon-title {
-    font-size: 14px;
-    font-weight: bold;
-    letter-spacing: 1px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #000000;
+    text-transform: uppercase;
   }
   
   .bon-subtitle {
-    font-size: 8px;
-    color: ${TELYA_COLORS.textMuted};
+    font-size: 10px;
+    font-weight: 600;
+    color: #000000;
     margin-top: 1mm;
   }
   
+  /* ORDER NUMBER - VERY PROMINENT */
   .bon-order-number {
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 22px;
+    font-weight: 700;
     text-align: center;
     padding: 3mm 2mm;
     margin: 2mm 0;
-    background: #f0f0f0;
+    background: #000000;
+    color: #ffffff;
     border-radius: 2mm;
+    letter-spacing: 1px;
+  }
+  
+  /* TRACKING CODE - PROMINENT */
+  .bon-tracking-code {
+    text-align: center;
+    margin: 2mm 0;
+    padding: 3mm;
+    background: #f0f0f0;
+    border: 2px solid #000000;
+    border-radius: 2mm;
+  }
+  
+  .bon-tracking-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #000000;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 1mm;
+  }
+  
+  .bon-tracking-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 3px;
+    color: #000000;
   }
   
   .bon-datetime {
     text-align: center;
-    font-size: 9px;
-    color: ${TELYA_COLORS.textMuted};
+    font-size: 10px;
+    font-weight: 600;
+    color: #000000;
     margin-bottom: 3mm;
   }
   
   .bon-section {
-    margin: 2mm 0;
+    margin: 3mm 0;
     padding-bottom: 2mm;
-    border-bottom: 1px dotted ${TELYA_COLORS.textLight};
+    border-bottom: 1px solid #000000;
   }
   
   .bon-section-title {
-    font-size: 8px;
-    font-weight: bold;
+    font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
-    color: ${TELYA_COLORS.textMuted};
-    margin-bottom: 1.5mm;
+    color: #000000;
+    margin-bottom: 2mm;
     letter-spacing: 0.5px;
+    border-bottom: 1px solid #000000;
+    padding-bottom: 1mm;
   }
   
   .bon-row {
     display: flex;
     justify-content: space-between;
-    margin: 0.8mm 0;
-    font-size: 9px;
+    margin: 1.5mm 0;
+    font-size: 11px;
   }
   
   .bon-label {
-    color: ${TELYA_COLORS.textMuted};
+    font-weight: 600;
+    color: #000000;
   }
   
   .bon-value {
-    font-weight: 500;
+    font-weight: 700;
     text-align: right;
     max-width: 42mm;
     word-wrap: break-word;
+    color: #000000;
   }
   
   .bon-mono {
     font-family: 'Courier New', monospace;
-    font-size: 8px;
+    font-size: 10px;
+    font-weight: 700;
   }
   
   .bon-error {
-    font-size: 8px;
-    padding: 1.5mm;
-    background: #f8f8f8;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2mm;
+    background: #f0f0f0;
+    border: 1px solid #000000;
     border-radius: 1mm;
     margin-top: 1mm;
+    color: #000000;
   }
   
   .bon-notice {
     margin: 3mm 0;
-    padding: 2.5mm;
-    background: #fff8e1;
-    border: 1px solid #ffc107;
+    padding: 3mm;
+    background: #ffffff;
+    border: 2px solid #000000;
     border-radius: 2mm;
     text-align: center;
-    font-size: 8px;
   }
   
   .bon-notice-icon {
-    font-size: 12px;
+    font-size: 14px;
     margin-bottom: 1mm;
   }
   
   .bon-notice-text {
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 700;
     margin-bottom: 1mm;
+    color: #000000;
   }
   
   .bon-notice-sub {
-    font-size: 7px;
-    color: ${TELYA_COLORS.textMuted};
+    font-size: 9px;
+    font-weight: 600;
+    color: #000000;
   }
-  
+
   /* Data Security Warning */
   .bon-warning {
     margin: 3mm 0;
     padding: 2mm;
-    background: #ffebee;
-    border: 1px solid #ef5350;
+    background: #ffffff;
+    border: 2px solid #000000;
     border-radius: 2mm;
     text-align: center;
-    font-size: 7px;
   }
   
   .bon-warning-icon {
-    font-size: 10px;
+    font-size: 12px;
     margin-bottom: 1mm;
   }
   
   .bon-warning-text {
-    color: #c62828;
+    font-size: 9px;
+    font-weight: 600;
+    color: #000000;
     line-height: 1.3;
   }
   
   /* QR Code Section */
   .bon-qr-section {
     margin: 3mm 0;
-    padding: 2.5mm;
-    border: 1px dashed ${TELYA_COLORS.textLight};
+    padding: 3mm;
+    border: 2px solid #000000;
     border-radius: 2mm;
     text-align: center;
   }
   
   .bon-qr-title {
-    font-size: 8px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
     margin-bottom: 2mm;
-    color: ${TELYA_COLORS.primaryBlue};
+    color: #000000;
   }
   
   .bon-qr-code {
@@ -517,78 +565,59 @@ export const BON_STYLES = `
   }
   
   .bon-qr-code svg {
-    width: 80px !important;
-    height: 80px !important;
+    width: 85px !important;
+    height: 85px !important;
   }
   
   .bon-qr-hint {
-    font-size: 7px;
-    color: ${TELYA_COLORS.textMuted};
+    font-size: 9px;
+    font-weight: 600;
+    color: #000000;
   }
   
   .bon-qr-url {
-    font-size: 8px;
-    font-weight: 600;
-    color: ${TELYA_COLORS.primaryBlue};
+    font-size: 11px;
+    font-weight: 700;
+    color: #000000;
+    margin-top: 1mm;
   }
   
   .bon-qr-info {
-    font-size: 6px;
-    color: ${TELYA_COLORS.textMuted};
-    margin-top: 0.5mm;
+    font-size: 9px;
+    font-weight: 600;
+    color: #000000;
+    margin-top: 1mm;
   }
-  
-  /* Tracking Code Highlight */
-  .bon-tracking-code {
-    text-align: center;
-    margin: 2mm 0;
-    padding: 2mm;
-    background: #f0f0f0;
-    border-radius: 2mm;
-  }
-  
-  .bon-tracking-label {
-    font-size: 7px;
-    color: ${TELYA_COLORS.textMuted};
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  .bon-tracking-value {
-    font-size: 16px;
-    font-weight: bold;
-    font-family: 'Courier New', monospace;
-    letter-spacing: 2px;
-    color: ${TELYA_COLORS.primaryBlue};
-  }
-  
+
   /* Legal Notices Section */
   .bon-legal {
     margin: 3mm 0;
     padding: 2mm;
-    border: 1px solid ${TELYA_COLORS.borderLight};
+    border: 1px solid #000000;
     border-radius: 2mm;
-    font-size: 6px;
-    line-height: 1.4;
-    color: ${TELYA_COLORS.textMuted};
+    font-size: 7px;
+    line-height: 1.35;
+    color: #000000;
   }
   
   .bon-legal-title {
-    font-size: 7px;
-    font-weight: 600;
-    color: ${TELYA_COLORS.primaryBlue};
+    font-size: 9px;
+    font-weight: 700;
+    color: #000000;
     text-transform: uppercase;
-    margin-bottom: 1.5mm;
-    border-bottom: 1px dotted ${TELYA_COLORS.borderLight};
+    margin-bottom: 2mm;
+    border-bottom: 1px solid #000000;
     padding-bottom: 1mm;
   }
   
   .bon-legal-item {
-    margin-bottom: 1mm;
+    margin-bottom: 1.5mm;
+    font-weight: 500;
   }
   
   .bon-legal-item strong {
-    color: ${TELYA_COLORS.textDark};
+    font-weight: 700;
+    color: #000000;
   }
   
   /* Signature Area */
@@ -598,30 +627,33 @@ export const BON_STYLES = `
   }
   
   .bon-signature-line {
-    border-top: 1px solid ${TELYA_COLORS.textDark};
+    border-top: 2px solid #000000;
     width: 60mm;
     margin: 0 auto 1mm auto;
-    padding-top: 10mm;
+    padding-top: 12mm;
   }
   
   .bon-signature-label {
-    font-size: 7px;
-    color: ${TELYA_COLORS.textMuted};
+    font-size: 9px;
+    font-weight: 600;
+    color: #000000;
   }
   
   .bon-footer {
     text-align: center;
-    font-size: 8px;
-    color: ${TELYA_COLORS.textMuted};
+    font-size: 9px;
+    font-weight: 600;
+    color: #000000;
     margin-top: 3mm;
     padding-top: 2mm;
-    border-top: 2px dashed ${TELYA_COLORS.textLight};
+    border-top: 2px solid #000000;
   }
   
   .bon-footer-company {
-    font-weight: 600;
-    color: ${TELYA_COLORS.primaryBlue};
-    margin-bottom: 0.5mm;
+    font-weight: 700;
+    color: #000000;
+    margin-bottom: 1mm;
+    font-size: 10px;
   }
 `;
 
