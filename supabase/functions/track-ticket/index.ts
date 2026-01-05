@@ -6,10 +6,9 @@ const corsHeaders = {
 };
 
 interface TrackRequest {
-  action: 'lookup' | 'lookup_by_email' | 'kva_decision' | 'send_message';
-  ticket_number?: string;
-  tracking_token?: string;
+  action: 'lookup' | 'kva_decision' | 'send_message';
   email?: string;
+  tracking_code?: string;
   kva_approved?: boolean;
   disposal_option?: 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN';
   message?: string;
@@ -80,133 +79,66 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: TrackRequest = await req.json();
-    const { action, ticket_number, tracking_token, email, kva_approved, message } = body;
+    const { action, email, tracking_code, kva_approved, message } = body;
 
-    // Handle email-based lookup (returns list of tickets for customer)
-    if (action === 'lookup_by_email') {
-      if (!email || !email.includes('@')) {
-        return new Response(
-          JSON.stringify({ error: 'Gültige E-Mail-Adresse erforderlich.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const cleanEmail = email.toLowerCase().trim();
-
-      // Find customer by email
-      const { data: customers, error: customerError } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('email', cleanEmail);
-
-      if (customerError || !customers || customers.length === 0) {
-        console.log('No customer found for email:', cleanEmail, 'IP:', clientIP);
-        return new Response(
-          JSON.stringify({ error: 'Keine Aufträge für diese E-Mail-Adresse gefunden.' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const customerIds = customers.map(c => c.id);
-
-      // Find active tickets for this customer (not ABGEHOLT/STORNIERT)
-      const { data: tickets, error: ticketsError } = await supabase
-        .from('repair_tickets')
-        .select(`
-          id, ticket_number, status, created_at, kva_token,
-          device:devices(brand, model, device_type)
-        `)
-        .in('customer_id', customerIds)
-        .not('status', 'in', '("ABGEHOLT","STORNIERT")')
-        .order('created_at', { ascending: false });
-
-      if (ticketsError) {
-        console.error('Error fetching tickets by email:', ticketsError);
-        return new Response(
-          JSON.stringify({ error: 'Datenbankfehler.' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (!tickets || tickets.length === 0) {
-        return new Response(
-          JSON.stringify({ error: 'Keine aktiven Aufträge für diese E-Mail-Adresse gefunden.' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Return list of tickets (with masked tokens for security)
-      const ticketList = tickets.map(t => ({
-        id: t.id,
-        ticket_number: t.ticket_number,
-        status: t.status,
-        created_at: t.created_at,
-        device: t.device ? { brand: (t.device as any).brand, model: (t.device as any).model } : null,
-        has_token: !!t.kva_token,
-      }));
-
-      // If only one active ticket, auto-return the token for convenience
-      if (tickets.length === 1 && tickets[0].kva_token) {
-        return new Response(
-          JSON.stringify({ 
-            tickets: ticketList,
-            single_ticket: {
-              ticket_number: tickets[0].ticket_number,
-              tracking_token: tickets[0].kva_token
-            }
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+    // VALIDATION: ONLY Email + Tracking Code allowed
+    if (!email || !email.includes('@')) {
+      console.log('Invalid or missing email:', email, 'IP:', clientIP);
       return new Response(
-        JSON.stringify({ tickets: ticketList }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Ungültige Eingabe. Bitte überprüfen Sie Ihre Daten.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate required fields for other actions
-    if (!ticket_number || !tracking_token) {
-      console.log('Missing required fields:', { ticket_number: !!ticket_number, tracking_token: !!tracking_token, ip: clientIP });
+    if (!tracking_code || tracking_code.length < 6 || tracking_code.length > 8) {
+      console.log('Invalid or missing tracking code:', tracking_code?.length, 'IP:', clientIP);
       return new Response(
-        JSON.stringify({ error: 'Auftragsnummer und Tracking-Token sind erforderlich.' }),
+        JSON.stringify({ error: 'Ungültige Eingabe. Bitte überprüfen Sie Ihre Daten.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Clean inputs
-    const cleanTicketNumber = ticket_number.toUpperCase().trim();
-    const cleanToken = tracking_token.trim();
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanCode = tracking_code.toUpperCase().trim();
 
-    // Verify ticket exists and token matches
+    // Find customer by email
+    const { data: customers, error: customerError } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('email', cleanEmail);
+
+    if (customerError || !customers || customers.length === 0) {
+      console.log('No customer found for email - neutral error', 'IP:', clientIP);
+      return new Response(
+        JSON.stringify({ error: 'Ungültige Eingabe. Bitte überprüfen Sie Ihre Daten.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const customerIds = customers.map(c => c.id);
+
+    // Find ticket with matching tracking code (kva_token) AND customer
     const { data: ticket, error: ticketError } = await supabase
       .from('repair_tickets')
       .select('id, ticket_number, status, kva_token, kva_required, kva_approved, kva_approved_at, estimated_price, created_at, updated_at, error_description_text, device_id, location_id, is_b2b, endcustomer_price, endcustomer_price_released')
-      .eq('ticket_number', cleanTicketNumber)
+      .in('customer_id', customerIds)
+      .eq('kva_token', cleanCode)
       .maybeSingle();
 
     if (ticketError) {
       console.error('Database error looking up ticket:', ticketError);
       return new Response(
-        JSON.stringify({ error: 'Datenbankfehler. Bitte versuchen Sie es später erneut.' }),
+        JSON.stringify({ error: 'Ungültige Eingabe. Bitte überprüfen Sie Ihre Daten.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (!ticket) {
-      console.log('Ticket not found:', cleanTicketNumber, 'IP:', clientIP);
+      console.log('No ticket found for email + code combination, IP:', clientIP);
       return new Response(
-        JSON.stringify({ error: 'Auftrag nicht gefunden.' }),
+        JSON.stringify({ error: 'Ungültige Eingabe. Bitte überprüfen Sie Ihre Daten.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Verify tracking token (kva_token field)
-    if (!ticket.kva_token || ticket.kva_token !== cleanToken) {
-      console.log('Invalid tracking token for ticket:', cleanTicketNumber, 'IP:', clientIP);
-      return new Response(
-        JSON.stringify({ error: 'Ungültiger Tracking-Token.' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -276,7 +208,7 @@ Deno.serve(async (req) => {
           device: device ? { brand: device.brand, model: device.model, device_type: device.device_type } : null,
           location: location ? { name: location.name } : null,
           status_history: filteredHistory,
-          // Include KVA data for new system
+          // Include KVA data
           kva: kvaEstimate ? {
             id: kvaEstimate.id,
             version: kvaEstimate.version,
@@ -326,7 +258,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Check if already decided (in new system or legacy)
+      // Check if already decided
       if (currentKva && ['FREIGEGEBEN', 'ABGELEHNT', 'ENTSORGEN'].includes(currentKva.status)) {
         return new Response(
           JSON.stringify({ error: 'KVA wurde bereits entschieden.' }),
@@ -411,14 +343,13 @@ Deno.serve(async (req) => {
         note: kva_approved ? 'KVA vom Kunden angenommen - Reparatur startet' : `KVA vom Kunden abgelehnt${body.disposal_option === 'KOSTENLOS_ENTSORGEN' ? ' - Kostenlose Entsorgung gewählt' : ''}`,
       });
 
-      // Create notifications for all employees with relevant roles (deduplicated)
+      // Create notifications for all employees
       const { data: employees } = await supabase
         .from('user_roles')
         .select('user_id')
         .in('role', ['ADMIN', 'THEKE', 'TECHNIKER']);
 
       if (employees && employees.length > 0) {
-        // Deduplicate user_ids (users may have multiple roles)
         const uniqueUserIds = [...new Set(employees.map(emp => emp.user_id))];
         
         const notifications = uniqueUserIds.map(userId => ({
@@ -429,20 +360,20 @@ Deno.serve(async (req) => {
           user_id: userId,
           type: 'KVA_DECISION',
           title: kva_approved ? 'KVA angenommen' : 'KVA abgelehnt',
-          message: `Kunde hat KVA für ${cleanTicketNumber} ${kva_approved ? 'angenommen' : 'abgelehnt'}.`,
+          message: `Kunde hat KVA für ${ticket.ticket_number} ${kva_approved ? 'angenommen' : 'abgelehnt'}.`,
           is_read: false,
         }));
 
         await supabase.from('notification_logs').insert(notifications);
       }
 
-      console.log('KVA decision recorded:', { ticket_number: cleanTicketNumber, approved: kva_approved });
+      console.log('KVA decision recorded:', { ticket_number: ticket.ticket_number, approved: kva_approved });
 
       return new Response(
         JSON.stringify({ 
           success: true, 
           kva_approved: kva_approved,
-          kva_approved_at: new Date().toISOString()
+          kva_approved_at: decisionTime
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -477,14 +408,13 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Create notifications for all employees with relevant roles (deduplicated)
+      // Create notifications for all employees
       const { data: employees } = await supabase
         .from('user_roles')
         .select('user_id')
         .in('role', ['ADMIN', 'THEKE', 'TECHNIKER']);
 
       if (employees && employees.length > 0) {
-        // Deduplicate user_ids (users may have multiple roles)
         const uniqueUserIds = [...new Set(employees.map(emp => emp.user_id))];
         
         const notifications = uniqueUserIds.map(userId => ({
@@ -495,14 +425,14 @@ Deno.serve(async (req) => {
           user_id: userId,
           type: 'NEW_CUSTOMER_MESSAGE',
           title: 'Neue Kundennachricht',
-          message: `Neue Nachricht vom Kunden für ${cleanTicketNumber}: ${cleanMessage.substring(0, 100)}${cleanMessage.length > 100 ? '...' : ''}`,
+          message: `Neue Nachricht vom Kunden für ${ticket.ticket_number}: ${cleanMessage.substring(0, 100)}${cleanMessage.length > 100 ? '...' : ''}`,
           is_read: false,
         }));
 
         await supabase.from('notification_logs').insert(notifications);
       }
 
-      console.log('Customer message sent:', { ticket_number: cleanTicketNumber, message_length: cleanMessage.length });
+      console.log('Customer message sent:', { ticket_number: ticket.ticket_number, message_length: cleanMessage.length });
 
       return new Response(
         JSON.stringify({ success: true }),

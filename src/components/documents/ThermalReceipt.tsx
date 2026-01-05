@@ -5,7 +5,9 @@ import { DEVICE_TYPE_LABELS, DeviceType } from '@/types/database';
 import { TELYA_ADDRESS } from '@/types/b2b';
 import { BON_STYLES, generatePdfFilename } from '@/lib/pdf-styles';
 import { DOCUMENT_LOGOS } from '@/lib/document-logo';
+import { LEGAL_TEXTS } from '@/lib/legal-texts';
 import { QRCodeSVG } from 'qrcode.react';
+import { getBaseUrl } from '@/lib/base-url';
 
 interface ThermalReceiptProps {
   ticket: any;
@@ -96,26 +98,34 @@ export default function ThermalReceipt({
   
   if (isPhone) {
     if (ticket.device?.imei_unreadable) {
-      identNumber = 'Nicht lesbar';
+      identNumber = '☐ Nicht lesbar';
     } else {
       identNumber = ticket.device?.imei_or_serial || '-';
     }
   } else {
     if (ticket.device?.serial_unreadable) {
-      identNumber = 'Nicht lesbar';
+      identNumber = '☐ Nicht lesbar';
     } else {
       identNumber = ticket.device?.serial_number || ticket.device?.imei_or_serial || '-';
     }
   }
   
   const createdDate = format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', { locale: de });
+  const trackingCode = ticket.kva_token || '';
+  const customerEmail = ticket.customer?.email || '';
+  
+  // Generate tracking URL with email + code (production domain only)
+  const baseUrl = getBaseUrl();
+  const trackingUrl = customerEmail && trackingCode 
+    ? `${baseUrl}/track?email=${encodeURIComponent(customerEmail)}&code=${encodeURIComponent(trackingCode)}`
+    : `${baseUrl}/track`;
 
   return (
     <div>
       {/* Hidden receipt for printing */}
       <div ref={receiptRef} style={{ display: 'none' }}>
         <div className="bon-receipt">
-          {/* Header mit zentralem Logo-Handling */}
+          {/* Header with Logo */}
           <div className="bon-header">
             <div className="bon-logo-container">
               <img 
@@ -126,17 +136,26 @@ export default function ThermalReceipt({
               />
             </div>
             <div className="bon-title">ABHOLSCHEIN</div>
-            <div className="bon-subtitle">Reparieren statt ersetzen</div>
+            <div className="bon-subtitle">{TELYA_ADDRESS.name}</div>
+            {ticket.location?.name && (
+              <div className="bon-subtitle">Filiale: {ticket.location.name}</div>
+            )}
           </div>
 
-          {/* Order Number - Prominent (neues Format ohne Bindestriche) */}
+          {/* Order Number - Prominent */}
           <div className="bon-order-number">
             {ticket.ticket_number}
           </div>
 
+          {/* Tracking Code - Very Prominent */}
+          <div className="bon-tracking-code">
+            <div className="bon-tracking-label">Trackingcode</div>
+            <div className="bon-tracking-value">{trackingCode}</div>
+          </div>
+
           {/* Date/Time */}
           <div className="bon-datetime">
-            {createdDate} Uhr
+            Annahme: {createdDate} Uhr
           </div>
 
           {/* Customer Section */}
@@ -150,6 +169,12 @@ export default function ThermalReceipt({
               <div className="bon-row">
                 <span className="bon-label">Tel:</span>
                 <span className="bon-value">{ticket.customer.phone}</span>
+              </div>
+            )}
+            {ticket.customer?.email && (
+              <div className="bon-row">
+                <span className="bon-label">E-Mail:</span>
+                <span className="bon-value" style={{ fontSize: '8px' }}>{ticket.customer.email}</span>
               </div>
             )}
           </div>
@@ -177,53 +202,28 @@ export default function ThermalReceipt({
             )}
             <div className="bon-row">
               <span className="bon-label">{identLabel}:</span>
-              <span className={`bon-value ${identNumber !== 'Nicht lesbar' ? 'bon-mono' : ''}`}>{identNumber}</span>
+              <span className={`bon-value ${!identNumber.includes('Nicht lesbar') ? 'bon-mono' : ''}`}>{identNumber}</span>
             </div>
           </div>
 
           {/* Error Section */}
           {ticket.error_description_text && (
             <div className="bon-section">
-              <div className="bon-section-title">Fehler</div>
+              <div className="bon-section-title">Fehlerbeschreibung</div>
               <div className="bon-error">
-                {ticket.error_description_text.substring(0, 80)}
-                {ticket.error_description_text.length > 80 ? '...' : ''}
+                {ticket.error_description_text.substring(0, 100)}
+                {ticket.error_description_text.length > 100 ? '...' : ''}
               </div>
             </div>
           )}
-
-          {/* Location Section */}
-          {ticket.location?.name && (
-            <div className="bon-section">
-              <div className="bon-section-title">Abholort</div>
-              <div className="bon-row">
-                <span className="bon-label">Filiale:</span>
-                <span className="bon-value">{ticket.location.name}</span>
-              </div>
-              {ticket.location?.address && (
-                <div className="bon-row">
-                  <span className="bon-label">Adresse:</span>
-                  <span className="bon-value" style={{ fontSize: '8px' }}>{ticket.location.address}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Data Security Warning */}
-          <div className="bon-warning">
-            <div className="bon-warning-icon">⚠️</div>
-            <div className="bon-warning-text">
-              Bitte sichern Sie Ihre Daten vor der Reparatur. Für Datenverlust übernehmen wir keine Haftung.
-            </div>
-          </div>
 
           {/* QR Code for Status Tracking */}
-          {ticket.kva_token && (
+          {trackingCode && customerEmail && (
             <div className="bon-qr-section">
               <div className="bon-qr-title">Status online abrufen:</div>
               <div className="bon-qr-code">
                 <QRCodeSVG 
-                  value={`${window.location.origin}/track?ticket=${encodeURIComponent(ticket.ticket_number)}&token=${ticket.kva_token}`}
+                  value={trackingUrl}
                   size={80}
                   level="M"
                   includeMargin={false}
@@ -231,9 +231,38 @@ export default function ThermalReceipt({
               </div>
               <div className="bon-qr-hint">QR-Code scannen oder</div>
               <div className="bon-qr-url">www.telya.de/track</div>
-              <div className="bon-qr-token">Code: {ticket.kva_token}</div>
+              <div className="bon-qr-info">E-Mail + Trackingcode eingeben</div>
             </div>
           )}
+
+          {/* Legal Notices - Required by law */}
+          <div className="bon-legal">
+            <div className="bon-legal-title">Wichtige Hinweise</div>
+            <div className="bon-legal-item">
+              <strong>Datensicherung:</strong> {LEGAL_TEXTS.datensicherung}
+            </div>
+            <div className="bon-legal-item">
+              <strong>Haftung:</strong> {LEGAL_TEXTS.haftung}
+            </div>
+            <div className="bon-legal-item">
+              <strong>KVA:</strong> {LEGAL_TEXTS.kva}
+            </div>
+            <div className="bon-legal-item">
+              <strong>Abholung:</strong> {LEGAL_TEXTS.abholung}
+            </div>
+            <div className="bon-legal-item">
+              <strong>Datenschutz:</strong> {LEGAL_TEXTS.datenschutz}
+            </div>
+            <div className="bon-legal-item">
+              {LEGAL_TEXTS.agb}
+            </div>
+          </div>
+
+          {/* Signature Area */}
+          <div className="bon-signature">
+            <div className="bon-signature-line"></div>
+            <div className="bon-signature-label">Unterschrift Kunde</div>
+          </div>
 
           {/* Notice Box */}
           <div className="bon-notice">
@@ -249,6 +278,8 @@ export default function ThermalReceipt({
           {/* Footer */}
           <div className="bon-footer">
             <div className="bon-footer-company">{TELYA_ADDRESS.name}</div>
+            <div>{TELYA_ADDRESS.street}</div>
+            <div>{TELYA_ADDRESS.zip} {TELYA_ADDRESS.city}</div>
             <div>Tel: {TELYA_ADDRESS.phone}</div>
             <div>www.telya.de</div>
           </div>

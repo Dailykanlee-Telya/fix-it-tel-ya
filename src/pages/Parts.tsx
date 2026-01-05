@@ -511,13 +511,20 @@ export default function Parts() {
               ) : (
                 filteredParts.map((part: any) => {
                   const isLowStock = part.stock_quantity <= part.min_stock_quantity;
-                  const manufacturerName = part.manufacturers?.name || part.brand || '-';
-                  const modelName = part.device_catalog?.model || part.model || null;
+                  const manufacturerName = part.manufacturers?.name || part.brand || '';
+                  const modelName = part.device_catalog?.model || part.model || '';
+                  
+                  // Generate display name dynamically: "Part Name – Manufacturer Model"
+                  const displayName = modelName 
+                    ? `${part.name} – ${manufacturerName} ${modelName}`
+                    : manufacturerName 
+                      ? `${part.name} – ${manufacturerName} (Generisch)`
+                      : part.name;
                   
                   return (
                     <TableRow key={part.id} className={isLowStock ? 'bg-destructive/5' : ''}>
                       <TableCell>
-                        <div className="font-medium">{part.name}</div>
+                        <div className="font-medium">{displayName}</div>
                         {part.sku && (
                           <div className="text-xs text-muted-foreground">SKU: {part.sku}</div>
                         )}
@@ -674,14 +681,17 @@ export default function Parts() {
               <Label className="text-sm font-medium text-muted-foreground">Details</Label>
             </div>
 
-            {/* Part Name */}
+            {/* Part Name - ONLY the part type, no manufacturer/model */}
             <div className="space-y-2">
-              <Label>Bezeichnung <span className="text-destructive">*</span></Label>
+              <Label>Ersatzteil-Bezeichnung <span className="text-destructive">*</span></Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="z.B. Display OLED Original, Akku 3000mAh"
+                placeholder="z.B. Display OLED, Akku, Ladebuchse"
               />
+              <p className="text-xs text-muted-foreground">
+                Nur das Ersatzteil eingeben! Hersteller und Modell werden automatisch hinzugefügt.
+              </p>
             </div>
 
             {/* SKU Fields */}

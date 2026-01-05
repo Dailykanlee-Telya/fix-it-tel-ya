@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search,
@@ -22,11 +21,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
-  AlertTriangle,
   Truck,
   Trash2,
-  Mail,
-  Ticket,
 } from 'lucide-react';
 import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { format } from 'date-fns';
@@ -78,15 +74,6 @@ interface TicketData {
   kva?: KvaData | null;
 }
 
-interface TicketListItem {
-  id: string;
-  ticket_number: string;
-  status: TicketStatus;
-  created_at: string;
-  device: { brand: string; model: string } | null;
-  has_token: boolean;
-}
-
 // Status timeline steps (simplified for customer view)
 const STATUS_TIMELINE: { status: TicketStatus; label: string; icon: React.ComponentType<any> }[] = [
   { status: 'NEU_EINGEGANGEN', label: 'Eingegangen', icon: Package },
@@ -107,15 +94,9 @@ export default function TrackTicket() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   
-  // Search mode state
-  const [searchMode, setSearchMode] = useState<'email' | 'ticket'>('email');
+  // Search form state - ONLY email + tracking code
   const [email, setEmail] = useState('');
-  const [ticketNumber, setTicketNumber] = useState('');
-  const [trackingToken, setTrackingToken] = useState('');
-  
-  // Ticket list (for email search with multiple results)
-  const [ticketList, setTicketList] = useState<TicketListItem[]>([]);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [trackingCode, setTrackingCode] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -124,12 +105,12 @@ export default function TrackTicket() {
   const [disposalOption, setDisposalOption] = useState<'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN'>('ZURUECKSENDEN');
   const [autoSearchDone, setAutoSearchDone] = useState(false);
 
-  const callTrackingApi = useCallback(async (action: string, extraData: Record<string, any> = {}, overrideTicket?: string, overrideToken?: string) => {
+  const callTrackingApi = useCallback(async (action: string, extraData: Record<string, any> = {}, overrideEmail?: string, overrideCode?: string) => {
     const response = await supabase.functions.invoke('track-ticket', {
       body: {
         action,
-        ticket_number: overrideTicket || ticketNumber,
-        tracking_token: overrideToken || trackingToken,
+        email: overrideEmail || email.toLowerCase().trim(),
+        tracking_code: overrideCode || trackingCode.toUpperCase().trim(),
         ...extraData
       }
     });
@@ -146,17 +127,16 @@ export default function TrackTicket() {
     }
     
     return response.data;
-  }, [ticketNumber, trackingToken]);
+  }, [email, trackingCode]);
 
-  // Auto-search from URL parameters
+  // Auto-search from URL parameters (for QR code / email links)
   useEffect(() => {
-    const ticketParam = searchParams.get('ticket');
-    const tokenParam = searchParams.get('token');
+    const emailParam = searchParams.get('email');
+    const codeParam = searchParams.get('code') || searchParams.get('token');
     
-    if (ticketParam && tokenParam && !autoSearchDone) {
-      setSearchMode('ticket');
-      setTicketNumber(ticketParam);
-      setTrackingToken(tokenParam.toUpperCase());
+    if (emailParam && codeParam && !autoSearchDone) {
+      setEmail(emailParam);
+      setTrackingCode(codeParam.toUpperCase());
       setAutoSearchDone(true);
       
       const performAutoSearch = async () => {
@@ -165,20 +145,13 @@ export default function TrackTicket() {
           const response = await supabase.functions.invoke('track-ticket', {
             body: {
               action: 'lookup',
-              ticket_number: ticketParam,
-              tracking_token: tokenParam.toUpperCase()
+              email: emailParam.toLowerCase().trim(),
+              tracking_code: codeParam.toUpperCase().trim()
             }
           });
           
-          if (response.error) {
-            const errorMessage = response.data?.error 
-              || response.error.message 
-              || 'Ein Fehler ist aufgetreten.';
-            throw new Error(errorMessage);
-          }
-          
-          if (response.data?.error) {
-            throw new Error(response.data.error);
+          if (response.error || response.data?.error) {
+            throw new Error(response.data?.error || response.error?.message || 'Ein Fehler ist aufgetreten.');
           }
           
           setTicket(response.data);
@@ -186,7 +159,7 @@ export default function TrackTicket() {
           toast({
             variant: 'destructive',
             title: 'Fehler',
-            description: error.message,
+            description: 'Die Daten konnten nicht gefunden werden. Bitte überprüfen Sie Ihre Eingaben.',
           });
         } finally {
           setLoading(false);
@@ -197,71 +170,30 @@ export default function TrackTicket() {
     }
   }, [searchParams, autoSearchDone, toast]);
 
-  // Email-based search
-  const handleEmailSearch = async (e: React.FormEvent) => {
+  // Search by email + tracking code
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setTicket(null);
-    setTicketList([]);
-
-    try {
-      const response = await supabase.functions.invoke('track-ticket', {
-        body: {
-          action: 'lookup_by_email',
-          email: email.toLowerCase().trim()
-        }
-      });
-
-      if (response.error || response.data?.error) {
-        throw new Error(response.data?.error || response.error?.message || 'Fehler bei der Suche');
-      }
-
-      const data = response.data;
-
-      // If only one ticket with auto-login
-      if (data.single_ticket) {
-        setTicketNumber(data.single_ticket.ticket_number);
-        setTrackingToken(data.single_ticket.tracking_token);
-        // Auto-fetch the ticket details
-        const ticketData = await callTrackingApi('lookup', {}, data.single_ticket.ticket_number, data.single_ticket.tracking_token);
-        setTicket(ticketData);
-      } else if (data.tickets && data.tickets.length > 0) {
-        setTicketList(data.tickets);
-      }
-    } catch (error: any) {
+    
+    if (!email.trim() || !trackingCode.trim()) {
       toast({
         variant: 'destructive',
-        title: 'Fehler',
-        description: error.message,
+        title: 'Fehlende Angaben',
+        description: 'Bitte geben Sie E-Mail und Trackingcode ein.',
       });
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
-
-  // Select ticket from list (requires token input)
-  const handleSelectTicket = async (ticketItem: TicketListItem) => {
-    setSelectedTicketId(ticketItem.id);
-    setTicketNumber(ticketItem.ticket_number);
-    // User needs to enter the token from their confirmation email
-    setSearchMode('ticket');
-  };
-
-  // Traditional ticket number + token search
-  const handleTicketSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+    
     setLoading(true);
     setTicket(null);
 
     try {
       const data = await callTrackingApi('lookup');
       setTicket(data);
-      setTicketList([]); // Clear list when successfully loaded
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Fehler',
-        description: error.message,
+        description: 'Die Daten konnten nicht gefunden werden. Bitte überprüfen Sie Ihre Eingaben.',
       });
     } finally {
       setLoading(false);
@@ -360,10 +292,8 @@ export default function TrackTicket() {
 
   const resetSearch = () => {
     setTicket(null);
-    setTicketList([]);
-    setTicketNumber('');
-    setTrackingToken('');
-    setSelectedTicketId(null);
+    setEmail('');
+    setTrackingCode('');
   };
 
   return (
@@ -378,175 +308,61 @@ export default function TrackTicket() {
           />
           <h1 className="text-3xl font-bold text-foreground text-center">Reparaturstatus abfragen</h1>
           <p className="text-muted-foreground mt-2 text-center">
-            Geben Sie Ihre Daten ein, um den Status Ihrer Reparatur zu prüfen
+            Geben Sie Ihre E-Mail und den Trackingcode aus Ihrer Bestätigung ein
           </p>
         </div>
 
-        {/* Search Form */}
-        {!ticket && ticketList.length === 0 && (
+        {/* Search Form - Email + Tracking Code ONLY */}
+        {!ticket && (
           <Card className="shadow-xl border-0 mb-6">
             <CardContent className="pt-6">
-              <Tabs value={searchMode} onValueChange={(v) => setSearchMode(v as 'email' | 'ticket')}>
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="email" className="gap-2">
-                    <Mail className="h-4 w-4" />
-                    Per E-Mail
-                  </TabsTrigger>
-                  <TabsTrigger value="ticket" className="gap-2">
-                    <Ticket className="h-4 w-4" />
-                    Per Auftragsnummer
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="email">
-                  <form onSubmit={handleEmailSearch} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-base font-medium">E-Mail-Adresse</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="ihre@email.de"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="h-12 text-lg"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Die E-Mail-Adresse, die Sie bei der Auftragsannahme angegeben haben
-                      </p>
-                    </div>
-
-                    <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
-                      {loading ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Suche...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="mr-2 h-5 w-5" />
-                          Aufträge suchen
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </TabsContent>
-
-                <TabsContent value="ticket">
-                  <form onSubmit={handleTicketSearch} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="ticket" className="text-base font-medium">Auftragsnummer</Label>
-                      <Input
-                        id="ticket"
-                        placeholder="z.B. TEBO250101"
-                        value={ticketNumber}
-                        onChange={(e) => setTicketNumber(e.target.value)}
-                        required
-                        className="h-12 text-lg"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="token" className="text-base font-medium">Tracking-Code</Label>
-                      <Input
-                        id="token"
-                        placeholder="8-stelliger Code aus Ihrer Bestätigung"
-                        value={trackingToken}
-                        onChange={(e) => setTrackingToken(e.target.value.toUpperCase())}
-                        required
-                        className="h-12 text-lg uppercase"
-                        maxLength={8}
-                      />
-                    </div>
-
-                    <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
-                      {loading ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Suche...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="mr-2 h-5 w-5" />
-                          Status anzeigen
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Ticket Selection List (multiple tickets found) */}
-        {ticketList.length > 0 && !ticket && (
-          <Card className="shadow-xl border-0 mb-6 animate-slide-up">
-            <CardHeader>
-              <CardTitle className="text-lg">Ihre Aufträge</CardTitle>
-              <CardDescription>
-                Wählen Sie einen Auftrag aus und geben Sie den Tracking-Code ein
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {ticketList.map((t) => (
-                <div
-                  key={t.id}
-                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                    selectedTicketId === t.id 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                  }`}
-                  onClick={() => handleSelectTicket(t)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Smartphone className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-mono font-medium">{t.ticket_number}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {t.device?.brand} {t.device?.model}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs px-2 py-1 rounded-full bg-muted">
-                        {STATUS_LABELS[t.status]}
-                      </span>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(t.created_at), 'dd.MM.yyyy', { locale: de })}
-                      </p>
-                    </div>
-                  </div>
+              <form onSubmit={handleSearch} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-base font-medium">E-Mail-Adresse *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="ihre@email.de"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12 text-lg"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Die E-Mail-Adresse, die Sie bei der Auftragsannahme angegeben haben
+                  </p>
                 </div>
-              ))}
-
-              {selectedTicketId && (
-                <div className="pt-4 border-t space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="token-list" className="text-base font-medium">Tracking-Code eingeben</Label>
-                    <Input
-                      id="token-list"
-                      placeholder="8-stelliger Code aus Ihrer Bestätigung"
-                      value={trackingToken}
-                      onChange={(e) => setTrackingToken(e.target.value.toUpperCase())}
-                      className="h-12 text-lg uppercase"
-                      maxLength={8}
-                    />
-                  </div>
-                  <Button 
-                    className="w-full" 
-                    onClick={handleTicketSearch}
-                    disabled={!trackingToken || loading}
-                  >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Status anzeigen
-                  </Button>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="trackingCode" className="text-base font-medium">Trackingcode *</Label>
+                  <Input
+                    id="trackingCode"
+                    placeholder="z.B. ABC1234"
+                    value={trackingCode}
+                    onChange={(e) => setTrackingCode(e.target.value.toUpperCase())}
+                    required
+                    className="h-12 text-lg uppercase font-mono tracking-widest"
+                    maxLength={8}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Den 7-stelligen Code finden Sie auf Ihrem Abholschein und in Ihrer Bestätigungs-E-Mail
+                  </p>
                 </div>
-              )}
 
-              <Button variant="outline" className="w-full" onClick={resetSearch}>
-                Andere E-Mail verwenden
-              </Button>
+                <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Suche...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-5 w-5" />
+                      Status anzeigen
+                    </>
+                  )}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         )}
@@ -854,8 +670,8 @@ export default function TrackTicket() {
 
         {/* Footer */}
         <div className="text-center mt-8 text-sm text-muted-foreground">
-          <p>Telya GmbH • Schalker Str. 59, 45881 Gelsenkirchen</p>
-          <p className="mt-1">Tel: 0209 88307161 • service@telya.de</p>
+          <p>Telya GmbH · Schalker Str. 59, 45881 Gelsenkirchen</p>
+          <p className="mt-1">Tel: 0209 88307161 · service@telya.de</p>
         </div>
       </div>
     </div>

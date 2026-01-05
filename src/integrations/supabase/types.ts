@@ -2174,6 +2174,7 @@ export type Database = {
       generate_purchase_order_number: { Args: never; Returns: string }
       generate_shipment_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
+      generate_tracking_code: { Args: never; Returns: string }
       generate_tracking_token: { Args: never; Returns: string }
       get_b2b_partner_id: { Args: { _user_id: string }; Returns: string }
       get_stock_quantity: {
