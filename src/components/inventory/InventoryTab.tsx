@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,7 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Loader2, ClipboardCheck, Check, X, AlertTriangle, Eye } from 'lucide-react';
+import { Plus, Loader2, ClipboardCheck, Check, X, AlertTriangle, Eye, Search, Save } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { INVENTORY_STATUS_LABELS, InventoryStatus } from '@/types/inventory';
@@ -70,6 +70,10 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   
+  // Counting state for editable quantities
+  const [countEdits, setCountEdits] = useState<Record<string, { counted: number; reason: string }>>({});
+  const [countSearch, setCountSearch] = useState('');
+  
   // Check if user is admin/GF (only they can approve)
   const isGF = hasRole('ADMIN') || hasRole('FILIALLEITER');
 
@@ -97,7 +101,7 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
   });
 
   // Fetch counts for detail view
-  const { data: sessionCounts = [] } = useQuery({
+  const { data: sessionCounts = [], refetch: refetchCounts } = useQuery({
     queryKey: ['inventory-counts', detailSession?.id],
     queryFn: async () => {
       if (!detailSession?.id) return [];
@@ -105,7 +109,7 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
         .from('inventory_counts')
         .select(`
           *,
-          part:parts(id, name, sku)
+          part:parts(id, name, sku, brand, model)
         `)
         .eq('inventory_session_id', detailSession.id)
         .order('counted_at');
@@ -113,6 +117,62 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
       return data;
     },
     enabled: !!detailSession?.id,
+  });
+  
+  // Initialize count edits when session counts load
+  useEffect(() => {
+    if (sessionCounts.length > 0 && Object.keys(countEdits).length === 0) {
+      const edits: Record<string, { counted: number; reason: string }> = {};
+      sessionCounts.forEach((count: any) => {
+        edits[count.id] = {
+          counted: count.counted_quantity,
+          reason: count.discrepancy_reason || ''
+        };
+      });
+      setCountEdits(edits);
+    }
+  }, [sessionCounts]);
+  
+  // Filtered counts based on search
+  const filteredCounts = sessionCounts.filter((count: any) => {
+    if (!countSearch) return true;
+    const searchLower = countSearch.toLowerCase();
+    return (
+      count.part?.name?.toLowerCase().includes(searchLower) ||
+      count.part?.sku?.toLowerCase().includes(searchLower) ||
+      count.part?.brand?.toLowerCase().includes(searchLower) ||
+      count.part?.model?.toLowerCase().includes(searchLower)
+    );
+  });
+  
+  // Save count mutation
+  const saveCountMutation = useMutation({
+    mutationFn: async ({ countId, counted, reason }: { countId: string; counted: number; reason: string }) => {
+      const countItem = sessionCounts.find((c: any) => c.id === countId);
+      if (!countItem) throw new Error('Zähleintrag nicht gefunden');
+      
+      const difference = counted - countItem.expected_quantity;
+      const valueDiff = difference * (countItem.unit_value || 0);
+      
+      const { error } = await supabase
+        .from('inventory_counts')
+        .update({
+          counted_quantity: counted,
+          difference,
+          value_difference: valueDiff,
+          discrepancy_reason: difference !== 0 ? reason : null,
+          counted_at: new Date().toISOString(),
+        })
+        .eq('id', countId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchCounts();
+    },
+    onError: (error: any) => {
+      toast({ variant: 'destructive', title: 'Fehler', description: error.message });
+    },
   });
 
   const resetForm = () => {
@@ -168,14 +228,17 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
 
       return session;
     },
-    onSuccess: () => {
+    onSuccess: (session) => {
       queryClient.invalidateQueries({ queryKey: ['inventory-sessions'] });
       setDialogOpen(false);
       resetForm();
       toast({
         title: 'Inventursitzung erstellt',
-        description: 'Die Inventur wurde gestartet.',
+        description: 'Die Inventur wurde gestartet. Sie können jetzt die Ist-Mengen erfassen.',
       });
+      // Open the newly created session for counting
+      setDetailSession(session);
+      setDetailDialogOpen(true);
     },
     onError: (error: any) => {
       toast({ variant: 'destructive', title: 'Fehler', description: error.message });
@@ -300,6 +363,8 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
 
   const handleViewSession = (session: any) => {
     setDetailSession(session);
+    setCountEdits({});
+    setCountSearch('');
     setDetailDialogOpen(true);
   };
 
@@ -436,7 +501,7 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
 
       {/* Session Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5" />
@@ -444,6 +509,7 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
             </DialogTitle>
             <DialogDescription>
               Status: {detailSession && INVENTORY_STATUS_LABELS[detailSession.status as InventoryStatus]}
+              {detailSession?.status === 'IN_PROGRESS' && ' – Erfassen Sie die Ist-Mengen für jedes Teil'}
             </DialogDescription>
           </DialogHeader>
 
@@ -451,7 +517,7 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Gezählt</p>
+                  <p className="text-xs text-muted-foreground">Artikel gesamt</p>
                   <p className="text-xl font-bold">{sessionCounts.length}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-warning/10">
@@ -464,7 +530,123 @@ export default function InventoryTab({ selectedLocation, stockLocations }: Inven
                 </div>
               </div>
 
-              {discrepancyCounts.length > 0 && (
+              {/* Search for IN_PROGRESS sessions */}
+              {detailSession.status === 'IN_PROGRESS' && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Artikel suchen (Name, SKU, Hersteller, Modell)..."
+                    value={countSearch}
+                    onChange={(e) => setCountSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              )}
+
+              {/* Counting Table for IN_PROGRESS */}
+              {detailSession.status === 'IN_PROGRESS' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 font-semibold">
+                    Ist-Mengen erfassen
+                  </Label>
+                  <div className="rounded-md border max-h-[400px] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead className="w-[200px]">Artikel</TableHead>
+                          <TableHead className="w-[100px]">SKU</TableHead>
+                          <TableHead className="w-[80px] text-right">Soll</TableHead>
+                          <TableHead className="w-[100px] text-right">Ist</TableHead>
+                          <TableHead className="w-[60px] text-right">Diff.</TableHead>
+                          <TableHead>Begründung (bei Abweichung)</TableHead>
+                          <TableHead className="w-[60px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredCounts.map((count: any) => {
+                          const edit = countEdits[count.id] || { counted: count.counted_quantity, reason: count.discrepancy_reason || '' };
+                          const diff = edit.counted - count.expected_quantity;
+                          const hasUnsavedChanges = edit.counted !== count.counted_quantity || edit.reason !== (count.discrepancy_reason || '');
+                          
+                          return (
+                            <TableRow key={count.id} className={diff !== 0 ? 'bg-warning/5' : ''}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{count.part?.name}</p>
+                                  {(count.part?.brand || count.part?.model) && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {count.part?.brand} {count.part?.model}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">{count.part?.sku || '-'}</TableCell>
+                              <TableCell className="text-right font-medium">{count.expected_quantity}</TableCell>
+                              <TableCell className="text-right">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={edit.counted}
+                                  onChange={(e) => setCountEdits(prev => ({
+                                    ...prev,
+                                    [count.id]: { ...edit, counted: parseInt(e.target.value) || 0 }
+                                  }))}
+                                  className="w-20 text-right h-8"
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {diff !== 0 && (
+                                  <span className={diff > 0 ? 'text-success font-medium' : 'text-destructive font-medium'}>
+                                    {diff > 0 ? '+' : ''}{diff}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {diff !== 0 && (
+                                  <Input
+                                    placeholder="Grund für Abweichung..."
+                                    value={edit.reason}
+                                    onChange={(e) => setCountEdits(prev => ({
+                                      ...prev,
+                                      [count.id]: { ...edit, reason: e.target.value }
+                                    }))}
+                                    className="h-8 text-sm"
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {hasUnsavedChanges && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => saveCountMutation.mutate({ countId: count.id, counted: edit.counted, reason: edit.reason })}
+                                    disabled={saveCountMutation.isPending}
+                                    title="Speichern"
+                                  >
+                                    {saveCountMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Save className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {filteredCounts.length === 0 && countSearch && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Keine Artikel gefunden für „{countSearch}"
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Discrepancies for non-IN_PROGRESS sessions */}
+              {detailSession.status !== 'IN_PROGRESS' && discrepancyCounts.length > 0 && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-warning" />

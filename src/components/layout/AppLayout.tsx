@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions, PermissionKey } from '@/hooks/usePermissions';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Ticket, Wrench, Package, Users, MapPin, BarChart3, Settings, LogOut, Menu, X, ChevronDown, UserCog, Building2, Truck, ShieldCheck, Warehouse } from 'lucide-react';
+import { LayoutDashboard, Ticket, Wrench, Package, Users, MapPin, BarChart3, Settings, LogOut, Menu, X, ChevronDown, UserCog, Building2, Truck, ShieldCheck, Warehouse, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -80,6 +80,11 @@ const adminNavigation: NavItem[] = [{
   href: '/permissions',
   icon: ShieldCheck,
   permission: 'MANAGE_PERMISSIONS'
+}, {
+  name: 'Dokumentenvorlagen',
+  href: '/document-templates',
+  icon: FileText,
+  permission: 'MANAGE_SETTINGS'
 }, {
   name: 'B2B-Partner',
   href: '/b2b-partners',

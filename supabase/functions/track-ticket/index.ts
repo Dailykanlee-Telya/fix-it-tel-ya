@@ -8,6 +8,7 @@ const corsHeaders = {
 interface TrackRequest {
   action: 'lookup' | 'kva_decision' | 'send_message';
   email?: string;
+  phone?: string;
   tracking_code?: string;
   kva_approved?: boolean;
   disposal_option?: 'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN';
@@ -79,11 +80,14 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: TrackRequest = await req.json();
-    const { action, email, tracking_code, kva_approved, message } = body;
+    const { action, email, phone, tracking_code, kva_approved, message } = body;
 
-    // VALIDATION: ONLY Email + Tracking Code allowed
-    if (!email || !email.includes('@')) {
-      console.log('Invalid or missing email:', email, 'IP:', clientIP);
+    // VALIDATION: Email OR Phone + Tracking Code required
+    const hasEmail = email && email.includes('@');
+    const hasPhone = phone && phone.length >= 6;
+    
+    if (!hasEmail && !hasPhone) {
+      console.log('Missing email or phone, IP:', clientIP);
       return new Response(
         JSON.stringify({ error: 'Ungültige Eingabe. Bitte überprüfen Sie Ihre Daten.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -99,24 +103,46 @@ Deno.serve(async (req) => {
     }
 
     // Clean inputs
-    const cleanEmail = email.toLowerCase().trim();
+    const cleanEmail = email ? email.toLowerCase().trim() : null;
+    const cleanPhone = phone ? phone.replace(/\s+/g, '').replace(/^(\+49|0049)/, '0') : null;
     const cleanCode = tracking_code.toUpperCase().trim();
 
-    // Find customer by email
-    const { data: customers, error: customerError } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('email', cleanEmail);
+    // Find customer by email OR phone
+    let customerIds: string[] = [];
+    
+    if (cleanEmail) {
+      const { data: emailCustomers, error: emailError } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', cleanEmail);
+      
+      if (!emailError && emailCustomers) {
+        customerIds = emailCustomers.map(c => c.id);
+      }
+    }
+    
+    if (cleanPhone && customerIds.length === 0) {
+      // Normalize phone for comparison (remove spaces, leading 0 or +49)
+      const { data: phoneCustomers, error: phoneError } = await supabase
+        .from('customers')
+        .select('id, phone');
+      
+      if (!phoneError && phoneCustomers) {
+        const matchingCustomers = phoneCustomers.filter(c => {
+          const normalizedDbPhone = c.phone?.replace(/\s+/g, '').replace(/^(\+49|0049)/, '0');
+          return normalizedDbPhone === cleanPhone;
+        });
+        customerIds = matchingCustomers.map(c => c.id);
+      }
+    }
 
-    if (customerError || !customers || customers.length === 0) {
-      console.log('No customer found for email - neutral error', 'IP:', clientIP);
+    if (customerIds.length === 0) {
+      console.log('No customer found - neutral error', 'IP:', clientIP);
       return new Response(
         JSON.stringify({ error: 'Ungültige Eingabe. Bitte überprüfen Sie Ihre Daten.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const customerIds = customers.map(c => c.id);
 
     // Find ticket with matching tracking code (kva_token) AND customer
     const { data: ticket, error: ticketError } = await supabase
@@ -135,7 +161,7 @@ Deno.serve(async (req) => {
     }
 
     if (!ticket) {
-      console.log('No ticket found for email + code combination, IP:', clientIP);
+      console.log('No ticket found for contact + code combination, IP:', clientIP);
       return new Response(
         JSON.stringify({ error: 'Ungültige Eingabe. Bitte überprüfen Sie Ihre Daten.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
