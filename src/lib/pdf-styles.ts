@@ -532,11 +532,81 @@ export const BON_STYLES = `
     color: ${TELYA_COLORS.primaryBlue};
   }
   
-  .bon-qr-token {
-    font-size: 7px;
-    font-family: 'Courier New', monospace;
+  .bon-qr-info {
+    font-size: 6px;
     color: ${TELYA_COLORS.textMuted};
-    margin-top: 1mm;
+    margin-top: 0.5mm;
+  }
+  
+  /* Tracking Code Highlight */
+  .bon-tracking-code {
+    text-align: center;
+    margin: 2mm 0;
+    padding: 2mm;
+    background: #f0f0f0;
+    border-radius: 2mm;
+  }
+  
+  .bon-tracking-label {
+    font-size: 7px;
+    color: ${TELYA_COLORS.textMuted};
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .bon-tracking-value {
+    font-size: 16px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+    color: ${TELYA_COLORS.primaryBlue};
+  }
+  
+  /* Legal Notices Section */
+  .bon-legal {
+    margin: 3mm 0;
+    padding: 2mm;
+    border: 1px solid ${TELYA_COLORS.borderLight};
+    border-radius: 2mm;
+    font-size: 6px;
+    line-height: 1.4;
+    color: ${TELYA_COLORS.textMuted};
+  }
+  
+  .bon-legal-title {
+    font-size: 7px;
+    font-weight: 600;
+    color: ${TELYA_COLORS.primaryBlue};
+    text-transform: uppercase;
+    margin-bottom: 1.5mm;
+    border-bottom: 1px dotted ${TELYA_COLORS.borderLight};
+    padding-bottom: 1mm;
+  }
+  
+  .bon-legal-item {
+    margin-bottom: 1mm;
+  }
+  
+  .bon-legal-item strong {
+    color: ${TELYA_COLORS.textDark};
+  }
+  
+  /* Signature Area */
+  .bon-signature {
+    margin: 4mm 0;
+    text-align: center;
+  }
+  
+  .bon-signature-line {
+    border-top: 1px solid ${TELYA_COLORS.textDark};
+    width: 60mm;
+    margin: 0 auto 1mm auto;
+    padding-top: 10mm;
+  }
+  
+  .bon-signature-label {
+    font-size: 7px;
+    color: ${TELYA_COLORS.textMuted};
   }
   
   .bon-footer {
@@ -545,11 +615,12 @@ export const BON_STYLES = `
     color: ${TELYA_COLORS.textMuted};
     margin-top: 3mm;
     padding-top: 2mm;
-    border-top: 1px dashed ${TELYA_COLORS.textLight};
+    border-top: 2px dashed ${TELYA_COLORS.textLight};
   }
   
   .bon-footer-company {
     font-weight: 600;
+    color: ${TELYA_COLORS.primaryBlue};
     margin-bottom: 0.5mm;
   }
 `;
