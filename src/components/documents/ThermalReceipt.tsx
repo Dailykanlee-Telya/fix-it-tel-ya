@@ -113,11 +113,16 @@ export default function ThermalReceipt({
   const createdDate = format(new Date(ticket.created_at), 'dd.MM.yyyy HH:mm', { locale: de });
   const trackingCode = ticket.kva_token || '';
   const customerEmail = ticket.customer?.email || '';
+  const customerPhone = ticket.customer?.phone || '';
   
-  // Generate tracking URL with email + code (production domain only)
-  const baseUrl = getBaseUrl();
-  const trackingUrl = customerEmail && trackingCode 
-    ? `${baseUrl}/track?email=${encodeURIComponent(customerEmail)}&code=${encodeURIComponent(trackingCode)}`
+  // Generate tracking URL - use email if available, otherwise phone
+  // Production domain: https://telya.repariert.de
+  const baseUrl = 'https://telya.repariert.de';
+  const contactParam = customerEmail 
+    ? `email=${encodeURIComponent(customerEmail)}`
+    : `phone=${encodeURIComponent(customerPhone)}`;
+  const trackingUrl = trackingCode 
+    ? `${baseUrl}/track?${contactParam}&code=${encodeURIComponent(trackingCode)}`
     : `${baseUrl}/track`;
 
   return (
@@ -218,7 +223,7 @@ export default function ThermalReceipt({
           )}
 
           {/* QR Code for Status Tracking */}
-          {trackingCode && customerEmail && (
+          {trackingCode && (customerEmail || customerPhone) && (
             <div className="bon-qr-section">
               <div className="bon-qr-title">Status online abrufen:</div>
               <div className="bon-qr-code">
@@ -230,8 +235,8 @@ export default function ThermalReceipt({
                 />
               </div>
               <div className="bon-qr-hint">QR-Code scannen oder</div>
-              <div className="bon-qr-url">www.telya.de/track</div>
-              <div className="bon-qr-info">E-Mail + Trackingcode eingeben</div>
+              <div className="bon-qr-url">telya.repariert.de/track</div>
+              <div className="bon-qr-info">{customerEmail ? 'E-Mail' : 'Mobilnr.'} + Trackingcode eingeben</div>
             </div>
           )}
 
