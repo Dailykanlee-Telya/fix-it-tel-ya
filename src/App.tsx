@@ -38,7 +38,7 @@ const Reports = lazy(() => import("@/pages/Reports"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const UserManagement = lazy(() => import("@/pages/UserManagement"));
 const PermissionSettings = lazy(() => import("@/pages/PermissionSettings"));
-// DocumentTemplates removed - documents are only managed within ticket context
+const DocumentTemplates = lazy(() => import("@/pages/DocumentTemplates"));
 const B2BPartners = lazy(() => import("@/pages/B2BPartners"));
 const B2BReturnShipments = lazy(() => import("@/pages/B2BReturnShipments"));
 const B2BReturnShipmentNew = lazy(() => import("@/pages/B2BReturnShipmentNew"));
@@ -202,7 +202,11 @@ function AppRoutes() {
                 <PermissionSettings />
               </PermissionProtectedRoute>
             } />
-            {/* DocumentTemplates route removed - documents only exist within ticket context */}
+            <Route path="document-templates" element={
+              <PermissionProtectedRoute requiredPermission="MANAGE_SETTINGS">
+                <DocumentTemplates />
+              </PermissionProtectedRoute>
+            } />
             <Route path="b2b-partners" element={
               <PermissionProtectedRoute requiredPermission="MANAGE_B2B_PARTNERS">
                 <B2BPartners />

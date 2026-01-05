@@ -94,8 +94,8 @@ export default function TrackTicket() {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   
-  // Search form state - ONLY email + tracking code
-  const [email, setEmail] = useState('');
+  // Search form state - Email OR Phone + Tracking Code
+  const [emailOrPhone, setEmailOrPhone] = useState('');
   const [trackingCode, setTrackingCode] = useState('');
   
   const [loading, setLoading] = useState(false);
@@ -105,12 +105,19 @@ export default function TrackTicket() {
   const [disposalOption, setDisposalOption] = useState<'ZURUECKSENDEN' | 'KOSTENLOS_ENTSORGEN'>('ZURUECKSENDEN');
   const [autoSearchDone, setAutoSearchDone] = useState(false);
 
-  const callTrackingApi = useCallback(async (action: string, extraData: Record<string, any> = {}, overrideEmail?: string, overrideCode?: string) => {
+  // Detect if input is email or phone
+  const isEmail = emailOrPhone.includes('@');
+
+  const callTrackingApi = useCallback(async (action: string, extraData: Record<string, any> = {}, overrideEmailOrPhone?: string, overrideCode?: string) => {
+    const inputValue = overrideEmailOrPhone || emailOrPhone.trim();
+    const isEmailInput = inputValue.includes('@');
+    
     const response = await supabase.functions.invoke('track-ticket', {
       body: {
         action,
-        email: overrideEmail || email.toLowerCase().trim(),
-        tracking_code: overrideCode || trackingCode.toUpperCase().trim(),
+        email: isEmailInput ? inputValue.toLowerCase() : undefined,
+        phone: !isEmailInput ? inputValue : undefined,
+        tracking_code: (overrideCode || trackingCode).toUpperCase().trim(),
         ...extraData
       }
     });
@@ -127,25 +134,30 @@ export default function TrackTicket() {
     }
     
     return response.data;
-  }, [email, trackingCode]);
+  }, [emailOrPhone, trackingCode]);
 
   // Auto-search from URL parameters (for QR code / email links)
   useEffect(() => {
     const emailParam = searchParams.get('email');
+    const phoneParam = searchParams.get('phone');
     const codeParam = searchParams.get('code') || searchParams.get('token');
     
-    if (emailParam && codeParam && !autoSearchDone) {
-      setEmail(emailParam);
+    const contactParam = emailParam || phoneParam;
+    
+    if (contactParam && codeParam && !autoSearchDone) {
+      setEmailOrPhone(contactParam);
       setTrackingCode(codeParam.toUpperCase());
       setAutoSearchDone(true);
       
       const performAutoSearch = async () => {
         setLoading(true);
         try {
+          const isEmailInput = contactParam.includes('@');
           const response = await supabase.functions.invoke('track-ticket', {
             body: {
               action: 'lookup',
-              email: emailParam.toLowerCase().trim(),
+              email: isEmailInput ? contactParam.toLowerCase().trim() : undefined,
+              phone: !isEmailInput ? contactParam.trim() : undefined,
               tracking_code: codeParam.toUpperCase().trim()
             }
           });
@@ -170,15 +182,15 @@ export default function TrackTicket() {
     }
   }, [searchParams, autoSearchDone, toast]);
 
-  // Search by email + tracking code
+  // Search by email/phone + tracking code
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email.trim() || !trackingCode.trim()) {
+    if (!emailOrPhone.trim() || !trackingCode.trim()) {
       toast({
         variant: 'destructive',
         title: 'Fehlende Angaben',
-        description: 'Bitte geben Sie E-Mail und Trackingcode ein.',
+        description: 'Bitte geben Sie E-Mail oder Mobilnummer und den Trackingcode ein.',
       });
       return;
     }
@@ -292,7 +304,7 @@ export default function TrackTicket() {
 
   const resetSearch = () => {
     setTicket(null);
-    setEmail('');
+    setEmailOrPhone('');
     setTrackingCode('');
   };
 
@@ -308,7 +320,7 @@ export default function TrackTicket() {
           />
           <h1 className="text-3xl font-bold text-foreground text-center">Reparaturstatus abfragen</h1>
           <p className="text-muted-foreground mt-2 text-center">
-            Geben Sie Ihre E-Mail und den Trackingcode aus Ihrer Bestätigung ein
+            Geben Sie Ihre E-Mail-Adresse oder Mobilnummer und den Trackingcode ein
           </p>
         </div>
 
@@ -318,18 +330,20 @@ export default function TrackTicket() {
             <CardContent className="pt-6">
               <form onSubmit={handleSearch} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-base font-medium">E-Mail-Adresse *</Label>
+                  <Label htmlFor="emailOrPhone" className="text-base font-medium">E-Mail oder Mobilnummer *</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="ihre@email.de"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="emailOrPhone"
+                    type="text"
+                    placeholder="ihre@email.de oder 0170..."
+                    value={emailOrPhone}
+                    onChange={(e) => setEmailOrPhone(e.target.value)}
                     required
                     className="h-12 text-lg"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Die E-Mail-Adresse, die Sie bei der Auftragsannahme angegeben haben
+                    {isEmail 
+                      ? 'Die E-Mail-Adresse, die Sie bei der Auftragsannahme angegeben haben'
+                      : 'Die Mobilnummer, die Sie bei der Auftragsannahme angegeben haben'}
                   </p>
                 </div>
                 
@@ -345,7 +359,7 @@ export default function TrackTicket() {
                     maxLength={8}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Den 7-stelligen Code finden Sie auf Ihrem Abholschein und in Ihrer Bestätigungs-E-Mail
+                    Den 7-stelligen Code finden Sie auf Ihrem Abholschein und in Ihrer Bestätigungs-E-Mail/SMS
                   </p>
                 </div>
 

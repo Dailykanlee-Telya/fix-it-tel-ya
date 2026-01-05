@@ -53,7 +53,7 @@ export default function PartsImportExport({ manufacturers, parts }: PartsImportE
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
 
-  // Export to CSV
+  // Export to CSV - WITHOUT part_id/UUID
   const handleExport = () => {
     if (!parts || parts.length === 0) {
       toast({ variant: 'destructive', title: 'Keine Daten', description: 'Keine Ersatzteile zum Exportieren vorhanden.' });
@@ -61,7 +61,6 @@ export default function PartsImportExport({ manufacturers, parts }: PartsImportE
     }
 
     const headers = [
-      'part_id',
       'sku',
       'name',
       'category',
@@ -80,7 +79,6 @@ export default function PartsImportExport({ manufacturers, parts }: PartsImportE
 
     for (const part of parts) {
       const row = [
-        part.id,
         part.sku || '',
         part.name || '',
         part.part_category || '',
