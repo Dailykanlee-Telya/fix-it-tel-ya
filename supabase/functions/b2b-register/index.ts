@@ -153,6 +153,68 @@ Deno.serve(async (req) => {
 
     console.log('B2B partner registered successfully:', partner.id);
 
+    // Send confirmation email to the registering partner
+    try {
+      const resendApiKey = Deno.env.get('RESEND_API_KEY');
+      if (resendApiKey) {
+        const { Resend } = await import('https://esm.sh/resend@2.0.0');
+        const resend = new Resend(resendApiKey);
+        
+        await resend.emails.send({
+          from: 'Telya B2B <noreply@telya.repariert.de>',
+          to: [body.email],
+          subject: 'Registrierung erhalten – wir schalten dich frei',
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
+                .header { background: #1e3a5f; color: white; padding: 20px; text-align: center; }
+                .content { padding: 20px; }
+                .info-box { background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1e3a5f; }
+                .footer { font-size: 12px; color: #666; padding: 20px; border-top: 1px solid #eee; margin-top: 20px; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>Telya B2B-Partner</h1>
+              </div>
+              <div class="content">
+                <p>Hallo ${body.contactName},</p>
+                
+                <div class="info-box">
+                  <strong>Deine Registrierung ist eingegangen!</strong><br><br>
+                  Wir prüfen deine Anfrage schnellstmöglich.
+                </div>
+                
+                <p>Sobald dein Zugang freigeschaltet ist, erhältst du eine E-Mail mit:</p>
+                <ul>
+                  <li>Link zum Passwort setzen</li>
+                  <li>Link zum Login</li>
+                </ul>
+                
+                <p>Nach dem Passwort setzen kannst du sofort mit der Auftragsanlage starten.</p>
+                
+                <p>Bei Fragen: <a href="mailto:service@telya.de">service@telya.de</a></p>
+                
+                <p>Mit freundlichen Grüßen,<br>Dein Telya Team</p>
+              </div>
+              <div class="footer">
+                <p>Telya GmbH | Schalker Str. 59, 45881 Gelsenkirchen</p>
+              </div>
+            </body>
+            </html>
+          `,
+        });
+        console.log('Confirmation email sent to:', body.email);
+      }
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError);
+      // Don't fail registration if email fails
+    }
+
     return new Response(
       JSON.stringify({ success: true, partnerId: partner.id }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
