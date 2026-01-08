@@ -935,7 +935,7 @@ export default function B2BPartners() {
                     <SelectValue placeholder="Keine Zuordnung" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Keine Zuordnung</SelectItem>
+                    <SelectItem value="none">Keine Zuordnung</SelectItem>
                     {locations?.map((loc) => (
                       <SelectItem key={loc.id} value={loc.id}>
                         {loc.name}
@@ -957,9 +957,10 @@ export default function B2BPartners() {
             <Button
               onClick={() => {
                 if (selectedPartner) {
+                  const locationToSend = approveLocationId === 'none' || !approveLocationId ? undefined : approveLocationId;
                   approvePartnerMutation.mutate({ 
                     partner: selectedPartner, 
-                    locationId: approveLocationId || undefined 
+                    locationId: locationToSend 
                   });
                 }
               }}
