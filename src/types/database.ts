@@ -1,6 +1,6 @@
 // Custom types for the repair management system
 
-export type AppRole = 'ADMIN' | 'THEKE' | 'TECHNIKER' | 'BUCHHALTUNG' | 'FILIALLEITER' | 'B2B_ADMIN' | 'B2B_USER';
+export type AppRole = 'ADMIN' | 'THEKE' | 'TECHNIKER' | 'BUCHHALTUNG' | 'FILIALLEITER' | 'B2B_INHABER' | 'B2B_ADMIN' | 'B2B_USER';
 
 export type DeviceType = 'HANDY' | 'TABLET' | 'LAPTOP' | 'SMARTWATCH' | 'OTHER';
 
@@ -214,6 +214,13 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   TECHNIKER: 'Techniker',
   BUCHHALTUNG: 'Buchhaltung',
   FILIALLEITER: 'Filialleiter',
+  B2B_INHABER: 'B2B-Inhaber',
   B2B_ADMIN: 'B2B-Administrator',
   B2B_USER: 'B2B-Benutzer',
 };
+
+// Internal employee roles (not B2B)
+export const INTERNAL_ROLES: AppRole[] = ['ADMIN', 'THEKE', 'TECHNIKER', 'BUCHHALTUNG', 'FILIALLEITER'];
+
+// B2B roles
+export const B2B_ROLES: AppRole[] = ['B2B_INHABER', 'B2B_ADMIN', 'B2B_USER'];

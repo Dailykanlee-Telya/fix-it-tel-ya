@@ -7,15 +7,15 @@ import { AppRole } from '@/types/database';
 export function useB2BAuth() {
   const { user, profile, roles, hasAnyRole, hasRole } = useAuth();
 
-  // Cast B2B_INHABER since it was added via migration but types.ts is auto-generated
-  const isB2BUser = hasAnyRole(['B2B_INHABER' as AppRole, 'B2B_ADMIN', 'B2B_USER']);
-  const isB2BInhaber = hasRole('B2B_INHABER' as AppRole);
-  const isB2BAdmin = hasAnyRole(['B2B_INHABER' as AppRole, 'B2B_ADMIN']);
+  // B2B_INHABER is now in the types, no cast needed
+  const isB2BUser = hasAnyRole(['B2B_INHABER', 'B2B_ADMIN', 'B2B_USER']);
+  const isB2BInhaber = hasRole('B2B_INHABER');
+  const isB2BAdmin = hasAnyRole(['B2B_INHABER', 'B2B_ADMIN']);
   const isInternalUser = hasAnyRole(['ADMIN', 'THEKE', 'TECHNIKER', 'BUCHHALTUNG', 'FILIALLEITER']);
 
   // Get the highest B2B role
   const getB2BRole = (): B2BRole | null => {
-    if (hasRole('B2B_INHABER' as AppRole)) return 'B2B_INHABER';
+    if (hasRole('B2B_INHABER')) return 'B2B_INHABER';
     if (hasRole('B2B_ADMIN')) return 'B2B_ADMIN';
     if (hasRole('B2B_USER')) return 'B2B_USER';
     return null;
