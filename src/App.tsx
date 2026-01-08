@@ -61,8 +61,8 @@ const B2BSettings = lazy(() => import("@/pages/b2b/B2BSettings"));
 
 const queryClient = new QueryClient();
 
-function AuthProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, isApproved, signOut } = useAuth();
+function AuthProtectedRoute({ children, redirectB2B = false }: { children: React.ReactNode; redirectB2B?: boolean }) {
+  const { user, loading, isApproved, signOut, hasAnyRole } = useAuth();
 
   if (loading) {
     return <PageLoader />;
@@ -102,6 +102,15 @@ function AuthProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // If redirectB2B is true, check if user is B2B and redirect to B2B dashboard
+  // Cast B2B_INHABER as it may not be in the auto-generated types yet
+  const isB2BUser = hasAnyRole(['B2B_INHABER' as any, 'B2B_ADMIN', 'B2B_USER']);
+  const isInternalUser = hasAnyRole(['ADMIN', 'THEKE', 'TECHNIKER', 'BUCHHALTUNG', 'FILIALLEITER']);
+  
+  if (redirectB2B && isB2BUser && !isInternalUser) {
+    return <Navigate to="/b2b/dashboard" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -134,7 +143,7 @@ function AppRoutes() {
           <Route
             path="/"
             element={
-              <AuthProtectedRoute>
+              <AuthProtectedRoute redirectB2B>
                 <AppLayout />
               </AuthProtectedRoute>
             }

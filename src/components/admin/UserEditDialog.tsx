@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
-import { AppRole, ROLE_LABELS } from '@/types/database';
-import { Loader2 } from 'lucide-react';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { AppRole, ROLE_LABELS, INTERNAL_ROLES, B2B_ROLES } from '@/types/database';
+import { Loader2, Building2 } from 'lucide-react';
 
 interface Location {
   id: string;
@@ -32,6 +32,7 @@ interface UserData {
   can_view_all_locations: boolean;
   role: AppRole;
   user_locations: UserLocation[];
+  b2b_partner_id?: string | null;
 }
 
 interface UserEditDialogProps {
@@ -49,6 +50,23 @@ export function UserEditDialog({ open, onOpenChange, user, locations }: UserEdit
   const [defaultLocationId, setDefaultLocationId] = useState<string>('');
   const [canViewAllLocations, setCanViewAllLocations] = useState(false);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [b2bPartnerId, setB2bPartnerId] = useState<string>('');
+
+  // Fetch B2B partners for B2B role assignment
+  const { data: b2bPartners } = useQuery({
+    queryKey: ['b2b-partners-for-user-edit'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('b2b_partners')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const isB2BRole = B2B_ROLES.includes(role);
 
   useEffect(() => {
     if (user) {
@@ -56,21 +74,37 @@ export function UserEditDialog({ open, onOpenChange, user, locations }: UserEdit
       setDefaultLocationId(user.default_location_id || '');
       setCanViewAllLocations(user.can_view_all_locations);
       setSelectedLocations(user.user_locations.map(ul => ul.location_id));
+      setB2bPartnerId(user.b2b_partner_id || '');
     }
   }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
     
+    // Validate B2B role requires partner
+    if (isB2BRole && !b2bPartnerId) {
+      toast.error('Bitte wählen Sie einen B2B-Partner für B2B-Rollen');
+      return;
+    }
+    
     setSaving(true);
     try {
       // Update profile
+      const profileUpdate: Record<string, any> = {
+        can_view_all_locations: isB2BRole ? false : canViewAllLocations,
+        b2b_partner_id: isB2BRole ? b2bPartnerId : null,
+      };
+      
+      // Only set location for internal users
+      if (!isB2BRole) {
+        profileUpdate.default_location_id = defaultLocationId || null;
+      } else {
+        profileUpdate.default_location_id = null;
+      }
+      
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
-          default_location_id: defaultLocationId || null,
-          can_view_all_locations: canViewAllLocations,
-        })
+        .update(profileUpdate)
         .eq('id', user.id);
 
       if (profileError) throw profileError;
@@ -89,7 +123,7 @@ export function UserEditDialog({ open, onOpenChange, user, locations }: UserEdit
 
       if (insertRoleError) throw insertRoleError;
 
-      // Update user_locations
+      // Update user_locations (only for internal users)
       // First delete all existing
       const { error: deleteLocError } = await supabase
         .from('user_locations')
@@ -98,8 +132,8 @@ export function UserEditDialog({ open, onOpenChange, user, locations }: UserEdit
 
       if (deleteLocError) throw deleteLocError;
 
-      // Then insert new ones
-      if (selectedLocations.length > 0) {
+      // Then insert new ones (only for internal users)
+      if (!isB2BRole && selectedLocations.length > 0) {
         const locationsToInsert = selectedLocations.map(locId => ({
           user_id: user.id,
           location_id: locId,
@@ -161,63 +195,105 @@ export function UserEditDialog({ open, onOpenChange, user, locations }: UserEdit
           {/* Role Selection */}
           <div className="space-y-2">
             <Label htmlFor="role">Rolle</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
+            <Select value={role} onValueChange={(v) => {
+              setRole(v as AppRole);
+              // Reset B2B partner if switching to internal role
+              if (INTERNAL_ROLES.includes(v as AppRole)) {
+                setB2bPartnerId('');
+              }
+            }}>
               <SelectTrigger id="role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(ROLE_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
+                <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Interne Rollen</div>
+                {INTERNAL_ROLES.map((roleKey) => (
+                  <SelectItem key={roleKey} value={roleKey}>
+                    {ROLE_LABELS[roleKey]}
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium border-t mt-1 pt-1">B2B-Rollen</div>
+                {B2B_ROLES.map((roleKey) => (
+                  <SelectItem key={roleKey} value={roleKey}>
+                    {ROLE_LABELS[roleKey]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* View All Locations Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="view-all">Zugriff auf alle Filialen</Label>
-              <p className="text-sm text-muted-foreground">
-                Kann Aufträge aller Standorte sehen
+          {/* B2B Partner Selection - only for B2B roles */}
+          {isB2BRole && (
+            <div className="space-y-2">
+              <Label htmlFor="b2b-partner" className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                B2B-Partner
+              </Label>
+              <Select value={b2bPartnerId} onValueChange={setB2bPartnerId}>
+                <SelectTrigger id="b2b-partner">
+                  <SelectValue placeholder="Partner auswählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {b2bPartners?.map((partner) => (
+                    <SelectItem key={partner.id} value={partner.id}>
+                      {partner.name} {partner.code && `(${partner.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                B2B-Benutzer werden diesem Partner zugeordnet
               </p>
             </div>
-            <Switch
-              id="view-all"
-              checked={canViewAllLocations}
-              onCheckedChange={setCanViewAllLocations}
-            />
-          </div>
+          )}
 
-          {/* Default Location */}
-          <div className="space-y-2">
-            <Label htmlFor="default-location">Standard-Filiale</Label>
-            <Select 
-              value={defaultLocationId} 
-              onValueChange={(v) => {
-                setDefaultLocationId(v);
-                // Also ensure it's in selectedLocations
-                if (v && !selectedLocations.includes(v)) {
-                  setSelectedLocations(prev => [...prev, v]);
-                }
-              }}
-            >
-              <SelectTrigger id="default-location">
-                <SelectValue placeholder="Keine Standard-Filiale" />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id}>
-                    {loc.name} {loc.code && `(${loc.code})`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* View All Locations Toggle - only for internal users */}
+          {!isB2BRole && (
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="view-all">Zugriff auf alle Filialen</Label>
+                <p className="text-sm text-muted-foreground">
+                  Kann Aufträge aller Standorte sehen
+                </p>
+              </div>
+              <Switch
+                id="view-all"
+                checked={canViewAllLocations}
+                onCheckedChange={setCanViewAllLocations}
+              />
+            </div>
+          )}
 
-          {/* Additional Locations */}
-          {!canViewAllLocations && (
+          {/* Default Location - only for internal users */}
+          {!isB2BRole && (
+            <div className="space-y-2">
+              <Label htmlFor="default-location">Standard-Filiale</Label>
+              <Select 
+                value={defaultLocationId} 
+                onValueChange={(v) => {
+                  setDefaultLocationId(v);
+                  // Also ensure it's in selectedLocations
+                  if (v && !selectedLocations.includes(v)) {
+                    setSelectedLocations(prev => [...prev, v]);
+                  }
+                }}
+              >
+                <SelectTrigger id="default-location">
+                  <SelectValue placeholder="Keine Standard-Filiale" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name} {loc.code && `(${loc.code})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Additional Locations - only for internal users */}
+          {!isB2BRole && !canViewAllLocations && (
             <div className="space-y-2">
               <Label>Zusätzliche Filialen (Aufträge sichtbar)</Label>
               <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
