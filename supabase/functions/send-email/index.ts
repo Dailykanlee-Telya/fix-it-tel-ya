@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@2.0.0';
-import DOMPurify from 'https://esm.sh/isomorphic-dompurify@2.21.0';
+import * as ammonia from 'https://deno.land/x/ammonia@0.3.1/mod.ts';
+
+await ammonia.init();
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
@@ -9,13 +11,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Sanitize HTML to prevent XSS in emails
+// Sanitize HTML to prevent XSS in emails using Ammonia (Rust-based, Deno-native)
 const sanitizeHtml = (html: string): string => {
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'a', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'img', 'style'],
-    ALLOWED_ATTR: ['href', 'style', 'class', 'src', 'alt', 'width', 'height', 'border', 'cellpadding', 'cellspacing'],
-    ALLOW_DATA_ATTR: false,
-  });
+  return ammonia.clean(html);
 };
 
 interface EmailRequest {
