@@ -73,11 +73,110 @@ export type Database = {
           },
         ]
       }
+      b2b_customers: {
+        Row: {
+          address: string | null
+          b2b_partner_id: string
+          created_at: string
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          b2b_partner_id: string
+          created_at?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          b2b_partner_id?: string
+          created_at?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "b2b_customers_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      b2b_document_templates: {
+        Row: {
+          b2b_partner_id: string
+          conditions: string | null
+          created_at: string
+          footer: string | null
+          id: string
+          intro: string | null
+          is_active: boolean
+          legal_text: string | null
+          template_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          b2b_partner_id: string
+          conditions?: string | null
+          created_at?: string
+          footer?: string | null
+          id?: string
+          intro?: string | null
+          is_active?: boolean
+          legal_text?: string | null
+          template_type: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          b2b_partner_id?: string
+          conditions?: string | null
+          created_at?: string
+          footer?: string | null
+          id?: string
+          intro?: string | null
+          is_active?: boolean
+          legal_text?: string | null
+          template_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "b2b_document_templates_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       b2b_partners: {
         Row: {
           billing_email: string | null
           city: string | null
           code: string | null
+          company_logo_url: string | null
+          company_slogan: string | null
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
@@ -87,8 +186,14 @@ export type Database = {
           default_return_address: Json | null
           id: string
           is_active: boolean
+          legal_footer: string | null
+          location_id: string | null
           name: string
+          primary_color: string | null
+          privacy_policy_url: string | null
+          secondary_color: string | null
           street: string | null
+          terms_and_conditions: string | null
           updated_at: string
           zip: string | null
         }
@@ -96,6 +201,8 @@ export type Database = {
           billing_email?: string | null
           city?: string | null
           code?: string | null
+          company_logo_url?: string | null
+          company_slogan?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -105,8 +212,14 @@ export type Database = {
           default_return_address?: Json | null
           id?: string
           is_active?: boolean
+          legal_footer?: string | null
+          location_id?: string | null
           name: string
+          primary_color?: string | null
+          privacy_policy_url?: string | null
+          secondary_color?: string | null
           street?: string | null
+          terms_and_conditions?: string | null
           updated_at?: string
           zip?: string | null
         }
@@ -114,6 +227,8 @@ export type Database = {
           billing_email?: string | null
           city?: string | null
           code?: string | null
+          company_logo_url?: string | null
+          company_slogan?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
@@ -123,12 +238,76 @@ export type Database = {
           default_return_address?: Json | null
           id?: string
           is_active?: boolean
+          legal_footer?: string | null
+          location_id?: string | null
           name?: string
+          primary_color?: string | null
+          privacy_policy_url?: string | null
+          secondary_color?: string | null
           street?: string | null
+          terms_and_conditions?: string | null
           updated_at?: string
           zip?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "b2b_partners_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      b2b_prices: {
+        Row: {
+          b2b_partner_id: string
+          b2b_price: number
+          brand: string | null
+          created_at: string
+          device_type: string
+          endcustomer_price: number | null
+          id: string
+          is_active: boolean
+          model: string | null
+          repair_type: string
+          updated_at: string
+        }
+        Insert: {
+          b2b_partner_id: string
+          b2b_price?: number
+          brand?: string | null
+          created_at?: string
+          device_type: string
+          endcustomer_price?: number | null
+          id?: string
+          is_active?: boolean
+          model?: string | null
+          repair_type: string
+          updated_at?: string
+        }
+        Update: {
+          b2b_partner_id?: string
+          b2b_price?: number
+          brand?: string | null
+          created_at?: string
+          device_type?: string
+          endcustomer_price?: number | null
+          id?: string
+          is_active?: boolean
+          model?: string | null
+          repair_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "b2b_prices_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       b2b_shipments: {
         Row: {
@@ -137,9 +316,11 @@ export type Database = {
           created_by: string | null
           dhl_label_url: string | null
           dhl_tracking_number: string | null
+          endcustomer_address: Json | null
           id: string
           notes: string | null
           recipient_address: Json | null
+          return_to_endcustomer: boolean | null
           sender_address: Json | null
           shipment_number: string
           shipment_type: string
@@ -152,9 +333,11 @@ export type Database = {
           created_by?: string | null
           dhl_label_url?: string | null
           dhl_tracking_number?: string | null
+          endcustomer_address?: Json | null
           id?: string
           notes?: string | null
           recipient_address?: Json | null
+          return_to_endcustomer?: boolean | null
           sender_address?: Json | null
           shipment_number: string
           shipment_type?: string
@@ -167,9 +350,11 @@ export type Database = {
           created_by?: string | null
           dhl_label_url?: string | null
           dhl_tracking_number?: string | null
+          endcustomer_address?: Json | null
           id?: string
           notes?: string | null
           recipient_address?: Json | null
+          return_to_endcustomer?: boolean | null
           sender_address?: Json | null
           shipment_number?: string
           shipment_type?: string
@@ -187,6 +372,57 @@ export type Database = {
           {
             foreignKeyName: "b2b_shipments_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      b2b_user_invitations: {
+        Row: {
+          accepted_at: string | null
+          b2b_partner_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invitation_token: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          accepted_at?: string | null
+          b2b_partner_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invitation_token: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          accepted_at?: string | null
+          b2b_partner_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "b2b_user_invitations_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "b2b_user_invitations_invited_by_fkey"
+            columns: ["invited_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1406,15 +1642,18 @@ export type Database = {
           accessories: string | null
           assigned_technician_id: string | null
           auto_approved_limit: number | null
+          b2b_customer_id: string | null
           b2b_partner_id: string | null
           created_at: string
           customer_id: string
           device_id: string
           disposal_option: string | null
           email_opt_in: boolean | null
+          endcustomer_kva_allowed: boolean | null
           endcustomer_price: number | null
           endcustomer_price_released: boolean | null
           endcustomer_reference: string | null
+          endcustomer_return_address: Json | null
           error_cause: Database["public"]["Enums"]["error_cause"] | null
           error_code: Database["public"]["Enums"]["error_code"] | null
           error_description_text: string | null
@@ -1426,6 +1665,9 @@ export type Database = {
           is_b2b: boolean
           kva_approved: boolean | null
           kva_approved_at: string | null
+          kva_decision_at: string | null
+          kva_decision_by: string | null
+          kva_decision_type: string | null
           kva_fee_amount: number | null
           kva_fee_applicable: boolean | null
           kva_required: boolean
@@ -1435,6 +1677,7 @@ export type Database = {
           passcode_info: string | null
           price_mode: Database["public"]["Enums"]["price_mode"]
           priority: string | null
+          return_to_endcustomer: boolean | null
           shipment_id: string | null
           sms_opt_in: boolean | null
           status: Database["public"]["Enums"]["ticket_status"]
@@ -1445,15 +1688,18 @@ export type Database = {
           accessories?: string | null
           assigned_technician_id?: string | null
           auto_approved_limit?: number | null
+          b2b_customer_id?: string | null
           b2b_partner_id?: string | null
           created_at?: string
           customer_id: string
           device_id: string
           disposal_option?: string | null
           email_opt_in?: boolean | null
+          endcustomer_kva_allowed?: boolean | null
           endcustomer_price?: number | null
           endcustomer_price_released?: boolean | null
           endcustomer_reference?: string | null
+          endcustomer_return_address?: Json | null
           error_cause?: Database["public"]["Enums"]["error_cause"] | null
           error_code?: Database["public"]["Enums"]["error_code"] | null
           error_description_text?: string | null
@@ -1465,6 +1711,9 @@ export type Database = {
           is_b2b?: boolean
           kva_approved?: boolean | null
           kva_approved_at?: string | null
+          kva_decision_at?: string | null
+          kva_decision_by?: string | null
+          kva_decision_type?: string | null
           kva_fee_amount?: number | null
           kva_fee_applicable?: boolean | null
           kva_required?: boolean
@@ -1474,6 +1723,7 @@ export type Database = {
           passcode_info?: string | null
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
+          return_to_endcustomer?: boolean | null
           shipment_id?: string | null
           sms_opt_in?: boolean | null
           status?: Database["public"]["Enums"]["ticket_status"]
@@ -1484,15 +1734,18 @@ export type Database = {
           accessories?: string | null
           assigned_technician_id?: string | null
           auto_approved_limit?: number | null
+          b2b_customer_id?: string | null
           b2b_partner_id?: string | null
           created_at?: string
           customer_id?: string
           device_id?: string
           disposal_option?: string | null
           email_opt_in?: boolean | null
+          endcustomer_kva_allowed?: boolean | null
           endcustomer_price?: number | null
           endcustomer_price_released?: boolean | null
           endcustomer_reference?: string | null
+          endcustomer_return_address?: Json | null
           error_cause?: Database["public"]["Enums"]["error_cause"] | null
           error_code?: Database["public"]["Enums"]["error_code"] | null
           error_description_text?: string | null
@@ -1504,6 +1757,9 @@ export type Database = {
           is_b2b?: boolean
           kva_approved?: boolean | null
           kva_approved_at?: string | null
+          kva_decision_at?: string | null
+          kva_decision_by?: string | null
+          kva_decision_type?: string | null
           kva_fee_amount?: number | null
           kva_fee_applicable?: boolean | null
           kva_required?: boolean
@@ -1513,6 +1769,7 @@ export type Database = {
           passcode_info?: string | null
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
+          return_to_endcustomer?: boolean | null
           shipment_id?: string | null
           sms_opt_in?: boolean | null
           status?: Database["public"]["Enums"]["ticket_status"]
@@ -1525,6 +1782,13 @@ export type Database = {
             columns: ["assigned_technician_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_tickets_b2b_customer_id_fkey"
+            columns: ["b2b_customer_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_customers"
             referencedColumns: ["id"]
           },
           {
@@ -2209,6 +2473,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_b2b_inhaber: { Args: { _user_id: string }; Returns: boolean }
       is_b2b_user: { Args: { _user_id: string }; Returns: boolean }
       is_employee: { Args: { _user_id: string }; Returns: boolean }
       reset_all_data: { Args: never; Returns: undefined }
@@ -2222,6 +2487,7 @@ export type Database = {
         | "FILIALLEITER"
         | "B2B_ADMIN"
         | "B2B_USER"
+        | "B2B_INHABER"
       b2b_shipment_status:
         | "ANGELEGT"
         | "GERAETE_UNTERWEGS"
@@ -2451,6 +2717,7 @@ export const Constants = {
         "FILIALLEITER",
         "B2B_ADMIN",
         "B2B_USER",
+        "B2B_INHABER",
       ],
       b2b_shipment_status: [
         "ANGELEGT",
