@@ -219,11 +219,11 @@ export default function B2BPartners() {
 
   // Approve partner mutation - uses Edge Function
   const approvePartnerMutation = useMutation({
-    mutationFn: async ({ partner, locationId }: { partner: B2BPartner; locationId: string }) => {
+    mutationFn: async ({ partner, locationId }: { partner: B2BPartner; locationId?: string }) => {
       const { data, error } = await supabase.functions.invoke('b2b-approve-partner', {
         body: {
           partnerId: partner.id,
-          locationId,
+          ...(locationId && { locationId }), // Optional: nur für internes Routing
         },
       });
       
@@ -658,7 +658,7 @@ export default function B2BPartners() {
                               className="flex-1 lg:flex-none gap-2"
                               onClick={() => {
                                 setSelectedPartner(partner);
-                                setApproveLocationId(locations?.[0]?.id || '');
+                                setApproveLocationId(''); // Keine Pflicht-Filiale
                                 setIsApproveOpen(true);
                               }}
                             >
@@ -929,12 +929,13 @@ export default function B2BPartners() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="approve-location">Zugeordnete Filiale *</Label>
+                <Label htmlFor="approve-location">Interne Telya-Filiale (optional)</Label>
                 <Select value={approveLocationId} onValueChange={setApproveLocationId}>
                   <SelectTrigger id="approve-location">
-                    <SelectValue placeholder="Filiale auswählen..." />
+                    <SelectValue placeholder="Keine Zuordnung" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Keine Zuordnung</SelectItem>
                     {locations?.map((loc) => (
                       <SelectItem key={loc.id} value={loc.id}>
                         {loc.name}
@@ -943,7 +944,7 @@ export default function B2BPartners() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Die Filiale wird dem Partner zugeordnet. Reparaturaufträge werden dieser Filiale zugewiesen.
+                  Nur für interne Bearbeitung/Routing. Hat keinen Einfluss auf die Rechte des B2B-Partners.
                 </p>
               </div>
             </div>
@@ -955,11 +956,14 @@ export default function B2BPartners() {
             </Button>
             <Button
               onClick={() => {
-                if (selectedPartner && approveLocationId) {
-                  approvePartnerMutation.mutate({ partner: selectedPartner, locationId: approveLocationId });
+                if (selectedPartner) {
+                  approvePartnerMutation.mutate({ 
+                    partner: selectedPartner, 
+                    locationId: approveLocationId || undefined 
+                  });
                 }
               }}
-              disabled={!approveLocationId || approvePartnerMutation.isPending}
+              disabled={approvePartnerMutation.isPending}
             >
               {approvePartnerMutation.isPending ? (
                 <>
