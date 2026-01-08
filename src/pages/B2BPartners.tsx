@@ -253,6 +253,22 @@ export default function B2BPartners() {
   // Reject/Delete partner mutation
   const rejectPartnerMutation = useMutation({
     mutationFn: async (partnerId: string) => {
+      // First check if there are any linked profiles
+      const { data: linkedProfiles } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('b2b_partner_id', partnerId);
+      
+      if (linkedProfiles && linkedProfiles.length > 0) {
+        // Unlink profiles first (set b2b_partner_id to null)
+        const { error: unlinkError } = await supabase
+          .from('profiles')
+          .update({ b2b_partner_id: null })
+          .eq('b2b_partner_id', partnerId);
+        if (unlinkError) throw new Error('Verknüpfte Benutzer konnten nicht entfernt werden.');
+      }
+      
+      // Now delete the partner
       const { error } = await supabase
         .from('b2b_partners')
         .delete()
@@ -263,8 +279,8 @@ export default function B2BPartners() {
       toast({ title: 'Anfrage abgelehnt', description: 'Die Partner-Anfrage wurde gelöscht.' });
       queryClient.invalidateQueries({ queryKey: ['b2b-partners-admin'] });
     },
-    onError: () => {
-      toast({ title: 'Fehler', description: 'Anfrage konnte nicht gelöscht werden.', variant: 'destructive' });
+    onError: (error: Error) => {
+      toast({ title: 'Fehler', description: error.message || 'Anfrage konnte nicht gelöscht werden.', variant: 'destructive' });
     },
   });
 
