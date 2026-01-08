@@ -110,11 +110,19 @@ export default function B2BRegister() {
             <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-6">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Anfrage erfolgreich!</h2>
-            <p className="text-muted-foreground mb-6">
-              Vielen Dank für Ihre B2B-Partner-Anfrage. Unser Team wird Ihre Anfrage prüfen und sich 
-              innerhalb von 1-2 Werktagen bei Ihnen melden.
+            <h2 className="text-2xl font-bold text-foreground mb-2">Danke für deine Anfrage!</h2>
+            <p className="text-muted-foreground mb-4">
+              Wir prüfen deine Registrierung kurz und schalten dich frei.
             </p>
+            <div className="bg-muted/50 rounded-lg p-4 mb-6 text-left">
+              <p className="text-sm font-medium mb-2">Was passiert jetzt?</p>
+              <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                <li>Du erhältst sofort eine Bestätigungsmail</li>
+                <li>Wir prüfen deine Anfrage (meist innerhalb weniger Stunden)</li>
+                <li>Nach Freigabe bekommst du eine Mail zum Passwort setzen</li>
+                <li>Nach dem Passwort setzen kannst du sofort loslegen!</li>
+              </ol>
+            </div>
             <div className="space-y-3">
               <Button onClick={() => navigate('/auth')} className="w-full">
                 Zurück zur Anmeldung

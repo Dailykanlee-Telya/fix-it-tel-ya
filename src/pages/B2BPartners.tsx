@@ -41,6 +41,11 @@ interface PartnerUser {
   b2b_partner_id: string | null;
 }
 
+interface Location {
+  id: string;
+  name: string;
+}
+
 export default function B2BPartners() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -49,6 +54,8 @@ export default function B2BPartners() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAssignUserOpen, setIsAssignUserOpen] = useState(false);
+  const [isApproveOpen, setIsApproveOpen] = useState(false);
+  const [approveLocationId, setApproveLocationId] = useState<string>('');
   const [selectedPartner, setSelectedPartner] = useState<B2BPartner | null>(null);
   const [newPartner, setNewPartner] = useState({
     name: '',
@@ -87,6 +94,19 @@ export default function B2BPartners() {
         .order('name');
       if (error) throw error;
       return data as PartnerUser[];
+    },
+  });
+
+  // Fetch locations for approval
+  const { data: locations } = useQuery({
+    queryKey: ['locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data as Location[];
     },
   });
 
@@ -197,85 +217,36 @@ export default function B2BPartners() {
     },
   });
 
-  // Approve partner mutation
+  // Approve partner mutation - uses Edge Function
   const approvePartnerMutation = useMutation({
-    mutationFn: async (partner: B2BPartner) => {
-      // Update partner to active
-      const { error } = await supabase
-        .from('b2b_partners')
-        .update({ is_active: true })
-        .eq('id', partner.id);
+    mutationFn: async ({ partner, locationId }: { partner: B2BPartner; locationId: string }) => {
+      const { data, error } = await supabase.functions.invoke('b2b-approve-partner', {
+        body: {
+          partnerId: partner.id,
+          locationId,
+        },
+      });
+      
       if (error) throw error;
-
-      // Send approval email if partner has contact email
-      if (partner.contact_email) {
-        try {
-          await supabase.functions.invoke('send-email', {
-            body: {
-              type: 'custom',
-              to_email: partner.contact_email,
-              subject: 'Ihre B2B-Partner-Anfrage wurde genehmigt - Telya',
-              body: `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                  <meta charset="utf-8">
-                  <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
-                    .header { background: #1e3a5f; color: white; padding: 20px; text-align: center; }
-                    .content { padding: 20px; }
-                    .success-box { background: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center; color: #155724; }
-                    .info-box { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; }
-                    .btn { display: inline-block; background: #1e3a5f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
-                    .footer { font-size: 12px; color: #666; padding: 20px; border-top: 1px solid #eee; margin-top: 20px; }
-                  </style>
-                </head>
-                <body>
-                  <div class="header">
-                    <h1>Telya B2B-Partner</h1>
-                  </div>
-                  <div class="content">
-                    <p>Sehr geehrte/r ${partner.contact_name || 'Partner'},</p>
-                    
-                    <div class="success-box">
-                      <h2>✓ Ihre Partnerschaft ist bestätigt!</h2>
-                      <p>Willkommen als B2B-Partner bei Telya.</p>
-                    </div>
-                    
-                    <p>Ihre Anfrage wurde geprüft und genehmigt. Sie können sich nun im B2B-Portal anmelden.</p>
-                    
-                    <div class="info-box">
-                      <strong>Firma:</strong> ${partner.name}<br>
-                      <strong>Status:</strong> Aktiv
-                    </div>
-                    
-                    <p>Ein Mitarbeiter wird sich in Kürze bei Ihnen melden, um Ihre Zugangsdaten einzurichten.</p>
-                    
-                    <p>Bei Fragen stehen wir Ihnen gerne zur Verfügung unter <a href="mailto:service@telya.de">service@telya.de</a>.</p>
-                    
-                    <p>Mit freundlichen Grüßen,<br>Ihr Telya Team</p>
-                  </div>
-                  <div class="footer">
-                    <p>Telya GmbH | Schalker Str. 59, 45881 Gelsenkirchen</p>
-                  </div>
-                </body>
-                </html>
-              `,
-            },
-          });
-          console.log('Approval email sent to:', partner.contact_email);
-        } catch (emailError) {
-          console.error('Failed to send approval email:', emailError);
-          // Don't fail the mutation if email fails
-        }
-      }
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
     onSuccess: () => {
-      toast({ title: 'Partner freigegeben', description: 'Der B2B-Partner wurde erfolgreich aktiviert und benachrichtigt.' });
+      toast({ 
+        title: 'Partner freigegeben', 
+        description: 'Zugangsdaten wurden per E-Mail versendet. Der Partner kann sich jetzt anmelden.' 
+      });
       queryClient.invalidateQueries({ queryKey: ['b2b-partners-admin'] });
+      setIsApproveOpen(false);
+      setSelectedPartner(null);
+      setApproveLocationId('');
     },
-    onError: () => {
-      toast({ title: 'Fehler', description: 'Partner konnte nicht freigegeben werden.', variant: 'destructive' });
+    onError: (error: Error) => {
+      toast({ 
+        title: 'Fehler', 
+        description: error.message || 'Partner konnte nicht freigegeben werden.', 
+        variant: 'destructive' 
+      });
     },
   });
 
@@ -669,14 +640,13 @@ export default function B2BPartners() {
                           <div className="flex flex-row lg:flex-col gap-2">
                             <Button
                               className="flex-1 lg:flex-none gap-2"
-                              onClick={() => approvePartnerMutation.mutate(partner)}
-                              disabled={approvePartnerMutation.isPending}
+                              onClick={() => {
+                                setSelectedPartner(partner);
+                                setApproveLocationId(locations?.[0]?.id || '');
+                                setIsApproveOpen(true);
+                              }}
                             >
-                              {approvePartnerMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <CheckCircle className="h-4 w-4" />
-                              )}
+                              <CheckCircle className="h-4 w-4" />
                               Freigeben
                             </Button>
                             <Button
@@ -909,6 +879,84 @@ export default function B2BPartners() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAssignUserOpen(false)}>Schließen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approve Partner Dialog */}
+      <Dialog open={isApproveOpen} onOpenChange={(open) => {
+        setIsApproveOpen(open);
+        if (!open) {
+          setSelectedPartner(null);
+          setApproveLocationId('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Partner freigeben
+            </DialogTitle>
+            <DialogDescription>
+              Der Partner erhält automatisch einen Zugang mit der Rolle "B2B-Inhaber" und eine E-Mail mit Link zum Passwort setzen.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedPartner && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-muted rounded-lg space-y-2">
+                <p className="font-medium">{selectedPartner.name}</p>
+                <p className="text-sm text-muted-foreground">{selectedPartner.contact_email}</p>
+                {selectedPartner.contact_name && (
+                  <p className="text-sm text-muted-foreground">{selectedPartner.contact_name}</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="approve-location">Zugeordnete Filiale *</Label>
+                <Select value={approveLocationId} onValueChange={setApproveLocationId}>
+                  <SelectTrigger id="approve-location">
+                    <SelectValue placeholder="Filiale auswählen..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations?.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Die Filiale wird dem Partner zugeordnet. Reparaturaufträge werden dieser Filiale zugewiesen.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsApproveOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedPartner && approveLocationId) {
+                  approvePartnerMutation.mutate({ partner: selectedPartner, locationId: approveLocationId });
+                }
+              }}
+              disabled={!approveLocationId || approvePartnerMutation.isPending}
+            >
+              {approvePartnerMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Wird freigegeben...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Freigeben & Zugangsdaten senden
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
