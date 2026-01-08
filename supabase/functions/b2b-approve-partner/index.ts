@@ -10,7 +10,7 @@ const corsHeaders = {
 
 interface ApproveRequest {
   partnerId: string;
-  locationId: string;
+  locationId?: string; // Optional: nur für internes Routing, nicht für B2B-Rechte
 }
 
 Deno.serve(async (req) => {
@@ -73,9 +73,9 @@ Deno.serve(async (req) => {
     const body: ApproveRequest = await req.json();
     const { partnerId, locationId } = body;
 
-    if (!partnerId || !locationId) {
+    if (!partnerId) {
       return new Response(
-        JSON.stringify({ error: 'Partner-ID und Filiale erforderlich' }),
+        JSON.stringify({ error: 'Partner-ID erforderlich' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -101,18 +101,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify location exists
-    const { data: location, error: locationError } = await supabaseAdmin
-      .from('locations')
-      .select('id, name')
-      .eq('id', locationId)
-      .single();
+    // Optionally verify location exists (for internal routing only)
+    let location: { id: string; name: string } | null = null;
+    if (locationId) {
+      const { data: locationData, error: locationError } = await supabaseAdmin
+        .from('locations')
+        .select('id, name')
+        .eq('id', locationId)
+        .single();
 
-    if (locationError || !location) {
-      return new Response(
-        JSON.stringify({ error: 'Filiale nicht gefunden' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (!locationError && locationData) {
+        location = locationData;
+      }
     }
 
     const email = partner.contact_email;
@@ -157,14 +157,15 @@ Deno.serve(async (req) => {
       console.log('Created new user:', userId);
     }
 
-    // Create/update profile
+    // Create/update profile - B2B users do NOT have location_id (they're not internal employees)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: userId,
         name: partner.contact_name || partner.name,
         email: email,
-        default_location_id: locationId,
+        // B2B users have NO location assignment - their access is via b2b_partner_id only
+        default_location_id: null,
         b2b_partner_id: partnerId,
         is_active: true,
       });
@@ -192,13 +193,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update partner: set active and link to location
+    // Update partner: set active and optionally link to internal location for routing
+    const updateData: { is_active: boolean; location_id?: string } = {
+      is_active: true,
+    };
+    if (locationId) {
+      updateData.location_id = locationId;
+    }
+    
     const { error: updateError } = await supabaseAdmin
       .from('b2b_partners')
-      .update({
-        is_active: true,
-        location_id: locationId,
-      })
+      .update(updateData)
       .eq('id', partnerId);
 
     if (updateError) {
@@ -271,8 +276,7 @@ Deno.serve(async (req) => {
             <div class="info-box">
               <strong>Deine Zugangsdaten:</strong><br>
               <strong>E-Mail:</strong> ${email}<br>
-              <strong>Firma:</strong> ${partner.name}<br>
-              <strong>Filiale:</strong> ${location.name}
+              <strong>Firma:</strong> ${partner.name}
             </div>
             
             <div class="steps">
