@@ -55,6 +55,9 @@ const B2BOrderDetail = lazy(() => import("@/pages/b2b/B2BOrderDetail"));
 const B2BShipments = lazy(() => import("@/pages/b2b/B2BShipments"));
 const B2BShipmentNew = lazy(() => import("@/pages/b2b/B2BShipmentNew"));
 const B2BShipmentDetail = lazy(() => import("@/pages/b2b/B2BShipmentDetail"));
+const B2BCustomers = lazy(() => import("@/pages/b2b/B2BCustomers"));
+const B2BPrices = lazy(() => import("@/pages/b2b/B2BPrices"));
+const B2BSettings = lazy(() => import("@/pages/b2b/B2BSettings"));
 
 const queryClient = new QueryClient();
 
@@ -246,6 +249,9 @@ function AppRoutes() {
             <Route path="shipments" element={<B2BShipments />} />
             <Route path="shipments/new" element={<B2BShipmentNew />} />
             <Route path="shipments/:id" element={<B2BShipmentDetail />} />
+            <Route path="customers" element={<B2BCustomers />} />
+            <Route path="prices" element={<B2BPrices />} />
+            <Route path="settings" element={<B2BSettings />} />
           </Route>
 
           {/* 404 */}

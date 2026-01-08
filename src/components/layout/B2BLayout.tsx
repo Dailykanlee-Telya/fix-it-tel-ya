@@ -18,23 +18,38 @@ import {
   Settings,
   Building2,
   Menu,
-  X
+  X,
+  Users,
+  Euro,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { B2B_ROLE_LABELS } from '@/types/b2b';
 
-const navigation = [
-  { name: 'Dashboard', href: '/b2b/dashboard', icon: LayoutDashboard },
-  { name: 'Aufträge', href: '/b2b/orders', icon: FileText },
-  { name: 'Sendungen', href: '/b2b/shipments', icon: Package },
-];
+const getNavigation = (isB2BInhaber: boolean, isB2BAdmin: boolean) => {
+  const nav = [
+    { name: 'Dashboard', href: '/b2b/dashboard', icon: LayoutDashboard },
+    { name: 'Aufträge', href: '/b2b/orders', icon: FileText },
+    { name: 'Sendungen', href: '/b2b/shipments', icon: Package },
+    { name: 'Kunden', href: '/b2b/customers', icon: Users },
+  ];
+  
+  // Only B2B_ADMIN and B2B_INHABER can see prices
+  if (isB2BAdmin) {
+    nav.push({ name: 'Preise', href: '/b2b/prices', icon: Euro });
+  }
+  
+  return nav;
+};
 
 export default function B2BLayout() {
-  const { b2bPartner, isB2BUser } = useB2BAuth();
+  const { b2bPartner, isB2BUser, isB2BInhaber, isB2BAdmin, b2bRole } = useB2BAuth();
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navigation = getNavigation(isB2BInhaber, isB2BAdmin);
 
   const handleSignOut = async () => {
     await signOut();
@@ -133,9 +148,12 @@ export default function B2BLayout() {
                 <div className="px-2 py-1.5">
                   <p className="text-sm font-medium">{profile?.name}</p>
                   <p className="text-xs text-muted-foreground">{profile?.email}</p>
+                  {b2bRole && (
+                    <p className="text-xs text-primary mt-1">{B2B_ROLE_LABELS[b2bRole]}</p>
+                  )}
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate('/b2b/settings')} disabled>
+                <DropdownMenuItem onClick={() => navigate('/b2b/settings')}>
                   <Settings className="h-4 w-4 mr-2" />
                   Einstellungen
                 </DropdownMenuItem>
