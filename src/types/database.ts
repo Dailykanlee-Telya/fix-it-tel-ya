@@ -4,14 +4,7 @@ export type AppRole = 'ADMIN' | 'THEKE' | 'TECHNIKER' | 'BUCHHALTUNG' | 'FILIALL
 
 export type DeviceType = 'HANDY' | 'TABLET' | 'LAPTOP' | 'SMARTWATCH' | 'OTHER';
 
-export type TicketStatus = 
-  | 'NEU_EINGEGANGEN' 
-  | 'IN_DIAGNOSE' 
-  | 'WARTET_AUF_TEIL_ODER_FREIGABE' 
-  | 'IN_REPARATUR' 
-  | 'FERTIG_ZUR_ABHOLUNG' 
-  | 'ABGEHOLT' 
-  | 'STORNIERT';
+// TicketStatus is defined with STATUS_LABELS below for B2B logistics support
 
 export type ErrorCode = 
   | 'DISPLAYBRUCH' 
@@ -168,6 +161,18 @@ export interface Feedback {
   created_at: string;
 }
 
+export type TicketStatus = 
+  | 'NEU_EINGEGANGEN' 
+  | 'IN_DIAGNOSE' 
+  | 'WARTET_AUF_TEIL_ODER_FREIGABE' 
+  | 'IN_REPARATUR' 
+  | 'FERTIG_ZUR_ABHOLUNG' 
+  | 'ABGEHOLT' 
+  | 'STORNIERT'
+  | 'EINGESENDET'
+  | 'RUECKVERSAND_AN_B2B'
+  | 'RUECKVERSAND_AN_ENDKUNDE';
+
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   NEU_EINGEGANGEN: 'Neu eingegangen',
   IN_DIAGNOSE: 'In Diagnose',
@@ -176,6 +181,9 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   FERTIG_ZUR_ABHOLUNG: 'Fertig zur Abholung',
   ABGEHOLT: 'Abgeholt',
   STORNIERT: 'Storniert',
+  EINGESENDET: 'Eingesendet',
+  RUECKVERSAND_AN_B2B: 'Rückversand an B2B',
+  RUECKVERSAND_AN_ENDKUNDE: 'Rückversand an Endkunde',
 };
 
 export const STATUS_COLORS: Record<TicketStatus, string> = {
@@ -186,6 +194,9 @@ export const STATUS_COLORS: Record<TicketStatus, string> = {
   FERTIG_ZUR_ABHOLUNG: 'status-ready',
   ABGEHOLT: 'status-done',
   STORNIERT: 'status-cancelled',
+  EINGESENDET: 'status-new',
+  RUECKVERSAND_AN_B2B: 'status-ready',
+  RUECKVERSAND_AN_ENDKUNDE: 'status-ready',
 };
 
 export const ERROR_CODE_LABELS: Record<ErrorCode, string> = {

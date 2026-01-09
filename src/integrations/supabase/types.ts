@@ -77,38 +77,53 @@ export type Database = {
         Row: {
           address: string | null
           b2b_partner_id: string
+          city: string | null
+          country: string | null
           created_at: string
           email: string | null
           first_name: string
+          house_number: string | null
           id: string
           last_name: string
           notes: string | null
           phone: string | null
+          street: string | null
           updated_at: string
+          zip: string | null
         }
         Insert: {
           address?: string | null
           b2b_partner_id: string
+          city?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           first_name: string
+          house_number?: string | null
           id?: string
           last_name: string
           notes?: string | null
           phone?: string | null
+          street?: string | null
           updated_at?: string
+          zip?: string | null
         }
         Update: {
           address?: string | null
           b2b_partner_id?: string
+          city?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           first_name?: string
+          house_number?: string | null
           id?: string
           last_name?: string
           notes?: string | null
           phone?: string | null
+          street?: string | null
           updated_at?: string
+          zip?: string | null
         }
         Relationships: [
           {
@@ -184,6 +199,7 @@ export type Database = {
           created_at: string
           customer_number: string | null
           default_return_address: Json | null
+          document_texts: Json | null
           id: string
           is_active: boolean
           legal_footer: string | null
@@ -210,6 +226,7 @@ export type Database = {
           created_at?: string
           customer_number?: string | null
           default_return_address?: Json | null
+          document_texts?: Json | null
           id?: string
           is_active?: boolean
           legal_footer?: string | null
@@ -236,6 +253,7 @@ export type Database = {
           created_at?: string
           customer_number?: string | null
           default_return_address?: Json | null
+          document_texts?: Json | null
           id?: string
           is_active?: boolean
           legal_footer?: string | null
@@ -1195,6 +1213,59 @@ export type Database = {
         }
         Relationships: []
       }
+      model_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          b2b_partner_id: string | null
+          brand: string
+          created_at: string
+          device_type: string
+          id: string
+          model_name: string
+          rejection_reason: string | null
+          requested_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          b2b_partner_id?: string | null
+          brand: string
+          created_at?: string
+          device_type: string
+          id?: string
+          model_name: string
+          rejection_reason?: string | null
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          b2b_partner_id?: string | null
+          brand?: string
+          created_at?: string
+          device_type?: string
+          id?: string
+          model_name?: string
+          rejection_reason?: string | null
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_requests_b2b_partner_id_fkey"
+            columns: ["b2b_partner_id"]
+            isOneToOne: false
+            referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_logs: {
         Row: {
           channel: Database["public"]["Enums"]["notification_channel"]
@@ -1646,6 +1717,8 @@ export type Database = {
           b2b_partner_id: string | null
           created_at: string
           customer_id: string
+          device_condition_at_intake: Json | null
+          device_condition_remarks: string | null
           device_id: string
           disposal_option: string | null
           email_opt_in: boolean | null
@@ -1675,6 +1748,9 @@ export type Database = {
           legal_notes_ack: boolean
           location_id: string
           passcode_info: string | null
+          passcode_pattern: Json | null
+          passcode_pin: string | null
+          passcode_type: string | null
           price_mode: Database["public"]["Enums"]["price_mode"]
           priority: string | null
           return_to_endcustomer: boolean | null
@@ -1692,6 +1768,8 @@ export type Database = {
           b2b_partner_id?: string | null
           created_at?: string
           customer_id: string
+          device_condition_at_intake?: Json | null
+          device_condition_remarks?: string | null
           device_id: string
           disposal_option?: string | null
           email_opt_in?: boolean | null
@@ -1721,6 +1799,9 @@ export type Database = {
           legal_notes_ack?: boolean
           location_id: string
           passcode_info?: string | null
+          passcode_pattern?: Json | null
+          passcode_pin?: string | null
+          passcode_type?: string | null
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
           return_to_endcustomer?: boolean | null
@@ -1738,6 +1819,8 @@ export type Database = {
           b2b_partner_id?: string | null
           created_at?: string
           customer_id?: string
+          device_condition_at_intake?: Json | null
+          device_condition_remarks?: string | null
           device_id?: string
           disposal_option?: string | null
           email_opt_in?: boolean | null
@@ -1767,6 +1850,9 @@ export type Database = {
           legal_notes_ack?: boolean
           location_id?: string
           passcode_info?: string | null
+          passcode_pattern?: Json | null
+          passcode_pin?: string | null
+          passcode_type?: string | null
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
           return_to_endcustomer?: boolean | null
@@ -2582,6 +2668,9 @@ export type Database = {
         | "FERTIG_ZUR_ABHOLUNG"
         | "ABGEHOLT"
         | "STORNIERT"
+        | "EINGESENDET"
+        | "RUECKVERSAND_AN_B2B"
+        | "RUECKVERSAND_AN_ENDKUNDE"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2822,6 +2911,9 @@ export const Constants = {
         "FERTIG_ZUR_ABHOLUNG",
         "ABGEHOLT",
         "STORNIERT",
+        "EINGESENDET",
+        "RUECKVERSAND_AN_B2B",
+        "RUECKVERSAND_AN_ENDKUNDE",
       ],
     },
   },

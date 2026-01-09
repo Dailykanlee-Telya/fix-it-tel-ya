@@ -63,6 +63,9 @@ const STATUS_CONFIG: Record<TicketStatus, { icon: React.ReactNode; color: string
   },
   'ABGEHOLT': { icon: <CheckCircle2 className="h-4 w-4" />, color: 'text-muted-foreground', bgColor: 'bg-muted' },
   'STORNIERT': { icon: <AlertTriangle className="h-4 w-4" />, color: 'text-muted-foreground', bgColor: 'bg-muted' },
+  'EINGESENDET': { icon: <Package className="h-4 w-4" />, color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-500' },
+  'RUECKVERSAND_AN_B2B': { icon: <Package className="h-4 w-4" />, color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-500' },
+  'RUECKVERSAND_AN_ENDKUNDE': { icon: <Package className="h-4 w-4" />, color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-500' },
 };
 
 export default function Workshop() {
