@@ -11,8 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, ArrowLeft, Upload } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Loader2, ArrowLeft, ChevronDown, User } from 'lucide-react';
 import DeviceModelSelect from '@/components/DeviceModelSelect';
+import ModelRequestButton from '@/components/b2b/ModelRequestButton';
+import DeviceConditionInput from '@/components/intake/DeviceConditionInput';
+import PasscodeInput from '@/components/intake/PasscodeInput';
+import B2BCustomerForm, { B2BCustomerData, emptyB2BCustomer } from '@/components/b2b/B2BCustomerForm';
 import { validateIMEI } from '@/lib/imei-validation';
 import { DeviceType } from '@/types/database';
 
@@ -49,6 +54,19 @@ export default function B2BOrderNew() {
   const [notes, setNotes] = useState('');
   const [imeiError, setImeiError] = useState('');
 
+  // NEW: Device condition at intake
+  const [deviceConditions, setDeviceConditions] = useState<string[]>([]);
+  const [deviceConditionRemarks, setDeviceConditionRemarks] = useState('');
+
+  // NEW: Passcode/Pattern
+  const [passcodeType, setPasscodeType] = useState<'pin' | 'pattern' | 'none' | 'unknown' | ''>('');
+  const [passcodePin, setPasscodePin] = useState('');
+  const [passcodePattern, setPasscodePattern] = useState<number[]>([]);
+
+  // NEW: Optional customer
+  const [includeCustomer, setIncludeCustomer] = useState(false);
+  const [customerData, setCustomerData] = useState<B2BCustomerData>(emptyB2BCustomer);
+
   // Fetch locations
   const { data: locations } = useQuery({
     queryKey: ['locations'],
@@ -79,7 +97,33 @@ export default function B2BOrderNew() {
         }
       }
 
-      // 1. Create a placeholder customer for B2B orders
+      let b2bCustomerId: string | null = null;
+
+      // Create B2B customer if included
+      if (includeCustomer && (customerData.first_name || customerData.last_name)) {
+        const { data: newCustomer, error: customerError } = await supabase
+          .from('b2b_customers')
+          .insert({
+            b2b_partner_id: b2bPartnerId,
+            first_name: customerData.first_name || 'Unbekannt',
+            last_name: customerData.last_name || '',
+            email: customerData.email || null,
+            phone: customerData.phone || null,
+            street: customerData.street || null,
+            house_number: customerData.house_number || null,
+            zip: customerData.zip || null,
+            city: customerData.city || null,
+            country: customerData.country || 'Deutschland',
+            notes: customerData.notes || null,
+          })
+          .select('id')
+          .single();
+
+        if (customerError) throw customerError;
+        b2bCustomerId = newCustomer.id;
+      }
+
+      // 1. Create a placeholder customer for B2B orders (required by repair_tickets FK)
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .insert({
@@ -121,7 +165,7 @@ export default function B2BOrderNew() {
 
       if (ticketNumberError) throw ticketNumberError;
 
-      // 4. Create repair ticket
+      // 4. Create repair ticket with all new fields
       const { data: ticket, error: ticketError } = await supabase
         .from('repair_tickets')
         .insert({
@@ -130,6 +174,7 @@ export default function B2BOrderNew() {
           device_id: deviceData.id,
           location_id: defaultLocationId,
           b2b_partner_id: b2bPartnerId,
+          b2b_customer_id: b2bCustomerId,
           is_b2b: true,
           endcustomer_reference: endcustomerReference || null,
           error_description_text: errorDescription,
@@ -139,6 +184,13 @@ export default function B2BOrderNew() {
           status: 'NEU_EINGEGANGEN',
           price_mode: 'KVA',
           legal_notes_ack: true,
+          // NEW: Device condition at intake
+          device_condition_at_intake: deviceConditions,
+          device_condition_remarks: deviceConditionRemarks || null,
+          // NEW: Passcode / Pattern
+          passcode_type: passcodeType || null,
+          passcode_pin: passcodeType === 'pin' ? passcodePin : null,
+          passcode_pattern: passcodeType === 'pattern' ? passcodePattern : null,
         })
         .select('id, ticket_number')
         .single();
@@ -243,6 +295,36 @@ export default function B2BOrderNew() {
           </CardContent>
         </Card>
 
+        {/* Optional: End Customer */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Endkunde (optional)
+                </CardTitle>
+                <CardDescription>
+                  Kundendaten für Rückversand oder Kommunikation
+                </CardDescription>
+              </div>
+              <Checkbox
+                id="include-customer"
+                checked={includeCustomer}
+                onCheckedChange={(checked) => setIncludeCustomer(!!checked)}
+              />
+            </div>
+          </CardHeader>
+          {includeCustomer && (
+            <CardContent>
+              <B2BCustomerForm
+                data={customerData}
+                onChange={setCustomerData}
+              />
+            </CardContent>
+          )}
+        </Card>
+
         {/* Device Info */}
         <Card>
           <CardHeader>
@@ -263,18 +345,26 @@ export default function B2BOrderNew() {
                   <SelectItem value="TABLET">Tablet</SelectItem>
                   <SelectItem value="LAPTOP">Laptop</SelectItem>
                   <SelectItem value="SMARTWATCH">Smartwatch</SelectItem>
-                  <SelectItem value="SONSTIGES">Sonstiges</SelectItem>
+                  <SelectItem value="OTHER">Sonstiges</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <DeviceModelSelect
-              deviceType={device.device_type}
-              brand={device.brand}
-              model={device.model}
-              onBrandChange={(brand) => setDevice({ ...device, brand, model: '' })}
-              onModelChange={(model) => setDevice({ ...device, model })}
-            />
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <DeviceModelSelect
+                  deviceType={device.device_type}
+                  brand={device.brand}
+                  model={device.model}
+                  onBrandChange={(brand) => setDevice({ ...device, brand, model: '' })}
+                  onModelChange={(model) => setDevice({ ...device, model })}
+                />
+              </div>
+              <ModelRequestButton
+                deviceType={device.device_type}
+                brand={device.brand}
+              />
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -322,6 +412,48 @@ export default function B2BOrderNew() {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Device Condition at Intake */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Gerätezustand bei Annahme</CardTitle>
+            <CardDescription>
+              Vorhandene Schäden dokumentieren (nicht nachträglich änderbar)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeviceConditionInput
+              value={deviceConditions}
+              remarks={deviceConditionRemarks}
+              onChange={(conditions, remarks) => {
+                setDeviceConditions(conditions);
+                setDeviceConditionRemarks(remarks);
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Passcode / Pattern */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Sperrcode / Entsperrung</CardTitle>
+            <CardDescription>
+              PIN oder Muster für Zugang zum Gerät
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PasscodeInput
+              passcodeType={passcodeType}
+              passcodePin={passcodePin}
+              passcodePattern={passcodePattern}
+              onChange={(type, pin, pattern) => {
+                setPasscodeType(type);
+                setPasscodePin(pin);
+                setPasscodePattern(pattern);
+              }}
+            />
           </CardContent>
         </Card>
 
