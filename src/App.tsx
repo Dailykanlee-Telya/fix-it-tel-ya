@@ -56,7 +56,7 @@ const B2BShipments = lazy(() => import("@/pages/b2b/B2BShipments"));
 const B2BShipmentNew = lazy(() => import("@/pages/b2b/B2BShipmentNew"));
 const B2BShipmentDetail = lazy(() => import("@/pages/b2b/B2BShipmentDetail"));
 const B2BCustomers = lazy(() => import("@/pages/b2b/B2BCustomers"));
-const B2BPrices = lazy(() => import("@/pages/b2b/B2BPrices"));
+// B2BPrices removed - prices are managed via KVA/orders only
 const B2BSettings = lazy(() => import("@/pages/b2b/B2BSettings"));
 
 const queryClient = new QueryClient();
@@ -259,7 +259,7 @@ function AppRoutes() {
             <Route path="shipments/new" element={<B2BShipmentNew />} />
             <Route path="shipments/:id" element={<B2BShipmentDetail />} />
             <Route path="customers" element={<B2BCustomers />} />
-            <Route path="prices" element={<B2BPrices />} />
+            {/* prices route removed */}
             <Route path="settings" element={<B2BSettings />} />
           </Route>
 

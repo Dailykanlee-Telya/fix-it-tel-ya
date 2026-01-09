@@ -46,6 +46,8 @@ import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { validateIMEI } from '@/lib/imei-validation';
 import PhotoUpload, { UploadedPhoto, usePhotoUpload } from '@/components/intake/PhotoUpload';
 import PickupReceipt from '@/components/documents/PickupReceipt';
+import DeviceConditionInput from '@/components/intake/DeviceConditionInput';
+import PasscodeInput from '@/components/intake/PasscodeInput';
 
 const ACCESSORIES = [
   { id: 'case', label: 'Hülle' },
@@ -111,6 +113,15 @@ export default function Intake() {
   // Accessories
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [accessoriesNote, setAccessoriesNote] = useState('');
+
+  // Device Condition at Intake (read-only after creation)
+  const [deviceConditions, setDeviceConditions] = useState<string[]>([]);
+  const [deviceConditionRemarks, setDeviceConditionRemarks] = useState('');
+
+  // Passcode / Pattern Lock
+  const [passcodeType, setPasscodeType] = useState<'pin' | 'pattern' | 'none' | 'unknown' | ''>('');
+  const [passcodePin, setPasscodePin] = useState('');
+  const [passcodePattern, setPasscodePattern] = useState<number[]>([]);
 
   // Legal
   const [legalAck, setLegalAck] = useState(false);
@@ -233,7 +244,7 @@ export default function Intake() {
         accessoriesNote,
       ].filter(Boolean).join(', ');
 
-      // Create ticket with tracking token and opt-ins
+      // Create ticket with tracking token, opt-ins, device condition, and passcode
       const { data: ticketData, error: ticketError } = await supabase
         .from('repair_tickets')
         .insert({
@@ -254,6 +265,13 @@ export default function Intake() {
           kva_token: kvaToken,
           email_opt_in: emailOptIn,
           sms_opt_in: smsOptIn,
+          // New fields: Device condition at intake
+          device_condition_at_intake: deviceConditions,
+          device_condition_remarks: deviceConditionRemarks || null,
+          // New fields: Passcode / Pattern
+          passcode_type: passcodeType || null,
+          passcode_pin: passcodeType === 'pin' ? passcodePin : null,
+          passcode_pattern: passcodeType === 'pattern' ? passcodePattern : null,
         })
         .select()
         .single();
@@ -856,6 +874,27 @@ export default function Intake() {
           </CardContent>
         </Card>
 
+        {/* Device Condition at Intake */}
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Gerätezustand bei Annahme
+            </CardTitle>
+            <CardDescription>Vorhandene Schäden und Gebrauchsspuren dokumentieren (nicht nachträglich änderbar)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeviceConditionInput
+              value={deviceConditions}
+              remarks={deviceConditionRemarks}
+              onChange={(conditions, remarks) => {
+                setDeviceConditions(conditions);
+                setDeviceConditionRemarks(remarks);
+              }}
+            />
+          </CardContent>
+        </Card>
+
         {/* Photo Upload Section */}
         <Card className="card-elevated">
           <CardHeader>
@@ -927,12 +966,19 @@ export default function Intake() {
               />
             </div>
 
+            <Separator />
+            
             <div className="space-y-2">
-              <Label>Passcode / Entsperrung</Label>
-              <Input
-                value={repair.passcode_info}
-                onChange={(e) => setRepair({ ...repair, passcode_info: e.target.value })}
-                placeholder="z.B. Code erhalten: 1234 / Kein Code"
+              <Label className="text-base font-medium">Sperrcode / Entsperrung</Label>
+              <PasscodeInput
+                passcodeType={passcodeType}
+                passcodePin={passcodePin}
+                passcodePattern={passcodePattern}
+                onChange={(type, pin, pattern) => {
+                  setPasscodeType(type);
+                  setPasscodePin(pin);
+                  setPasscodePattern(pattern);
+                }}
               />
             </div>
           </CardContent>
