@@ -26,20 +26,14 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { B2B_ROLE_LABELS } from '@/types/b2b';
 
-const getNavigation = (isB2BInhaber: boolean, isB2BAdmin: boolean) => {
-  const nav = [
+const getNavigation = () => {
+  // Removed prices link - prices are only shown in KVA/orders, not as separate list
+  return [
     { name: 'Dashboard', href: '/b2b/dashboard', icon: LayoutDashboard },
     { name: 'Aufträge', href: '/b2b/orders', icon: FileText },
     { name: 'Sendungen', href: '/b2b/shipments', icon: Package },
     { name: 'Kunden', href: '/b2b/customers', icon: Users },
   ];
-  
-  // Only B2B_ADMIN and B2B_INHABER can see prices
-  if (isB2BAdmin) {
-    nav.push({ name: 'Preise', href: '/b2b/prices', icon: Euro });
-  }
-  
-  return nav;
 };
 
 export default function B2BLayout() {
@@ -49,7 +43,7 @@ export default function B2BLayout() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navigation = getNavigation(isB2BInhaber, isB2BAdmin);
+  const navigation = getNavigation();
 
   const handleSignOut = async () => {
     await signOut();
