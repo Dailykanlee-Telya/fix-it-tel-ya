@@ -5,13 +5,14 @@ import { useB2BAuth } from '@/hooks/useB2BAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Smartphone, Laptop, Watch, Tablet, HelpCircle, Package, FileText } from 'lucide-react';
+import { Loader2, ArrowLeft, Smartphone, Laptop, Watch, Tablet, HelpCircle, Package, FileText, Euro } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { STATUS_LABELS, STATUS_COLORS, TicketStatus, DeviceType, DEVICE_TYPE_LABELS } from '@/types/database';
 import { B2BPriceAdjustment } from '@/components/b2b/B2BPriceAdjustment';
 import B2BTicketMessages from '@/components/b2b/B2BTicketMessages';
 import B2BTicketPhotos from '@/components/b2b/B2BTicketPhotos';
+import B2BTicketDocuments from '@/components/b2b/B2BTicketDocuments';
 
 const deviceIcons: Record<DeviceType, React.ComponentType<{ className?: string }>> = {
   HANDY: Smartphone,
@@ -37,6 +38,8 @@ export default function B2BOrderDetail() {
         .select(`
           *,
           device:devices(*),
+          customer:customers(*),
+          location:locations(*),
           status_history:status_history(
             id,
             old_status,
@@ -55,6 +58,24 @@ export default function B2BOrderDetail() {
         .eq('b2b_partner_id', b2bPartnerId)
         .single();
 
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id && !!b2bPartnerId,
+  });
+
+  // Fetch KVA estimates for this ticket
+  const { data: kvaEstimates } = useQuery({
+    queryKey: ['b2b-kva-estimates', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from('kva_estimates')
+        .select('*')
+        .eq('repair_ticket_id', id)
+        .eq('is_current', true)
+        .maybeSingle();
+      
       if (error) throw error;
       return data;
     },
@@ -200,11 +221,50 @@ export default function B2BOrderDetail() {
           </CardContent>
         </Card>
 
+        {/* KVA Price Display - Show internal_price from kva_estimates */}
+        {kvaEstimates && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Euro className="h-4 w-4" />
+                Kostenvoranschlag
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="p-3 bg-muted rounded-lg">
+                <span className="text-xs text-muted-foreground">Telya-Preis (Ihr Einkaufspreis)</span>
+                <p className="text-lg font-semibold">
+                  {kvaEstimates.internal_price !== null 
+                    ? `${Number(kvaEstimates.internal_price).toFixed(2)} €`
+                    : kvaEstimates.total_cost !== null
+                      ? `${Number(kvaEstimates.total_cost).toFixed(2)} €`
+                      : 'Noch nicht festgelegt'}
+                </p>
+              </div>
+              {kvaEstimates.diagnosis && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Diagnose</span>
+                  <p className="text-sm">{kvaEstimates.diagnosis}</p>
+                </div>
+              )}
+              {kvaEstimates.repair_description && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Reparaturbeschreibung</span>
+                  <p className="text-sm">{kvaEstimates.repair_description}</p>
+                </div>
+              )}
+              <Badge variant={kvaEstimates.status === 'FREIGEGEBEN' ? 'default' : 'secondary'}>
+                {kvaEstimates.status}
+              </Badge>
+            </CardContent>
+          </Card>
+        )}
+
         {/* B2B Price Adjustment - Only show if KVA is required */}
         {order.kva_required && (
           <B2BPriceAdjustment
             ticketId={order.id}
-            internalPrice={order.internal_price}
+            internalPrice={kvaEstimates?.internal_price ?? kvaEstimates?.total_cost ?? order.internal_price}
             endcustomerPrice={order.endcustomer_price}
             endcustomerPriceReleased={order.endcustomer_price_released || false}
             onUpdate={() => queryClient.invalidateQueries({ queryKey: ['b2b-order', id] })}
@@ -291,6 +351,11 @@ export default function B2BOrderDetail() {
 
         {/* Messages */}
         <B2BTicketMessages ticketId={order.id} />
+
+        {/* Documents */}
+        <div className="md:col-span-2">
+          <B2BTicketDocuments ticket={order} />
+        </div>
       </div>
     </div>
   );
