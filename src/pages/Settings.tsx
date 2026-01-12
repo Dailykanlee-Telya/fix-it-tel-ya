@@ -48,6 +48,7 @@ import { DataResetDialog } from '@/components/admin/DataResetDialog';
 import { NotificationTemplatesSettings } from '@/components/admin/NotificationTemplatesSettings';
 import CompanySettingsTab from '@/components/admin/CompanySettingsTab';
 import LocationsSettingsTab from '@/components/admin/LocationsSettingsTab';
+import WorkshopsSettingsTab from '@/components/admin/WorkshopsSettingsTab';
 
 function SessionTimeoutSettings() {
   const { toast } = useToast();
@@ -235,6 +236,7 @@ export default function Settings() {
           <TabsTrigger value="profile">Mein Profil</TabsTrigger>
           {isAdmin && <TabsTrigger value="company">Firmendaten</TabsTrigger>}
           {isAdmin && <TabsTrigger value="locations">Standorte</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="workshops">Werkstätten</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Benutzer</TabsTrigger>}
           {isAdmin && <TabsTrigger value="notifications">E-Mail-Vorlagen</TabsTrigger>}
           {isAdmin && <TabsTrigger value="system">System</TabsTrigger>}
@@ -280,6 +282,12 @@ export default function Settings() {
         {isAdmin && (
           <TabsContent value="locations" className="space-y-4">
             <LocationsSettingsTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="workshops" className="space-y-4">
+            <WorkshopsSettingsTab />
           </TabsContent>
         )}
 
