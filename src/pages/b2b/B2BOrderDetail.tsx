@@ -5,12 +5,13 @@ import { useB2BAuth } from '@/hooks/useB2BAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Loader2, ArrowLeft, Smartphone, Laptop, Watch, Tablet, HelpCircle, Package, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { STATUS_LABELS, STATUS_COLORS, TicketStatus, DeviceType, DEVICE_TYPE_LABELS } from '@/types/database';
 import { B2BPriceAdjustment } from '@/components/b2b/B2BPriceAdjustment';
+import B2BTicketMessages from '@/components/b2b/B2BTicketMessages';
+import B2BTicketPhotos from '@/components/b2b/B2BTicketPhotos';
 
 const deviceIcons: Record<DeviceType, React.ComponentType<{ className?: string }>> = {
   HANDY: Smartphone,
@@ -172,7 +173,7 @@ export default function B2BOrderDetail() {
               {order.kva_required && (
                 <div>
                   <span className="text-muted-foreground">KVA Status:</span>
-                  <p>
+                  <div className="mt-1">
                     {order.kva_approved === null ? (
                       <Badge variant="outline" className="bg-orange-50 text-orange-700">
                         Ausstehend
@@ -186,7 +187,7 @@ export default function B2BOrderDetail() {
                         Abgelehnt
                       </Badge>
                     )}
-                  </p>
+                  </div>
                 </div>
               )}
               {order.auto_approved_limit && (
@@ -284,6 +285,12 @@ export default function B2BOrderDetail() {
             )}
           </CardContent>
         </Card>
+
+        {/* Photos */}
+        <B2BTicketPhotos ticketId={order.id} />
+
+        {/* Messages */}
+        <B2BTicketMessages ticketId={order.id} />
       </div>
     </div>
   );

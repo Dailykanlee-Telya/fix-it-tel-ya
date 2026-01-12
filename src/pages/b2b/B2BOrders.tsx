@@ -66,10 +66,14 @@ export default function B2BOrders() {
   const statusOptions: { value: string; label: string }[] = [
     { value: 'all', label: 'Alle Status' },
     { value: 'NEU_EINGEGANGEN', label: 'Neu eingegangen' },
+    { value: 'EINGESENDET', label: 'Eingesendet' },
     { value: 'IN_DIAGNOSE', label: 'In Diagnose' },
     { value: 'WARTET_AUF_TEIL_ODER_FREIGABE', label: 'Wartet auf Freigabe' },
+    { value: 'FREIGEGEBEN', label: 'Freigegeben' },
     { value: 'IN_REPARATUR', label: 'In Reparatur' },
     { value: 'FERTIG_ZUR_ABHOLUNG', label: 'Fertig' },
+    { value: 'RUECKVERSAND_AN_B2B', label: 'Rückversand an Sie' },
+    { value: 'RUECKVERSAND_AN_ENDKUNDE', label: 'Rückversand an Endkunde' },
     { value: 'ABGEHOLT', label: 'Abgeholt/Retour' },
   ];
 

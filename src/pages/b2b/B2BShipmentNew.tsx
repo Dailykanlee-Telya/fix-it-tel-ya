@@ -48,17 +48,19 @@ export default function B2BShipmentNew() {
           endcustomer_reference,
           status,
           created_at,
-          device:devices(device_type, brand, model)
+          device:devices(device_type, brand, model, imei_or_serial)
         `)
         .eq('b2b_partner_id', b2bPartnerId)
         .is('shipment_id', null)
-        .in('status', ['NEU_EINGEGANGEN', 'IN_DIAGNOSE', 'WARTET_AUF_TEIL_ODER_FREIGABE'])
+        .in('status', ['NEU_EINGEGANGEN', 'IN_DIAGNOSE', 'WARTET_AUF_TEIL_ODER_FREIGABE', 'FREIGEGEBEN'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data || [];
     },
     enabled: !!b2bPartnerId,
+    staleTime: 0, // Always refetch
+    refetchOnMount: 'always',
   });
 
   const toggleTicket = (ticketId: string) => {
