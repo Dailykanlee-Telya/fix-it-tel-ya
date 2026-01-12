@@ -23,7 +23,7 @@ interface ModelRequestButtonProps {
 }
 
 export default function ModelRequestButton({ deviceType, brand, onSuccess }: ModelRequestButtonProps) {
-  const { b2bPartnerId, user } = useB2BAuth();
+  const { b2bPartnerId, user, b2bPartner } = useB2BAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [modelName, setModelName] = useState('');
@@ -34,7 +34,7 @@ export default function ModelRequestButton({ deviceType, brand, onSuccess }: Mod
         throw new Error('Modellname erforderlich');
       }
 
-      // Don't set status - let it default from DB
+      // Create the model request
       const { error } = await supabase.from('model_requests').insert({
         b2b_partner_id: b2bPartnerId,
         requested_by: user.id,
@@ -44,6 +44,29 @@ export default function ModelRequestButton({ deviceType, brand, onSuccess }: Mod
       });
 
       if (error) throw error;
+
+      // Create notification for admins
+      // First fetch admin users
+      const { data: adminUsers } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'ADMIN');
+
+      if (adminUsers && adminUsers.length > 0) {
+        // Create notifications for all admins
+        const notifications = adminUsers.map((admin) => ({
+          user_id: admin.user_id,
+          channel: 'EMAIL' as const,
+          trigger: 'TICKET_CREATED' as const, // Use existing trigger type
+          type: 'MODEL_REQUEST',
+          title: 'Neue Modellanfrage',
+          message: `${b2bPartner?.name || 'B2B Partner'} hat das Modell "${brand} ${modelName.trim()}" angefragt.`,
+          status: 'pending',
+          is_read: false,
+        }));
+
+        await supabase.from('notification_logs').insert(notifications);
+      }
     },
     onSuccess: () => {
       toast.success('Modellanfrage gesendet', {
