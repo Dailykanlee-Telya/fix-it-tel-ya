@@ -212,6 +212,7 @@ export type Database = {
           street: string | null
           terms_and_conditions: string | null
           updated_at: string
+          workshop_id: string | null
           zip: string | null
         }
         Insert: {
@@ -240,6 +241,7 @@ export type Database = {
           street?: string | null
           terms_and_conditions?: string | null
           updated_at?: string
+          workshop_id?: string | null
           zip?: string | null
         }
         Update: {
@@ -268,21 +270,22 @@ export type Database = {
           street?: string | null
           terms_and_conditions?: string | null
           updated_at?: string
+          workshop_id?: string | null
           zip?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "b2b_partners_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "b2b_partners_placeholder_customer_id_fkey"
             columns: ["placeholder_customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "b2b_partners_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
         ]
@@ -1756,7 +1759,7 @@ export type Database = {
           kva_required: boolean
           kva_token: string | null
           legal_notes_ack: boolean
-          location_id: string
+          location_id: string | null
           passcode_info: string | null
           passcode_pattern: Json | null
           passcode_pin: string | null
@@ -1769,6 +1772,7 @@ export type Database = {
           status: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at: string
+          workshop_id: string | null
         }
         Insert: {
           accessories?: string | null
@@ -1807,7 +1811,7 @@ export type Database = {
           kva_required?: boolean
           kva_token?: string | null
           legal_notes_ack?: boolean
-          location_id: string
+          location_id?: string | null
           passcode_info?: string | null
           passcode_pattern?: Json | null
           passcode_pin?: string | null
@@ -1820,6 +1824,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at?: string
+          workshop_id?: string | null
         }
         Update: {
           accessories?: string | null
@@ -1858,7 +1863,7 @@ export type Database = {
           kva_required?: boolean
           kva_token?: string | null
           legal_notes_ack?: boolean
-          location_id?: string
+          location_id?: string | null
           passcode_info?: string | null
           passcode_pattern?: Json | null
           passcode_pin?: string | null
@@ -1871,6 +1876,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number?: string
           updated_at?: string
+          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -1920,6 +1926,13 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "b2b_shipments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_tickets_workshop_id_fkey"
+            columns: ["workshop_id"]
+            isOneToOne: false
+            referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
         ]
@@ -2489,6 +2502,42 @@ export type Database = {
         }
         Relationships: []
       }
+      workshops: {
+        Row: {
+          address: Json | null
+          code: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: Json | null
+          code?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: Json | null
+          code?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2496,6 +2545,10 @@ export type Database = {
     Functions: {
       can_view_location: {
         Args: { _location_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_view_workshop: {
+        Args: { _user_id: string; _workshop_id: string }
         Returns: boolean
       }
       create_stock_movement: {
@@ -2530,10 +2583,19 @@ export type Database = {
       }
       generate_complaint_number: { Args: never; Returns: string }
       generate_inventory_session_number: { Args: never; Returns: string }
-      generate_order_number: {
-        Args: { _b2b_partner_id?: string; _location_id: string }
-        Returns: string
-      }
+      generate_order_number:
+        | {
+            Args: { _b2b_partner_id?: string; _location_id: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              _b2b_partner_id?: string
+              _location_id: string
+              _workshop_id?: string
+            }
+            Returns: string
+          }
       generate_purchase_order_number: { Args: never; Returns: string }
       generate_shipment_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }

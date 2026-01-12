@@ -10,7 +10,7 @@ const corsHeaders = {
 
 interface ApproveRequest {
   partnerId: string;
-  locationId?: string; // Optional: nur für internes Routing, nicht für B2B-Rechte
+  workshopId?: string; // Required: B2B partners must be linked to a workshop
 }
 
 Deno.serve(async (req) => {
@@ -71,13 +71,46 @@ Deno.serve(async (req) => {
     }
 
     const body: ApproveRequest = await req.json();
-    const { partnerId, locationId } = body;
+    const { partnerId, workshopId } = body;
 
     if (!partnerId) {
       return new Response(
         JSON.stringify({ error: 'Partner-ID erforderlich' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Verify workshop exists if provided
+    let workshop: { id: string; name: string } | null = null;
+    if (workshopId) {
+      const { data: workshopData, error: workshopError } = await supabaseAdmin
+        .from('workshops')
+        .select('id, name')
+        .eq('id', workshopId)
+        .single();
+
+      if (workshopError || !workshopData) {
+        return new Response(
+          JSON.stringify({ error: 'Werkstatt nicht gefunden' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      workshop = workshopData;
+    } else {
+      // Check if at least one workshop exists
+      const { data: workshops } = await supabaseAdmin
+        .from('workshops')
+        .select('id, name')
+        .eq('is_active', true)
+        .limit(1);
+
+      if (!workshops || workshops.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'Bitte legen Sie zuerst eine Werkstatt an, bevor Sie B2B-Partner freigeben.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      workshop = workshops[0];
     }
 
     // Get partner details
@@ -99,20 +132,6 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Partner ist bereits aktiv' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    // Optionally verify location exists (for internal routing only)
-    let location: { id: string; name: string } | null = null;
-    if (locationId) {
-      const { data: locationData, error: locationError } = await supabaseAdmin
-        .from('locations')
-        .select('id, name')
-        .eq('id', locationId)
-        .single();
-
-      if (!locationError && locationData) {
-        location = locationData;
-      }
     }
 
     const email = partner.contact_email;
@@ -157,14 +176,14 @@ Deno.serve(async (req) => {
       console.log('Created new user:', userId);
     }
 
-    // Create/update profile - B2B users do NOT have location_id (they're not internal employees)
+    // Create/update profile - B2B users have NO location_id (decoupled from Filialen)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: userId,
         name: partner.contact_name || partner.name,
         email: email,
-        // B2B users have NO location assignment - their access is via b2b_partner_id only
+        // B2B users have NO location assignment - fully decoupled from Filialen
         default_location_id: null,
         b2b_partner_id: partnerId,
         is_active: true,
@@ -193,17 +212,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update partner: set active and optionally link to internal location for routing
-    const updateData: { is_active: boolean; location_id?: string } = {
-      is_active: true,
-    };
-    if (locationId) {
-      updateData.location_id = locationId;
-    }
-    
+    // Update partner: set active and link to workshop (NOT location)
     const { error: updateError } = await supabaseAdmin
       .from('b2b_partners')
-      .update(updateData)
+      .update({
+        is_active: true,
+        workshop_id: workshop.id,
+        // Clear deprecated location_id
+        location_id: null,
+      })
       .eq('id', partnerId);
 
     if (updateError) {
@@ -276,7 +293,8 @@ Deno.serve(async (req) => {
             <div class="info-box">
               <strong>Deine Zugangsdaten:</strong><br>
               <strong>E-Mail:</strong> ${email}<br>
-              <strong>Firma:</strong> ${partner.name}
+              <strong>Firma:</strong> ${partner.name}<br>
+              <strong>Werkstatt:</strong> ${workshop.name}
             </div>
             
             <div class="steps">
@@ -326,7 +344,8 @@ Deno.serve(async (req) => {
       entity_id: partnerId,
       meta: { 
         partner_name: partner.name, 
-        location_id: locationId,
+        workshop_id: workshop.id,
+        workshop_name: workshop.name,
         created_user_id: userId,
       },
     });
@@ -335,6 +354,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         userId,
+        workshopId: workshop.id,
         message: 'Partner wurde freigegeben und Zugangsdaten versendet.',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

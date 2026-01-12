@@ -68,14 +68,14 @@ export default function B2BOrderNew() {
   const [includeCustomer, setIncludeCustomer] = useState(false);
   const [customerData, setCustomerData] = useState<B2BCustomerData>(emptyB2BCustomer);
 
-  // Get location from b2b_partner (not random .limit(1))
-  const locationId = b2bPartner?.location_id;
+  // Get workshop from b2b_partner (B2B is decoupled from locations)
+  const workshopId = b2bPartner?.workshop_id;
 
   // Create order mutation
   const createOrderMutation = useMutation({
     mutationFn: async () => {
-      if (!b2bPartnerId || !locationId) {
-        throw new Error('Fehlende Konfiguration. Bitte wenden Sie sich an den Support.');
+      if (!b2bPartnerId || !workshopId) {
+        throw new Error('Fehlende Werkstatt-Konfiguration. Bitte wenden Sie sich an den Support.');
       }
 
       // Validate IMEI for HANDY only: required unless unreadable
@@ -141,23 +141,25 @@ export default function B2BOrderNew() {
 
       if (deviceError) throw deviceError;
 
-      // 3. Generate order number
+      // 3. Generate order number (use workshop_id for B2B)
       const { data: ticketNumberData, error: ticketNumberError } = await supabase
         .rpc('generate_order_number', {
-          _location_id: locationId,
+          _location_id: null,
           _b2b_partner_id: b2bPartnerId,
+          _workshop_id: workshopId,
         });
 
       if (ticketNumberError) throw ticketNumberError;
 
-      // 4. Create repair ticket
+      // 4. Create repair ticket (B2B uses workshop_id, NOT location_id)
       const { data: ticket, error: ticketError } = await supabase
         .from('repair_tickets')
         .insert({
           ticket_number: ticketNumberData,
           customer_id: customerId,
           device_id: deviceData.id,
-          location_id: locationId,
+          location_id: null, // B2B tickets have no location
+          workshop_id: workshopId, // B2B tickets use workshop
           b2b_partner_id: b2bPartnerId,
           b2b_customer_id: b2bCustomerId,
           is_b2b: true,
