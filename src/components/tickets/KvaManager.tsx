@@ -82,6 +82,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [waiveFeeDialogOpen, setWaiveFeeDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [endcustomerPriceDialogOpen, setEndcustomerPriceDialogOpen] = useState(false);
   
   // Form states
   const [kvaType, setKvaType] = useState<string>('VARIABEL');
@@ -99,6 +100,10 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
   
   // Waiver form
   const [waiverReason, setWaiverReason] = useState<string>('');
+  
+  // B2B endcustomer price form
+  const [endcustomerPrice, setEndcustomerPrice] = useState<string>('');
+  const [releaseEndcustomerPrice, setReleaseEndcustomerPrice] = useState(false);
 
   // Fetch current KVA
   const { data: currentKva, isLoading: loadingKva } = useQuery({
@@ -447,6 +452,60 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     },
   });
 
+  // B2B: Set endcustomer price mutation
+  const setEndcustomerPriceMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentKva) throw new Error('Kein KVA vorhanden');
+
+      const parsedPrice = parseFloat(endcustomerPrice) || 0;
+
+      const { error } = await supabase
+        .from('kva_estimates')
+        .update({
+          endcustomer_price: parsedPrice,
+          endcustomer_price_released: releaseEndcustomerPrice,
+          updated_by: profile?.id,
+        })
+        .eq('id', currentKva.id);
+
+      if (error) throw error;
+
+      // Also update ticket
+      await supabase
+        .from('repair_tickets')
+        .update({
+          endcustomer_price: parsedPrice,
+          endcustomer_price_released: releaseEndcustomerPrice,
+        })
+        .eq('id', ticketId);
+
+      // Add history entry
+      await supabase.from('kva_history').insert({
+        kva_estimate_id: currentKva.id,
+        action: releaseEndcustomerPrice ? 'ENDKUNDENPREIS_FREIGEGEBEN' : 'ENDKUNDENPREIS_GESETZT',
+        new_values: { 
+          endcustomer_price: parsedPrice,
+          released: releaseEndcustomerPrice 
+        },
+        user_id: profile?.id,
+        note: releaseEndcustomerPrice 
+          ? `Endkundenpreis ${parsedPrice.toFixed(2)} € für Dokumente freigegeben`
+          : `Endkundenpreis auf ${parsedPrice.toFixed(2)} € gesetzt`,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
+      setEndcustomerPriceDialogOpen(false);
+      toast.success(releaseEndcustomerPrice 
+        ? 'Endkundenpreis freigegeben' 
+        : 'Endkundenpreis gespeichert');
+    },
+    onError: (error: any) => {
+      toast.error('Fehler: ' + error.message);
+    },
+  });
+
   const resetForm = () => {
     setKvaType('VARIABEL');
     setRepairCost('');
@@ -540,6 +599,48 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
                   {currentKva.kva_fee_amount?.toFixed(2)} €
                 </p>
               </div>
+
+              {/* B2B: Endcustomer Price Section */}
+              {ticket.is_b2b && (
+                <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Endkundenpreis</p>
+                      <p className="text-xs text-muted-foreground">
+                        {currentKva.endcustomer_price_released 
+                          ? 'Für Dokumente freigegeben'
+                          : 'Noch nicht für Dokumente freigegeben'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      {currentKva.endcustomer_price ? (
+                        <p className="text-lg font-semibold">{currentKva.endcustomer_price.toFixed(2)} €</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Nicht gesetzt</p>
+                      )}
+                      {currentKva.endcustomer_price_released && (
+                        <Badge variant="outline" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Freigegeben
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2 w-full"
+                    onClick={() => {
+                      setEndcustomerPrice(currentKva.endcustomer_price?.toString() || '');
+                      setReleaseEndcustomerPrice(currentKva.endcustomer_price_released || false);
+                      setEndcustomerPriceDialogOpen(true);
+                    }}
+                  >
+                    <Euro className="h-4 w-4 mr-2" />
+                    Endkundenpreis bearbeiten
+                  </Button>
+                </div>
+              )}
 
               {/* Validity */}
               {currentKva.valid_until && (
@@ -1006,6 +1107,78 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* B2B: Endcustomer Price Dialog */}
+      <Dialog open={endcustomerPriceDialogOpen} onOpenChange={setEndcustomerPriceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Endkundenpreis festlegen</DialogTitle>
+            <DialogDescription>
+              Legen Sie den Preis fest, der dem Endkunden auf Dokumenten angezeigt wird.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-muted/50">
+              <div className="flex justify-between text-sm">
+                <span>Interne Kosten (B2B-Preis)</span>
+                <span className="font-medium">{currentKva?.total_cost?.toFixed(2) || '0.00'} €</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Endkundenpreis (€)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={endcustomerPrice}
+                onChange={(e) => setEndcustomerPrice(e.target.value)}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground">
+                Dieser Preis wird auf Dokumenten für den Endkunden angezeigt.
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2 p-3 rounded-lg border">
+              <Checkbox
+                id="releasePrice"
+                checked={releaseEndcustomerPrice}
+                onCheckedChange={(checked) => setReleaseEndcustomerPrice(checked as boolean)}
+              />
+              <div>
+                <Label htmlFor="releasePrice" className="cursor-pointer">
+                  Endkundenpreis für Dokumente freigeben
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Der Preis wird auf Lieferscheinen und Reparaturberichten angezeigt
+                </p>
+              </div>
+            </div>
+
+            {releaseEndcustomerPrice && parseFloat(endcustomerPrice) > 0 && (
+              <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  ✓ Endkundenpreis von <strong>{parseFloat(endcustomerPrice).toFixed(2)} €</strong> wird auf Dokumenten angezeigt.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEndcustomerPriceDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button 
+              onClick={() => setEndcustomerPriceMutation.mutate()}
+              disabled={setEndcustomerPriceMutation.isPending || !endcustomerPrice}
+            >
+              {setEndcustomerPriceMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Speichern
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
