@@ -165,6 +165,7 @@ export type TicketStatus =
   | 'NEU_EINGEGANGEN' 
   | 'IN_DIAGNOSE' 
   | 'WARTET_AUF_TEIL_ODER_FREIGABE' 
+  | 'FREIGEGEBEN'
   | 'IN_REPARATUR' 
   | 'FERTIG_ZUR_ABHOLUNG' 
   | 'ABGEHOLT' 
@@ -177,6 +178,7 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
   NEU_EINGEGANGEN: 'Neu eingegangen',
   IN_DIAGNOSE: 'In Diagnose',
   WARTET_AUF_TEIL_ODER_FREIGABE: 'Wartet auf Teil/Freigabe',
+  FREIGEGEBEN: 'Freigegeben',
   IN_REPARATUR: 'In Reparatur',
   FERTIG_ZUR_ABHOLUNG: 'Fertig zur Abholung',
   ABGEHOLT: 'Abgeholt',
@@ -190,6 +192,7 @@ export const STATUS_COLORS: Record<TicketStatus, string> = {
   NEU_EINGEGANGEN: 'status-new',
   IN_DIAGNOSE: 'status-diagnosis',
   WARTET_AUF_TEIL_ODER_FREIGABE: 'status-waiting',
+  FREIGEGEBEN: 'status-approved',
   IN_REPARATUR: 'status-repair',
   FERTIG_ZUR_ABHOLUNG: 'status-ready',
   ABGEHOLT: 'status-done',

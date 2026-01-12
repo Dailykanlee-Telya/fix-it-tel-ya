@@ -51,6 +51,7 @@
     --status-new: 217 91% 40%;
     --status-diagnosis: 262 83% 58%;
     --status-waiting: 38 92% 50%;
+    --status-approved: 84 85% 42%;
     --status-repair: 199 89% 48%;
     --status-ready: 142 71% 45%;
     --status-done: 160 60% 35%;
@@ -185,6 +186,11 @@
 
   .status-waiting {
     @apply bg-accent/10 text-accent;
+  }
+
+  .status-approved {
+    background-color: hsl(84 85% 42% / 0.1);
+    color: hsl(84 85% 42%);
   }
 
   .status-repair {

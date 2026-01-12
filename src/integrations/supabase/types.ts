@@ -2646,6 +2646,7 @@ export type Database = {
         | "READY_FOR_PICKUP"
         | "REMINDER_NOT_PICKED"
         | "KVA_REMINDER"
+        | "KVA_B2B_APPROVED"
       part_category_enum:
         | "DISPLAY"
         | "AKKU"
@@ -2678,6 +2679,7 @@ export type Database = {
         | "NEU_EINGEGANGEN"
         | "IN_DIAGNOSE"
         | "WARTET_AUF_TEIL_ODER_FREIGABE"
+        | "FREIGEGEBEN"
         | "IN_REPARATUR"
         | "FERTIG_ZUR_ABHOLUNG"
         | "ABGEHOLT"
@@ -2886,6 +2888,7 @@ export const Constants = {
         "READY_FOR_PICKUP",
         "REMINDER_NOT_PICKED",
         "KVA_REMINDER",
+        "KVA_B2B_APPROVED",
       ],
       part_category_enum: [
         "DISPLAY",
@@ -2921,6 +2924,7 @@ export const Constants = {
         "NEU_EINGEGANGEN",
         "IN_DIAGNOSE",
         "WARTET_AUF_TEIL_ODER_FREIGABE",
+        "FREIGEGEBEN",
         "IN_REPARATUR",
         "FERTIG_ZUR_ABHOLUNG",
         "ABGEHOLT",

@@ -339,7 +339,8 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
 
       const newKvaStatus = approved ? 'FREIGEGEBEN' : 'ABGELEHNT';
       const oldTicketStatus = ticket.status;
-      const newTicketStatus = approved ? 'IN_REPARATUR' : 'WARTET_AUF_TEIL_ODER_FREIGABE';
+      // When manually approved, set to FREIGEGEBEN so workshop knows action is required
+      const newTicketStatus = approved ? 'FREIGEGEBEN' : 'WARTET_AUF_TEIL_ODER_FREIGABE';
 
       const { error } = await supabase
         .from('kva_estimates')
@@ -400,7 +401,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
       setApproveDialogOpen(false);
       setApprovalNote('');
       toast.success(approved 
-        ? 'KVA freigegeben - Auftrag ist jetzt "In Reparatur"' 
+        ? 'KVA freigegeben - Auftrag ist jetzt "Freigegeben" und wartet auf Bearbeitung' 
         : 'KVA abgelehnt');
       onStatusChange?.();
     },
