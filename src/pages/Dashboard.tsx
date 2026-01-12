@@ -19,6 +19,8 @@ import {
   TrendingUp,
   Eye,
   AlertCircle,
+  Zap,
+  PlayCircle,
 } from 'lucide-react';
 import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -47,6 +49,13 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
     bgColor: 'bg-amber-50 dark:bg-amber-950/50',
     borderColor: 'border-amber-200 dark:border-amber-800',
     icon: Timer 
+  },
+  FREIGEGEBEN: { 
+    label: 'Freigegeben', 
+    color: 'text-lime-700 dark:text-lime-400', 
+    bgColor: 'bg-lime-50 dark:bg-lime-950/50',
+    borderColor: 'border-lime-200 dark:border-lime-800',
+    icon: PlayCircle 
   },
   IN_REPARATUR: { 
     label: 'In Reparatur', 
@@ -149,6 +158,7 @@ export default function Dashboard() {
   });
 
   // Calculate statistics
+  const freigegebenCount = allTickets?.filter(t => t.status === 'FREIGEGEBEN').length || 0;
   const stats = {
     total: allTickets?.length || 0,
     todayNew: todayNewCount || 0,
@@ -157,11 +167,12 @@ export default function Dashboard() {
       const createdAt = new Date(t.created_at);
       return createdAt < sevenDaysAgo;
     }).length || 0,
+    freigegeben: freigegebenCount,
   };
 
   // Group tickets by status
   const ticketsByStatus: Record<string, any[]> = {};
-  const activeStatuses = ['NEU_EINGEGANGEN', 'IN_DIAGNOSE', 'WARTET_AUF_TEIL_ODER_FREIGABE', 'IN_REPARATUR', 'FERTIG_ZUR_ABHOLUNG'];
+  const activeStatuses = ['NEU_EINGEGANGEN', 'IN_DIAGNOSE', 'WARTET_AUF_TEIL_ODER_FREIGABE', 'FREIGEGEBEN', 'IN_REPARATUR', 'FERTIG_ZUR_ABHOLUNG'];
   activeStatuses.forEach(status => {
     ticketsByStatus[status] = allTickets?.filter(t => t.status === status) || [];
   });
@@ -201,7 +212,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards - All Clickable */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card 
           className="card-elevated hover:shadow-lg transition-shadow border-l-4 border-l-primary cursor-pointer"
           onClick={() => navigate('/tickets')}
@@ -214,6 +225,32 @@ export default function Dashboard() {
               </div>
               <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Ticket className="h-6 w-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* NEW: Bearbeitung erforderlich Card */}
+        <Card 
+          className={cn(
+            "card-elevated hover:shadow-lg transition-shadow border-l-4 cursor-pointer",
+            stats.freigegeben > 0 ? "border-l-lime-500 ring-2 ring-lime-500/30 animate-pulse" : "border-l-muted"
+          )}
+          onClick={() => navigate('/workshop?status=FREIGEGEBEN')}
+        >
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Bearbeitung erforderlich</p>
+                <p className={cn("text-3xl font-bold mt-1", stats.freigegeben > 0 ? "text-lime-600" : "text-foreground")}>
+                  {stats.freigegeben}
+                </p>
+              </div>
+              <div className={cn(
+                "h-12 w-12 rounded-xl flex items-center justify-center",
+                stats.freigegeben > 0 ? "bg-lime-500/10" : "bg-muted"
+              )}>
+                <PlayCircle className={cn("h-6 w-6", stats.freigegeben > 0 ? "text-lime-500" : "text-muted-foreground")} />
               </div>
             </div>
           </CardContent>
@@ -282,7 +319,7 @@ export default function Dashboard() {
       {/* Status Overview Cards */}
       <div>
         <h2 className="text-lg font-semibold mb-4">Status-Übersicht</h2>
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           {activeStatuses.map(status => {
             const config = STATUS_CONFIG[status];
             const count = ticketsByStatus[status]?.length || 0;

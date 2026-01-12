@@ -31,6 +31,7 @@ const STATUS_ORDER: TicketStatus[] = [
   'NEU_EINGEGANGEN',
   'IN_DIAGNOSE',
   'WARTET_AUF_TEIL_ODER_FREIGABE',
+  'FREIGEGEBEN',
   'IN_REPARATUR',
   'FERTIG_ZUR_ABHOLUNG',
 ];
@@ -50,6 +51,11 @@ const STATUS_CONFIG: Record<TicketStatus, { icon: React.ReactNode; color: string
     icon: <Timer className="h-4 w-4" />, 
     color: 'text-amber-600 dark:text-amber-400',
     bgColor: 'bg-amber-500'
+  },
+  'FREIGEGEBEN': { 
+    icon: <Zap className="h-4 w-4" />, 
+    color: 'text-lime-600 dark:text-lime-400',
+    bgColor: 'bg-lime-500'
   },
   'IN_REPARATUR': { 
     icon: <Wrench className="h-4 w-4" />, 
@@ -218,7 +224,7 @@ export default function Workshop() {
 
       {/* Kanban Board */}
       <div className="flex-1 overflow-x-auto min-h-0">
-        <div className="grid grid-cols-5 gap-3 h-full min-w-[1100px]">
+        <div className="grid grid-cols-6 gap-3 h-full min-w-[1300px]">
           {STATUS_ORDER.map((status) => {
             const config = STATUS_CONFIG[status];
             const statusTickets = ticketsByStatus[status] || [];

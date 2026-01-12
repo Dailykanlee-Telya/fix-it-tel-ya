@@ -343,9 +343,9 @@ Deno.serve(async (req) => {
         updateData.disposal_option = body.disposal_option;
       }
 
-      // Auto-transition to IN_REPARATUR if approved
+      // Auto-transition to FREIGEGEBEN if approved (workshop will then start repair)
       if (kva_approved) {
-        updateData.status = 'IN_REPARATUR';
+        updateData.status = 'FREIGEGEBEN';
       }
 
       const { error: updateError } = await supabase
@@ -365,8 +365,8 @@ Deno.serve(async (req) => {
       await supabase.from('status_history').insert({
         repair_ticket_id: ticket.id,
         old_status: ticket.status,
-        new_status: kva_approved ? 'IN_REPARATUR' : ticket.status,
-        note: kva_approved ? 'KVA vom Kunden angenommen - Reparatur startet' : `KVA vom Kunden abgelehnt${body.disposal_option === 'KOSTENLOS_ENTSORGEN' ? ' - Kostenlose Entsorgung gewählt' : ''}`,
+        new_status: kva_approved ? 'FREIGEGEBEN' : ticket.status,
+        note: kva_approved ? 'KVA vom Kunden freigegeben - Bearbeitung erforderlich' : `KVA vom Kunden abgelehnt${body.disposal_option === 'KOSTENLOS_ENTSORGEN' ? ' - Kostenlose Entsorgung gewählt' : ''}`,
       });
 
       // Create notifications for all employees
@@ -385,8 +385,10 @@ Deno.serve(async (req) => {
           related_ticket_id: ticket.id,
           user_id: userId,
           type: 'KVA_DECISION',
-          title: kva_approved ? 'KVA angenommen' : 'KVA abgelehnt',
-          message: `Kunde hat KVA für ${ticket.ticket_number} ${kva_approved ? 'angenommen' : 'abgelehnt'}.`,
+          title: kva_approved ? 'KVA freigegeben - Bearbeitung erforderlich' : 'KVA abgelehnt',
+          message: kva_approved 
+            ? `KVA für ${ticket.ticket_number} wurde freigegeben. Bitte Auftrag bearbeiten.`
+            : `Kunde hat KVA für ${ticket.ticket_number} abgelehnt.`,
           is_read: false,
         }));
 
