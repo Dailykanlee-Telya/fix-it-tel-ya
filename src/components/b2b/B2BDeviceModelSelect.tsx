@@ -81,19 +81,43 @@ export default function B2BDeviceModelSelect({
   });
 
   // Fetch models filtered by device type AND brand with proper sorting
+  // Apple: by sort_order descending (newest first), Others: alphabetically
   const { data: models } = useQuery({
     queryKey: ['device-catalog-models', catalogDeviceType, brand],
     queryFn: async () => {
       if (!brand) return [];
+      
+      const isApple = brand.toLowerCase() === 'apple';
+      
+      // For Apple: sort by sort_order (nulls last), then model
+      // For Others: sort alphabetically by model
       const { data, error } = await supabase
         .from('device_catalog')
         .select('model, sort_order')
         .eq('device_type', catalogDeviceType)
         .eq('brand', brand)
-        .order('sort_order', { ascending: true, nullsFirst: false })
+        .order('sort_order', { ascending: isApple ? true : true, nullsFirst: false })
         .order('model', { ascending: true });
       
       if (error) throw error;
+      
+      // For Apple, sort by sort_order (lower = newer like iPhone 16 = 1)
+      // For Others, just return alphabetically
+      if (isApple) {
+        return data
+          .sort((a, b) => {
+            // If both have sort_order, compare them
+            if (a.sort_order !== null && b.sort_order !== null) {
+              return a.sort_order - b.sort_order;
+            }
+            // Items without sort_order go to the end
+            if (a.sort_order === null) return 1;
+            if (b.sort_order === null) return -1;
+            return 0;
+          })
+          .map(d => d.model);
+      }
+      
       return data.map(d => d.model);
     },
     enabled: !!brand && !isOtherType,

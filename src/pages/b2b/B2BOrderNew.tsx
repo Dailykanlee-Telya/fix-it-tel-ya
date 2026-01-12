@@ -17,8 +17,9 @@ import B2BDeviceModelSelect from '@/components/b2b/B2BDeviceModelSelect';
 import DeviceConditionInput from '@/components/intake/DeviceConditionInput';
 import PasscodeInput from '@/components/intake/PasscodeInput';
 import B2BCustomerForm, { B2BCustomerData, emptyB2BCustomer } from '@/components/b2b/B2BCustomerForm';
+import B2BErrorCodeSelect from '@/components/b2b/B2BErrorCodeSelect';
 import { validateIMEI } from '@/lib/imei-validation';
-import { DeviceType } from '@/types/database';
+import { DeviceType, ErrorCode } from '@/types/database';
 
 interface DeviceData {
   device_type: DeviceType;
@@ -47,6 +48,7 @@ export default function B2BOrderNew() {
     serial_unreadable: false,
     color: '',
   });
+  const [errorCode, setErrorCode] = useState<ErrorCode | ''>('');
   const [errorDescription, setErrorDescription] = useState('');
   const [kvaOnly, setKvaOnly] = useState(false);
   const [autoApproveLimit, setAutoApproveLimit] = useState('');
@@ -160,6 +162,7 @@ export default function B2BOrderNew() {
           b2b_customer_id: b2bCustomerId,
           is_b2b: true,
           endcustomer_reference: endcustomerReference || null,
+          error_code: errorCode || null,
           error_description_text: errorDescription,
           kva_required: kvaOnly,
           auto_approved_limit: autoApproveLimit ? parseFloat(autoApproveLimit) : null,
@@ -490,6 +493,13 @@ export default function B2BOrderNew() {
             <CardTitle>Fehlerbeschreibung</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Error Code Select */}
+            <B2BErrorCodeSelect
+              value={errorCode}
+              onChange={setErrorCode}
+              deviceType={device.device_type}
+            />
+
             <div className="space-y-2">
               <Label htmlFor="error">Beschreibung des Fehlers *</Label>
               <Textarea
