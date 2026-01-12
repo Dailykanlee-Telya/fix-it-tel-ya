@@ -28,9 +28,9 @@ export default function B2BDashboard() {
 
       if (error) throw error;
 
-      const openStatuses = ['NEU_EINGEGANGEN', 'IN_DIAGNOSE', 'WARTET_AUF_TEIL_ODER_FREIGABE'];
-      const inRepairStatuses = ['IN_REPARATUR'];
-      const readyStatuses = ['FERTIG_ZUR_ABHOLUNG'];
+      const openStatuses = ['NEU_EINGEGANGEN', 'EINGESENDET', 'IN_DIAGNOSE', 'WARTET_AUF_TEIL_ODER_FREIGABE'];
+      const inRepairStatuses = ['FREIGEGEBEN', 'IN_REPARATUR'];
+      const readyStatuses = ['FERTIG_ZUR_ABHOLUNG', 'RUECKVERSAND_AN_B2B', 'RUECKVERSAND_AN_ENDKUNDE'];
 
       return {
         open: tickets?.filter(t => openStatuses.includes(t.status)).length || 0,

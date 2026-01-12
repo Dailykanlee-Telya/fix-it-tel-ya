@@ -30,17 +30,17 @@ export default function ModelRequestButton({ deviceType, brand, onSuccess }: Mod
 
   const createRequest = useMutation({
     mutationFn: async () => {
-      if (!b2bPartnerId || !modelName.trim()) {
+      if (!b2bPartnerId || !user?.id || !modelName.trim()) {
         throw new Error('Modellname erforderlich');
       }
 
+      // Don't set status - let it default from DB
       const { error } = await supabase.from('model_requests').insert({
         b2b_partner_id: b2bPartnerId,
-        requested_by: user?.id,
+        requested_by: user.id,
         device_type: deviceType,
         brand: brand,
         model_name: modelName.trim(),
-        status: 'PENDING',
       });
 
       if (error) throw error;
