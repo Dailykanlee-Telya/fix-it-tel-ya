@@ -356,8 +356,12 @@ export default function B2BOrderNew() {
                     deviceType={device.device_type}
                     brand={device.brand}
                     model={device.model}
-                    onBrandChange={(brand) => setDevice({ ...device, brand, model: '' })}
-                    onModelChange={(model) => setDevice({ ...device, model })}
+                    onBrandChange={(brand) =>
+                      setDevice((prev) => ({ ...prev, brand, model: '' }))
+                    }
+                    onModelChange={(model) =>
+                      setDevice((prev) => ({ ...prev, model }))
+                    }
                   />
                 </div>
                 <ModelRequestButton
