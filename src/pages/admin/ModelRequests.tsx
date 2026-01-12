@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
@@ -22,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Check, X, AlertCircle } from 'lucide-react';
+import { Loader2, Check, X, AlertCircle, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -43,8 +44,13 @@ interface ModelRequest {
 export default function ModelRequests() {
   const queryClient = useQueryClient();
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<ModelRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [editForm, setEditForm] = useState({
+    brand: '',
+    model_name: '',
+  });
 
   const { data: requests, isLoading } = useQuery({
     queryKey: ['model-requests'],
@@ -64,6 +70,26 @@ export default function ModelRequests() {
 
   const pendingRequests = requests?.filter(r => r.status === 'PENDING') || [];
   const processedRequests = requests?.filter(r => r.status !== 'PENDING') || [];
+
+  // Update model request (edit brand/model_name)
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, brand, model_name }: { id: string; brand: string; model_name: string }) => {
+      const { error } = await supabase
+        .from('model_requests')
+        .update({ brand, model_name })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Anfrage aktualisiert');
+      setEditDialogOpen(false);
+      setSelectedRequest(null);
+      queryClient.invalidateQueries({ queryKey: ['model-requests'] });
+    },
+    onError: (error: any) => {
+      toast.error('Fehler: ' + error.message);
+    },
+  });
 
   const approveMutation = useMutation({
     mutationFn: async (request: ModelRequest) => {
@@ -131,11 +157,29 @@ export default function ModelRequests() {
     setRejectDialogOpen(true);
   };
 
+  const openEditDialog = (request: ModelRequest) => {
+    setSelectedRequest(request);
+    setEditForm({
+      brand: request.brand,
+      model_name: request.model_name,
+    });
+    setEditDialogOpen(true);
+  };
+
   const handleReject = () => {
     if (!selectedRequest) return;
     rejectMutation.mutate({
       requestId: selectedRequest.id,
       reason: rejectionReason,
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!selectedRequest) return;
+    updateMutation.mutate({
+      id: selectedRequest.id,
+      brand: editForm.brand,
+      model_name: editForm.model_name,
     });
   };
 
@@ -165,7 +209,7 @@ export default function ModelRequests() {
       <div>
         <h1 className="text-2xl font-bold">Modellanfragen</h1>
         <p className="text-muted-foreground">
-          B2B-Partner können fehlende Modelle anfragen
+          B2B-Partner können fehlende Modelle anfragen. Sie können die Angaben vor der Genehmigung bearbeiten.
         </p>
       </div>
 
@@ -177,7 +221,7 @@ export default function ModelRequests() {
             Offene Anfragen ({pendingRequests.length})
           </CardTitle>
           <CardDescription>
-            Diese Anfragen warten auf Ihre Bearbeitung
+            Prüfen und bearbeiten Sie die Anfragen vor der Genehmigung
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -213,6 +257,14 @@ export default function ModelRequests() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEditDialog(request)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Bearbeiten
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -276,6 +328,45 @@ export default function ModelRequests() {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anfrage bearbeiten</DialogTitle>
+            <DialogDescription>
+              Korrigieren Sie die Angaben vor der Genehmigung
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-brand">Hersteller</Label>
+              <Input
+                id="edit-brand"
+                value={editForm.brand}
+                onChange={(e) => setEditForm(f => ({ ...f, brand: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-model">Modellname</Label>
+              <Input
+                id="edit-model"
+                value={editForm.model_name}
+                onChange={(e) => setEditForm(f => ({ ...f, model_name: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
