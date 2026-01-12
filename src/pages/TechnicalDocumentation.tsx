@@ -4,7 +4,7 @@ import { FileText, Printer, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DOCUMENTATION_META, DOCUMENTATION_CHAPTERS, ENUM_REFERENCE } from "@/lib/technical-documentation";
 import { DOC_PDF_STYLES } from "@/lib/doc-pdf-styles";
-import { getDocumentLogo } from "@/lib/document-logo";
+import { getLogoBase64, DOCUMENT_LOGOS } from "@/lib/document-logo";
 
 const TechnicalDocumentation = () => {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ const TechnicalDocumentation = () => {
 
   const handlePrint = async () => {
     setIsPrinting(true);
-    const logo = await getDocumentLogo();
+    const logo = await getLogoBase64(DOCUMENT_LOGOS.a4);
     
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
