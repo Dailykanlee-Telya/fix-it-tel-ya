@@ -205,6 +205,7 @@ export type Database = {
           legal_footer: string | null
           location_id: string | null
           name: string
+          placeholder_customer_id: string | null
           primary_color: string | null
           privacy_policy_url: string | null
           secondary_color: string | null
@@ -232,6 +233,7 @@ export type Database = {
           legal_footer?: string | null
           location_id?: string | null
           name: string
+          placeholder_customer_id?: string | null
           primary_color?: string | null
           privacy_policy_url?: string | null
           secondary_color?: string | null
@@ -259,6 +261,7 @@ export type Database = {
           legal_footer?: string | null
           location_id?: string | null
           name?: string
+          placeholder_customer_id?: string | null
           primary_color?: string | null
           privacy_policy_url?: string | null
           secondary_color?: string | null
@@ -273,6 +276,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "b2b_partners_placeholder_customer_id_fkey"
+            columns: ["placeholder_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -2527,6 +2537,10 @@ export type Database = {
       generate_tracking_code: { Args: never; Returns: string }
       generate_tracking_token: { Args: never; Returns: string }
       get_b2b_partner_id: { Args: { _user_id: string }; Returns: string }
+      get_or_create_b2b_placeholder_customer: {
+        Args: { partner_id: string }
+        Returns: string
+      }
       get_stock_quantity: {
         Args: { _part_id: string; _stock_location_id?: string }
         Returns: number

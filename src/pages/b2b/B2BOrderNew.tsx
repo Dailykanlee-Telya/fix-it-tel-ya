@@ -67,33 +67,26 @@ export default function B2BOrderNew() {
   const [includeCustomer, setIncludeCustomer] = useState(false);
   const [customerData, setCustomerData] = useState<B2BCustomerData>(emptyB2BCustomer);
 
-  // Fetch locations
-  const { data: locations } = useQuery({
-    queryKey: ['locations'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('id, name')
-        .limit(1);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const defaultLocationId = locations?.[0]?.id;
+  // Get location from b2b_partner (not random .limit(1))
+  const locationId = b2bPartner?.location_id;
 
   // Create order mutation
   const createOrderMutation = useMutation({
     mutationFn: async () => {
-      if (!b2bPartnerId || !defaultLocationId) {
-        throw new Error('Fehlende Konfiguration');
+      if (!b2bPartnerId || !locationId) {
+        throw new Error('Fehlende Konfiguration. Bitte wenden Sie sich an den Support.');
       }
 
-      // Validate IMEI if provided and device is phone
-      if (device.device_type === 'HANDY' && device.imei_or_serial && !device.imei_unreadable) {
-        const validation = validateIMEI(device.imei_or_serial);
-        if (!validation.isValid) {
-          throw new Error(validation.error || 'Ungültige IMEI');
+      // Validate IMEI for HANDY only: required unless unreadable
+      if (device.device_type === 'HANDY') {
+        if (!device.imei_or_serial && !device.imei_unreadable) {
+          throw new Error('IMEI ist erforderlich oder markieren Sie "IMEI nicht lesbar"');
+        }
+        if (device.imei_or_serial && !device.imei_unreadable) {
+          const validation = validateIMEI(device.imei_or_serial);
+          if (!validation.isValid) {
+            throw new Error(validation.error || 'Ungültige IMEI');
+          }
         }
       }
 
@@ -123,18 +116,9 @@ export default function B2BOrderNew() {
         b2bCustomerId = newCustomer.id;
       }
 
-      // 1. Create a placeholder customer for B2B orders (required by repair_tickets FK)
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          first_name: b2bPartner?.name || 'B2B',
-          last_name: 'Partner',
-          phone: b2bPartner?.contact_phone || '0000000000',
-          email: b2bPartner?.contact_email,
-          address: `${b2bPartner?.street || ''}, ${b2bPartner?.zip || ''} ${b2bPartner?.city || ''}`.trim(),
-        })
-        .select('id')
-        .single();
+      // 1. Use reusable placeholder customer for this B2B partner (via DB function)
+      const { data: customerId, error: customerError } = await supabase
+        .rpc('get_or_create_b2b_placeholder_customer', { partner_id: b2bPartnerId });
 
       if (customerError) throw customerError;
 
@@ -142,13 +126,13 @@ export default function B2BOrderNew() {
       const { data: deviceData, error: deviceError } = await supabase
         .from('devices')
         .insert({
-          customer_id: customer.id,
+          customer_id: customerId,
           device_type: device.device_type,
           brand: device.brand,
           model: device.model,
           imei_or_serial: device.imei_or_serial || null,
-          imei_unreadable: device.imei_unreadable,
-          serial_unreadable: device.serial_unreadable,
+          imei_unreadable: device.device_type === 'HANDY' ? device.imei_unreadable : false,
+          serial_unreadable: device.device_type !== 'HANDY' ? device.serial_unreadable : false,
           color: device.color || null,
         })
         .select('id')
@@ -156,23 +140,23 @@ export default function B2BOrderNew() {
 
       if (deviceError) throw deviceError;
 
-      // 3. Generate order number using the new function
+      // 3. Generate order number
       const { data: ticketNumberData, error: ticketNumberError } = await supabase
         .rpc('generate_order_number', {
-          _location_id: defaultLocationId,
+          _location_id: locationId,
           _b2b_partner_id: b2bPartnerId,
         });
 
       if (ticketNumberError) throw ticketNumberError;
 
-      // 4. Create repair ticket with all new fields
+      // 4. Create repair ticket
       const { data: ticket, error: ticketError } = await supabase
         .from('repair_tickets')
         .insert({
           ticket_number: ticketNumberData,
-          customer_id: customer.id,
+          customer_id: customerId,
           device_id: deviceData.id,
-          location_id: defaultLocationId,
+          location_id: locationId,
           b2b_partner_id: b2bPartnerId,
           b2b_customer_id: b2bCustomerId,
           is_b2b: true,
@@ -184,10 +168,8 @@ export default function B2BOrderNew() {
           status: 'NEU_EINGEGANGEN',
           price_mode: 'KVA',
           legal_notes_ack: true,
-          // NEW: Device condition at intake
           device_condition_at_intake: deviceConditions,
           device_condition_remarks: deviceConditionRemarks || null,
-          // NEW: Passcode / Pattern
           passcode_type: passcodeType || null,
           passcode_pin: passcodeType === 'pin' ? passcodePin : null,
           passcode_pattern: passcodeType === 'pattern' ? passcodePattern : null,
@@ -219,6 +201,7 @@ export default function B2BOrderNew() {
 
   const handleImeiChange = (value: string) => {
     setDevice({ ...device, imei_or_serial: value });
+    // Only validate IMEI for HANDY devices
     if (device.device_type === 'HANDY' && value && !device.imei_unreadable) {
       const validation = validateIMEI(value);
       setImeiError(validation.isValid ? '' : (validation.error || ''));
@@ -227,13 +210,28 @@ export default function B2BOrderNew() {
     }
   };
 
+  const isHandy = device.device_type === 'HANDY';
+  const isOtherDevice = device.device_type === 'OTHER';
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!device.brand || !device.model) {
       toast({
         title: 'Fehler',
-        description: 'Bitte wählen Sie Marke und Modell aus.',
+        description: isOtherDevice 
+          ? 'Bitte geben Sie Marke und Modell ein.'
+          : 'Bitte wählen Sie Marke und Modell aus.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // IMEI required for HANDY unless marked as unreadable
+    if (isHandy && !device.imei_or_serial && !device.imei_unreadable) {
+      toast({
+        title: 'Fehler',
+        description: 'IMEI ist erforderlich. Markieren Sie "IMEI nicht lesbar" falls nicht vorhanden.',
         variant: 'destructive',
       });
       return;
@@ -350,56 +348,90 @@ export default function B2BOrderNew() {
               </Select>
             </div>
 
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <DeviceModelSelect
+            {/* DeviceModelSelect is hidden for OTHER, uses free text */}
+            {!isOtherDevice && (
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <DeviceModelSelect
+                    deviceType={device.device_type}
+                    brand={device.brand}
+                    model={device.model}
+                    onBrandChange={(brand) => setDevice({ ...device, brand, model: '' })}
+                    onModelChange={(model) => setDevice({ ...device, model })}
+                  />
+                </div>
+                <ModelRequestButton
                   deviceType={device.device_type}
                   brand={device.brand}
-                  model={device.model}
-                  onBrandChange={(brand) => setDevice({ ...device, brand, model: '' })}
-                  onModelChange={(model) => setDevice({ ...device, model })}
                 />
               </div>
-              <ModelRequestButton
-                deviceType={device.device_type}
-                brand={device.brand}
-              />
-            </div>
+            )}
+
+            {/* Free text brand/model for OTHER device type */}
+            {isOtherDevice && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="brand">Marke *</Label>
+                  <Input
+                    id="brand"
+                    placeholder="Hersteller/Marke eingeben..."
+                    value={device.brand}
+                    onChange={(e) => setDevice({ ...device, brand: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="model">Gerätemodell / Bezeichnung *</Label>
+                  <Input
+                    id="model"
+                    placeholder="Modell oder Bezeichnung eingeben..."
+                    value={device.model}
+                    onChange={(e) => setDevice({ ...device, model: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* IMEI for HANDY, optional Serial for others */}
               <div className="space-y-2">
                 <Label htmlFor="imei">
-                  {device.device_type === 'HANDY' ? 'IMEI' : 'Seriennummer'}
+                  {isHandy ? 'IMEI *' : 'Seriennummer (optional)'}
                 </Label>
                 <Input
                   id="imei"
-                  placeholder={device.device_type === 'HANDY' ? '15-stellige IMEI' : 'Seriennummer'}
+                  placeholder={isHandy ? '15-stellige IMEI' : 'Seriennummer (falls vorhanden)'}
                   value={device.imei_or_serial}
                   onChange={(e) => handleImeiChange(e.target.value)}
-                  disabled={device.imei_unreadable || device.serial_unreadable}
+                  disabled={isHandy ? device.imei_unreadable : device.serial_unreadable}
                   className={imeiError ? 'border-destructive' : ''}
                 />
                 {imeiError && (
                   <p className="text-sm text-destructive">{imeiError}</p>
                 )}
-                <div className="flex items-center space-x-2 pt-1">
-                  <Checkbox
-                    id="imei-unreadable"
-                    checked={device.imei_unreadable || device.serial_unreadable}
-                    onCheckedChange={(checked) => {
-                      setDevice({
-                        ...device,
-                        imei_unreadable: !!checked,
-                        serial_unreadable: !!checked,
-                        imei_or_serial: '',
-                      });
-                      setImeiError('');
-                    }}
-                  />
-                  <Label htmlFor="imei-unreadable" className="text-sm text-muted-foreground">
-                    Nicht lesbar
-                  </Label>
-                </div>
+                {isHandy && (
+                  <div className="flex items-center space-x-2 pt-1">
+                    <Checkbox
+                      id="imei-unreadable"
+                      checked={device.imei_unreadable}
+                      onCheckedChange={(checked) => {
+                        setDevice({
+                          ...device,
+                          imei_unreadable: !!checked,
+                          imei_or_serial: '',
+                        });
+                        setImeiError('');
+                      }}
+                    />
+                    <Label htmlFor="imei-unreadable" className="text-sm text-muted-foreground">
+                      IMEI nicht lesbar
+                    </Label>
+                  </div>
+                )}
+                {!isHandy && (
+                  <p className="text-xs text-muted-foreground">
+                    Seriennummer ist optional für diesen Gerätetyp.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
