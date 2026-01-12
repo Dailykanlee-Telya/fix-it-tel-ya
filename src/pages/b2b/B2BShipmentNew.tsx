@@ -198,8 +198,8 @@ export default function B2BShipmentNew() {
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="select-all"
-                      checked={selectedTickets.size === availableTickets?.length && availableTickets.length > 0}
-                      onCheckedChange={selectAll}
+                      checked={availableTickets && availableTickets.length > 0 && selectedTickets.size === availableTickets.length}
+                      onCheckedChange={() => selectAll()}
                     />
                     <Label htmlFor="select-all" className="text-sm">
                       Alle auswählen ({availableTickets?.length || 0})
@@ -224,10 +224,10 @@ export default function B2BShipmentNew() {
                       {availableTickets?.map((ticket) => (
                         <TableRow 
                           key={ticket.id}
-                          className="cursor-pointer"
+                          className="cursor-pointer hover:bg-muted/50"
                           onClick={() => toggleTicket(ticket.id)}
                         >
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={selectedTickets.has(ticket.id)}
                               onCheckedChange={() => toggleTicket(ticket.id)}
