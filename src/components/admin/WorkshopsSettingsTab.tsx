@@ -75,14 +75,25 @@ export default function WorkshopsSettingsTab() {
     },
   });
 
+  // Generate code from name if not provided
+  const generateCode = (name: string): string => {
+    if (!name) return '';
+    // Take first 3 characters of the first word, uppercase
+    return name.trim().substring(0, 3).toUpperCase();
+  };
+
   // Create workshop mutation
   const createMutation = useMutation({
     mutationFn: async (workshop: typeof newWorkshop) => {
+      const code = workshop.code?.trim() 
+        ? workshop.code.toUpperCase().substring(0, 3) 
+        : generateCode(workshop.name);
+      
       const { data, error } = await supabase
         .from('workshops')
         .insert({
           name: workshop.name,
-          code: workshop.code?.toUpperCase().substring(0, 3) || null,
+          code: code || null,
           address: {
             street: workshop.street || null,
             zip: workshop.zip || null,
@@ -193,12 +204,12 @@ export default function WorkshopsSettingsTab() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ws-code">Kürzel *</Label>
+                  <Label htmlFor="ws-code">Kürzel</Label>
                   <Input
                     id="ws-code"
                     value={newWorkshop.code}
                     onChange={(e) => setNewWorkshop({ ...newWorkshop, code: e.target.value.toUpperCase().substring(0, 3) })}
-                    placeholder="ZW"
+                    placeholder={newWorkshop.name ? generateCode(newWorkshop.name) : 'Auto'}
                     maxLength={3}
                     className="uppercase"
                   />
@@ -235,7 +246,7 @@ export default function WorkshopsSettingsTab() {
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Abbrechen</Button>
               <Button 
                 onClick={() => createMutation.mutate(newWorkshop)}
-                disabled={!newWorkshop.name || !newWorkshop.code || createMutation.isPending}
+                disabled={!newWorkshop.name.trim() || createMutation.isPending}
               >
                 {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Erstellen
