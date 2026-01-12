@@ -2359,33 +2359,74 @@ export type Database = {
       }
       ticket_part_usage: {
         Row: {
+          approval_note: string | null
+          approval_status: Database["public"]["Enums"]["approval_status"] | null
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           id: string
+          note: string | null
           part_id: string
           quantity: number
+          reason: Database["public"]["Enums"]["part_usage_reason"]
           repair_ticket_id: string
-          unit_purchase_price: number | null
-          unit_sales_price: number | null
+          requires_admin_approval: boolean
+          reserved_at: string | null
+          stock_movement_id: string | null
+          updated_at: string
+          used_by_role: string
+          used_by_user_id: string
         }
         Insert: {
+          approval_note?: string | null
+          approval_status?:
+            | Database["public"]["Enums"]["approval_status"]
+            | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           id?: string
+          note?: string | null
           part_id: string
           quantity?: number
+          reason?: Database["public"]["Enums"]["part_usage_reason"]
           repair_ticket_id: string
-          unit_purchase_price?: number | null
-          unit_sales_price?: number | null
+          requires_admin_approval?: boolean
+          reserved_at?: string | null
+          stock_movement_id?: string | null
+          updated_at?: string
+          used_by_role: string
+          used_by_user_id: string
         }
         Update: {
+          approval_note?: string | null
+          approval_status?:
+            | Database["public"]["Enums"]["approval_status"]
+            | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           id?: string
+          note?: string | null
           part_id?: string
           quantity?: number
+          reason?: Database["public"]["Enums"]["part_usage_reason"]
           repair_ticket_id?: string
-          unit_purchase_price?: number | null
-          unit_sales_price?: number | null
+          requires_admin_approval?: boolean
+          reserved_at?: string | null
+          stock_movement_id?: string | null
+          updated_at?: string
+          used_by_role?: string
+          used_by_user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ticket_part_usage_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ticket_part_usage_part_id_fkey"
             columns: ["part_id"]
@@ -2398,6 +2439,20 @@ export type Database = {
             columns: ["repair_ticket_id"]
             isOneToOne: false
             referencedRelation: "repair_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_part_usage_stock_movement_id_fkey"
+            columns: ["stock_movement_id"]
+            isOneToOne: false
+            referencedRelation: "stock_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_part_usage_used_by_user_id_fkey"
+            columns: ["used_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2543,6 +2598,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_part_usage: {
+        Args: { _approved: boolean; _note?: string; _usage_id: string }
+        Returns: boolean
+      }
+      book_part_usage: {
+        Args: {
+          _note?: string
+          _part_id: string
+          _quantity: number
+          _reason: Database["public"]["Enums"]["part_usage_reason"]
+          _ticket_id: string
+        }
+        Returns: string
+      }
       can_view_location: {
         Args: { _location_id: string; _user_id: string }
         Returns: boolean
@@ -2653,6 +2722,7 @@ export type Database = {
         | "B2B_ADMIN"
         | "B2B_USER"
         | "B2B_INHABER"
+      approval_status: "PENDING" | "APPROVED" | "REJECTED"
       b2b_shipment_status:
         | "ANGELEGT"
         | "GERAETE_UNTERWEGS"
@@ -2725,6 +2795,13 @@ export type Database = {
         | "FLEXKABEL"
         | "BUTTONS"
         | "VIBRATIONSMOTOR"
+        | "SONSTIGES"
+      part_usage_reason:
+        | "REPARATUR"
+        | "TEST"
+        | "AUSTAUSCH"
+        | "FEHLERTEIL"
+        | "SELBSTVERSCHULDEN"
         | "SONSTIGES"
       price_mode: "FIXPREIS" | "KVA" | "NACH_AUFWAND"
       stock_movement_type:
@@ -2889,6 +2966,7 @@ export const Constants = {
         "B2B_USER",
         "B2B_INHABER",
       ],
+      approval_status: ["PENDING", "APPROVED", "REJECTED"],
       b2b_shipment_status: [
         "ANGELEGT",
         "GERAETE_UNTERWEGS",
@@ -2968,6 +3046,14 @@ export const Constants = {
         "FLEXKABEL",
         "BUTTONS",
         "VIBRATIONSMOTOR",
+        "SONSTIGES",
+      ],
+      part_usage_reason: [
+        "REPARATUR",
+        "TEST",
+        "AUSTAUSCH",
+        "FEHLERTEIL",
+        "SELBSTVERSCHULDEN",
         "SONSTIGES",
       ],
       price_mode: ["FIXPREIS", "KVA", "NACH_AUFWAND"],
