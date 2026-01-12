@@ -2296,6 +2296,7 @@ export type Database = {
           created_at: string
           id: string
           message_text: string
+          message_type: string
           repair_ticket_id: string
           sender_type: string
           sender_user_id: string | null
@@ -2304,6 +2305,7 @@ export type Database = {
           created_at?: string
           id?: string
           message_text: string
+          message_type?: string
           repair_ticket_id: string
           sender_type: string
           sender_user_id?: string | null
@@ -2312,6 +2314,7 @@ export type Database = {
           created_at?: string
           id?: string
           message_text?: string
+          message_type?: string
           repair_ticket_id?: string
           sender_type?: string
           sender_user_id?: string | null

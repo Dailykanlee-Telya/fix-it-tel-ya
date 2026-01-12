@@ -35,7 +35,8 @@ export default function B2BOrders() {
           created_at,
           kva_approved,
           kva_required,
-          device:devices(device_type, brand, model)
+          internal_price,
+          device:devices(device_type, brand, model, imei_or_serial)
         `)
         .eq('b2b_partner_id', b2bPartnerId)
         .order('created_at', { ascending: false });
@@ -152,7 +153,9 @@ export default function B2BOrders() {
                     <TableHead>Auftragsnummer</TableHead>
                     <TableHead>Endkunden-Referenz</TableHead>
                     <TableHead>Gerät</TableHead>
+                    <TableHead>IMEI/Serial</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Telya-Preis</TableHead>
                     <TableHead>KVA</TableHead>
                     <TableHead>Erstellt</TableHead>
                   </TableRow>
@@ -180,10 +183,16 @@ export default function B2BOrders() {
                           </div>
                         ) : '-'}
                       </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {order.device?.imei_or_serial || '-'}
+                      </TableCell>
                       <TableCell>
                         <Badge className={STATUS_COLORS[order.status as TicketStatus]}>
                           {STATUS_LABELS[order.status as TicketStatus]}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {order.internal_price ? `${order.internal_price.toFixed(2)} €` : '-'}
                       </TableCell>
                       <TableCell>
                         {order.kva_required ? (
