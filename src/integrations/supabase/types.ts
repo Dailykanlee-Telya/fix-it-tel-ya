@@ -2310,6 +2310,7 @@ export type Database = {
           id: string
           message_text: string
           message_type: string
+          message_type_enum: Database["public"]["Enums"]["message_type"] | null
           repair_ticket_id: string
           sender_type: string
           sender_user_id: string | null
@@ -2319,6 +2320,7 @@ export type Database = {
           id?: string
           message_text: string
           message_type?: string
+          message_type_enum?: Database["public"]["Enums"]["message_type"] | null
           repair_ticket_id: string
           sender_type: string
           sender_user_id?: string | null
@@ -2328,6 +2330,7 @@ export type Database = {
           id?: string
           message_text?: string
           message_type?: string
+          message_type_enum?: Database["public"]["Enums"]["message_type"] | null
           repair_ticket_id?: string
           sender_type?: string
           sender_user_id?: string | null
@@ -2459,7 +2462,9 @@ export type Database = {
       }
       ticket_photos: {
         Row: {
+          b2b_visible: boolean
           category: string | null
+          category_enum: Database["public"]["Enums"]["photo_category"] | null
           created_at: string
           customer_visible: boolean | null
           file_name: string
@@ -2471,7 +2476,9 @@ export type Database = {
           storage_url: string
         }
         Insert: {
+          b2b_visible?: boolean
           category?: string | null
+          category_enum?: Database["public"]["Enums"]["photo_category"] | null
           created_at?: string
           customer_visible?: boolean | null
           file_name: string
@@ -2483,7 +2490,9 @@ export type Database = {
           storage_url: string
         }
         Update: {
+          b2b_visible?: boolean
           category?: string | null
+          category_enum?: Database["public"]["Enums"]["photo_category"] | null
           created_at?: string
           customer_visible?: boolean | null
           file_name?: string
@@ -2771,6 +2780,7 @@ export type Database = {
         | "RUECKFRAGE"
         | "ABGELAUFEN"
       kva_type: "FIXPREIS" | "VARIABEL" | "BIS_ZU"
+      message_type: "internal_note" | "b2b_message" | "customer_message"
       notification_channel: "EMAIL" | "SMS" | "WHATSAPP"
       notification_trigger:
         | "TICKET_CREATED"
@@ -2803,6 +2813,12 @@ export type Database = {
         | "FEHLERTEIL"
         | "SELBSTVERSCHULDEN"
         | "SONSTIGES"
+      photo_category:
+        | "zustand_eingang"
+        | "schadensbild"
+        | "reparatur_vorher"
+        | "reparatur_nachher"
+        | "sonstiges"
       price_mode: "FIXPREIS" | "KVA" | "NACH_AUFWAND"
       stock_movement_type:
         | "PURCHASE"
@@ -3021,6 +3037,7 @@ export const Constants = {
         "ABGELAUFEN",
       ],
       kva_type: ["FIXPREIS", "VARIABEL", "BIS_ZU"],
+      message_type: ["internal_note", "b2b_message", "customer_message"],
       notification_channel: ["EMAIL", "SMS", "WHATSAPP"],
       notification_trigger: [
         "TICKET_CREATED",
@@ -3055,6 +3072,13 @@ export const Constants = {
         "FEHLERTEIL",
         "SELBSTVERSCHULDEN",
         "SONSTIGES",
+      ],
+      photo_category: [
+        "zustand_eingang",
+        "schadensbild",
+        "reparatur_vorher",
+        "reparatur_nachher",
+        "sonstiges",
       ],
       price_mode: ["FIXPREIS", "KVA", "NACH_AUFWAND"],
       stock_movement_type: [
