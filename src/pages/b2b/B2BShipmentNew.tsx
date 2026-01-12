@@ -25,14 +25,14 @@ export default function B2BShipmentNew() {
   const [notes, setNotes] = useState('');
   const [generateLabel, setGenerateLabel] = useState(true);
 
-  // Sender address (editable)
-  const [senderAddress, setSenderAddress] = useState({
+  // Sender address from B2B partner (readonly)
+  const senderAddress = {
     name: b2bPartner?.name || '',
     street: b2bPartner?.street || '',
     zip: b2bPartner?.zip || '',
     city: b2bPartner?.city || '',
     country: b2bPartner?.country || 'Deutschland',
-  });
+  };
 
   // Fetch available tickets (not yet assigned to a shipment)
   const { data: availableTickets, isLoading } = useQuery({
@@ -271,38 +271,21 @@ export default function B2BShipmentNew() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="sender-name">Firma / Name</Label>
-                <Input
-                  id="sender-name"
-                  value={senderAddress.name}
-                  onChange={(e) => setSenderAddress({ ...senderAddress, name: e.target.value })}
-                />
+            <p className="text-sm text-muted-foreground">
+              Absender wird automatisch aus Ihren Firmendaten übernommen.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div className="md:col-span-2">
+                <p className="text-sm font-medium">{senderAddress.name}</p>
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="sender-street">Straße</Label>
-                <Input
-                  id="sender-street"
-                  value={senderAddress.street}
-                  onChange={(e) => setSenderAddress({ ...senderAddress, street: e.target.value })}
-                />
+              <div className="md:col-span-2">
+                <p className="text-sm text-muted-foreground">{senderAddress.street}</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="sender-zip">PLZ</Label>
-                <Input
-                  id="sender-zip"
-                  value={senderAddress.zip}
-                  onChange={(e) => setSenderAddress({ ...senderAddress, zip: e.target.value })}
-                />
+              <div>
+                <p className="text-sm text-muted-foreground">{senderAddress.zip} {senderAddress.city}</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="sender-city">Stadt</Label>
-                <Input
-                  id="sender-city"
-                  value={senderAddress.city}
-                  onChange={(e) => setSenderAddress({ ...senderAddress, city: e.target.value })}
-                />
+              <div>
+                <p className="text-sm text-muted-foreground">{senderAddress.country}</p>
               </div>
             </div>
           </CardContent>

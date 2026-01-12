@@ -13,8 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Loader2, ArrowLeft, ChevronDown, User } from 'lucide-react';
-import DeviceModelSelect from '@/components/DeviceModelSelect';
-import ModelRequestButton from '@/components/b2b/ModelRequestButton';
+import B2BDeviceModelSelect from '@/components/b2b/B2BDeviceModelSelect';
 import DeviceConditionInput from '@/components/intake/DeviceConditionInput';
 import PasscodeInput from '@/components/intake/PasscodeInput';
 import B2BCustomerForm, { B2BCustomerData, emptyB2BCustomer } from '@/components/b2b/B2BCustomerForm';
@@ -348,27 +347,19 @@ export default function B2BOrderNew() {
               </Select>
             </div>
 
-            {/* DeviceModelSelect is hidden for OTHER, uses free text */}
+            {/* B2BDeviceModelSelect is hidden for OTHER, uses free text */}
             {!isOtherDevice && (
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <DeviceModelSelect
-                    deviceType={device.device_type}
-                    brand={device.brand}
-                    model={device.model}
-                    onBrandChange={(brand) =>
-                      setDevice((prev) => ({ ...prev, brand, model: '' }))
-                    }
-                    onModelChange={(model) =>
-                      setDevice((prev) => ({ ...prev, model }))
-                    }
-                  />
-                </div>
-                <ModelRequestButton
-                  deviceType={device.device_type}
-                  brand={device.brand}
-                />
-              </div>
+              <B2BDeviceModelSelect
+                deviceType={device.device_type}
+                brand={device.brand}
+                model={device.model}
+                onBrandChange={(brand) =>
+                  setDevice((prev) => ({ ...prev, brand, model: '' }))
+                }
+                onModelChange={(model) =>
+                  setDevice((prev) => ({ ...prev, model }))
+                }
+              />
             )}
 
             {/* Free text brand/model for OTHER device type */}
