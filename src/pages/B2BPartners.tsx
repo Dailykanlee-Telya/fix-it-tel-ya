@@ -41,7 +41,7 @@ interface PartnerUser {
   b2b_partner_id: string | null;
 }
 
-interface Workshop {
+interface Location {
   id: string;
   name: string;
 }
@@ -55,7 +55,7 @@ export default function B2BPartners() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAssignUserOpen, setIsAssignUserOpen] = useState(false);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
-  const [approveWorkshopId, setApproveWorkshopId] = useState<string>('');
+  const [approveLocationId, setApproveLocationId] = useState<string>('');
   const [selectedPartner, setSelectedPartner] = useState<B2BPartner | null>(null);
   const [newPartner, setNewPartner] = useState({
     name: '',
@@ -97,17 +97,16 @@ export default function B2BPartners() {
     },
   });
 
-  // Fetch workshops for approval
-  const { data: workshops } = useQuery({
-    queryKey: ['workshops'],
+  // Fetch locations for approval
+  const { data: locations } = useQuery({
+    queryKey: ['locations'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('workshops')
+        .from('locations')
         .select('id, name')
-        .eq('is_active', true)
         .order('name');
       if (error) throw error;
-      return data as Workshop[];
+      return data as Location[];
     },
   });
 
@@ -220,15 +219,11 @@ export default function B2BPartners() {
 
   // Approve partner mutation - uses Edge Function
   const approvePartnerMutation = useMutation({
-    mutationFn: async ({ partner, workshopId }: { partner: B2BPartner; workshopId: string }) => {
-      if (!workshopId) {
-        throw new Error('Bitte wählen Sie eine Werkstatt aus.');
-      }
-      
+    mutationFn: async ({ partner, locationId }: { partner: B2BPartner; locationId?: string }) => {
       const { data, error } = await supabase.functions.invoke('b2b-approve-partner', {
         body: {
           partnerId: partner.id,
-          workshopId,
+          ...(locationId && { locationId }), // Optional: nur für internes Routing
         },
       });
       
@@ -244,7 +239,7 @@ export default function B2BPartners() {
       queryClient.invalidateQueries({ queryKey: ['b2b-partners-admin'] });
       setIsApproveOpen(false);
       setSelectedPartner(null);
-      setApproveWorkshopId('');
+      setApproveLocationId('');
     },
     onError: (error: Error) => {
       toast({ 
@@ -663,7 +658,7 @@ export default function B2BPartners() {
                               className="flex-1 lg:flex-none gap-2"
                               onClick={() => {
                                 setSelectedPartner(partner);
-                                setApproveWorkshopId('');
+                                setApproveLocationId(''); // Keine Pflicht-Filiale
                                 setIsApproveOpen(true);
                               }}
                             >
@@ -909,7 +904,7 @@ export default function B2BPartners() {
         setIsApproveOpen(open);
         if (!open) {
           setSelectedPartner(null);
-          setApproveWorkshopId('');
+          setApproveLocationId('');
         }
       }}>
         <DialogContent>
@@ -934,27 +929,23 @@ export default function B2BPartners() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="approve-workshop">Werkstatt zuordnen *</Label>
-                <Select value={approveWorkshopId} onValueChange={setApproveWorkshopId}>
-                  <SelectTrigger id="approve-workshop">
-                    <SelectValue placeholder="Werkstatt auswählen..." />
+                <Label htmlFor="approve-location">Interne Telya-Filiale (optional)</Label>
+                <Select value={approveLocationId} onValueChange={setApproveLocationId}>
+                  <SelectTrigger id="approve-location">
+                    <SelectValue placeholder="Keine Zuordnung" />
                   </SelectTrigger>
                   <SelectContent>
-                    {workshops?.map((ws) => (
-                      <SelectItem key={ws.id} value={ws.id}>
-                        {ws.name}
+                    <SelectItem value="none">Keine Zuordnung</SelectItem>
+                    {locations?.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  B2B-Aufträge werden an diese Werkstatt weitergeleitet.
+                  Nur für interne Bearbeitung/Routing. Hat keinen Einfluss auf die Rechte des B2B-Partners.
                 </p>
-                {workshops?.length === 0 && (
-                  <p className="text-xs text-destructive">
-                    Keine Werkstätten vorhanden. Bitte erst unter Einstellungen → Werkstätten anlegen.
-                  </p>
-                )}
               </div>
             </div>
           )}
@@ -965,14 +956,15 @@ export default function B2BPartners() {
             </Button>
             <Button
               onClick={() => {
-                if (selectedPartner && approveWorkshopId) {
+                if (selectedPartner) {
+                  const locationToSend = approveLocationId === 'none' || !approveLocationId ? undefined : approveLocationId;
                   approvePartnerMutation.mutate({ 
                     partner: selectedPartner, 
-                    workshopId: approveWorkshopId 
+                    locationId: locationToSend 
                   });
                 }
               }}
-              disabled={approvePartnerMutation.isPending || !approveWorkshopId}
+              disabled={approvePartnerMutation.isPending}
             >
               {approvePartnerMutation.isPending ? (
                 <>

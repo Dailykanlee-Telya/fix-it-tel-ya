@@ -21,8 +21,6 @@ import {
   AlertCircle,
   Zap,
   PlayCircle,
-  Building2,
-  ShieldAlert,
 } from 'lucide-react';
 import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -143,35 +141,6 @@ export default function Dashboard() {
     },
   });
 
-  // Fetch pending part usage approvals (Selbstverschulden)
-  const { data: pendingApprovals } = useQuery({
-    queryKey: ['pending-part-approvals'],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('ticket_part_usage')
-        .select('*', { count: 'exact', head: true })
-        .eq('approval_status', 'PENDING');
-      
-      if (error) throw error;
-      return count || 0;
-    },
-  });
-
-  // Fetch B2B orders waiting for approval (KVA open)
-  const { data: b2bPendingKva } = useQuery({
-    queryKey: ['b2b-pending-kva'],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from('repair_tickets')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_b2b', true)
-        .eq('status', 'WARTET_AUF_TEIL_ODER_FREIGABE');
-      
-      if (error) throw error;
-      return count || 0;
-    },
-  });
-
   // Fetch parts with low stock
   const { data: lowStockParts } = useQuery({
     queryKey: ['low-stock-parts'],
@@ -199,8 +168,6 @@ export default function Dashboard() {
       return createdAt < sevenDaysAgo;
     }).length || 0,
     freigegeben: freigegebenCount,
-    pendingApprovals: pendingApprovals || 0,
-    b2bPendingKva: b2bPendingKva || 0,
   };
 
   // Group tickets by status
@@ -245,7 +212,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPI Cards - All Clickable */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card 
           className="card-elevated hover:shadow-lg transition-shadow border-l-4 border-l-primary cursor-pointer"
           onClick={() => navigate('/tickets')}
@@ -253,7 +220,7 @@ export default function Dashboard() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Offene Aufträge</p>
+                <p className="text-sm font-medium text-muted-foreground">Offene Aufträge gesamt</p>
                 <p className="text-3xl font-bold text-foreground mt-1">{stats.total}</p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -263,7 +230,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Bearbeitung erforderlich */}
+        {/* NEW: Bearbeitung erforderlich Card */}
         <Card 
           className={cn(
             "card-elevated hover:shadow-lg transition-shadow border-l-4 cursor-pointer",
@@ -274,7 +241,7 @@ export default function Dashboard() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Bearbeitung erf.</p>
+                <p className="text-sm font-medium text-muted-foreground">Bearbeitung erforderlich</p>
                 <p className={cn("text-3xl font-bold mt-1", stats.freigegeben > 0 ? "text-lime-600" : "text-foreground")}>
                   {stats.freigegeben}
                 </p>
@@ -284,58 +251,6 @@ export default function Dashboard() {
                 stats.freigegeben > 0 ? "bg-lime-500/10" : "bg-muted"
               )}>
                 <PlayCircle className={cn("h-6 w-6", stats.freigegeben > 0 ? "text-lime-500" : "text-muted-foreground")} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* B2B KVA offen */}
-        <Card 
-          className={cn(
-            "card-elevated hover:shadow-lg transition-shadow border-l-4 cursor-pointer",
-            stats.b2bPendingKva > 0 ? "border-l-violet-500 ring-2 ring-violet-500/30" : "border-l-muted"
-          )}
-          onClick={() => navigate('/tickets?filter=b2b_kva_open')}
-        >
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">B2B KVA offen</p>
-                <p className={cn("text-3xl font-bold mt-1", stats.b2bPendingKva > 0 ? "text-violet-600" : "text-foreground")}>
-                  {stats.b2bPendingKva}
-                </p>
-              </div>
-              <div className={cn(
-                "h-12 w-12 rounded-xl flex items-center justify-center",
-                stats.b2bPendingKva > 0 ? "bg-violet-500/10" : "bg-muted"
-              )}>
-                <Building2 className={cn("h-6 w-6", stats.b2bPendingKva > 0 ? "text-violet-500" : "text-muted-foreground")} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pending Approvals (Selbstverschulden) */}
-        <Card 
-          className={cn(
-            "card-elevated hover:shadow-lg transition-shadow border-l-4 cursor-pointer",
-            stats.pendingApprovals > 0 ? "border-l-orange-500 ring-2 ring-orange-500/30 animate-pulse" : "border-l-muted"
-          )}
-          onClick={() => navigate('/inventory?tab=pending')}
-        >
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Freigabe nötig</p>
-                <p className={cn("text-3xl font-bold mt-1", stats.pendingApprovals > 0 ? "text-orange-600" : "text-foreground")}>
-                  {stats.pendingApprovals}
-                </p>
-              </div>
-              <div className={cn(
-                "h-12 w-12 rounded-xl flex items-center justify-center",
-                stats.pendingApprovals > 0 ? "bg-orange-500/10" : "bg-muted"
-              )}>
-                <ShieldAlert className={cn("h-6 w-6", stats.pendingApprovals > 0 ? "text-orange-500" : "text-muted-foreground")} />
               </div>
             </div>
           </CardContent>
@@ -365,7 +280,7 @@ export default function Dashboard() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Heute fertig</p>
+                <p className="text-sm font-medium text-muted-foreground">Heute fertiggestellt</p>
                 <p className="text-3xl font-bold text-foreground mt-1">{stats.todayCompleted}</p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
@@ -385,7 +300,7 @@ export default function Dashboard() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Überfällig</p>
+                <p className="text-sm font-medium text-muted-foreground">Überfällig (&gt;7 Tage)</p>
                 <p className={cn("text-3xl font-bold mt-1", stats.overdue > 0 ? "text-destructive" : "text-foreground")}>
                   {stats.overdue}
                 </p>

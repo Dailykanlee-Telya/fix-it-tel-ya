@@ -212,7 +212,6 @@ export type Database = {
           street: string | null
           terms_and_conditions: string | null
           updated_at: string
-          workshop_id: string | null
           zip: string | null
         }
         Insert: {
@@ -241,7 +240,6 @@ export type Database = {
           street?: string | null
           terms_and_conditions?: string | null
           updated_at?: string
-          workshop_id?: string | null
           zip?: string | null
         }
         Update: {
@@ -270,22 +268,21 @@ export type Database = {
           street?: string | null
           terms_and_conditions?: string | null
           updated_at?: string
-          workshop_id?: string | null
           zip?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "b2b_partners_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "b2b_partners_placeholder_customer_id_fkey"
             columns: ["placeholder_customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "b2b_partners_workshop_id_fkey"
-            columns: ["workshop_id"]
-            isOneToOne: false
-            referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
         ]
@@ -1759,7 +1756,7 @@ export type Database = {
           kva_required: boolean
           kva_token: string | null
           legal_notes_ack: boolean
-          location_id: string | null
+          location_id: string
           passcode_info: string | null
           passcode_pattern: Json | null
           passcode_pin: string | null
@@ -1772,7 +1769,6 @@ export type Database = {
           status: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at: string
-          workshop_id: string | null
         }
         Insert: {
           accessories?: string | null
@@ -1811,7 +1807,7 @@ export type Database = {
           kva_required?: boolean
           kva_token?: string | null
           legal_notes_ack?: boolean
-          location_id?: string | null
+          location_id: string
           passcode_info?: string | null
           passcode_pattern?: Json | null
           passcode_pin?: string | null
@@ -1824,7 +1820,6 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at?: string
-          workshop_id?: string | null
         }
         Update: {
           accessories?: string | null
@@ -1863,7 +1858,7 @@ export type Database = {
           kva_required?: boolean
           kva_token?: string | null
           legal_notes_ack?: boolean
-          location_id?: string | null
+          location_id?: string
           passcode_info?: string | null
           passcode_pattern?: Json | null
           passcode_pin?: string | null
@@ -1876,7 +1871,6 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number?: string
           updated_at?: string
-          workshop_id?: string | null
         }
         Relationships: [
           {
@@ -1926,13 +1920,6 @@ export type Database = {
             columns: ["shipment_id"]
             isOneToOne: false
             referencedRelation: "b2b_shipments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "repair_tickets_workshop_id_fkey"
-            columns: ["workshop_id"]
-            isOneToOne: false
-            referencedRelation: "workshops"
             referencedColumns: ["id"]
           },
         ]
@@ -2310,7 +2297,6 @@ export type Database = {
           id: string
           message_text: string
           message_type: string
-          message_type_enum: Database["public"]["Enums"]["message_type"] | null
           repair_ticket_id: string
           sender_type: string
           sender_user_id: string | null
@@ -2320,7 +2306,6 @@ export type Database = {
           id?: string
           message_text: string
           message_type?: string
-          message_type_enum?: Database["public"]["Enums"]["message_type"] | null
           repair_ticket_id: string
           sender_type: string
           sender_user_id?: string | null
@@ -2330,7 +2315,6 @@ export type Database = {
           id?: string
           message_text?: string
           message_type?: string
-          message_type_enum?: Database["public"]["Enums"]["message_type"] | null
           repair_ticket_id?: string
           sender_type?: string
           sender_user_id?: string | null
@@ -2362,74 +2346,33 @@ export type Database = {
       }
       ticket_part_usage: {
         Row: {
-          approval_note: string | null
-          approval_status: Database["public"]["Enums"]["approval_status"] | null
-          approved_at: string | null
-          approved_by: string | null
           created_at: string
           id: string
-          note: string | null
           part_id: string
           quantity: number
-          reason: Database["public"]["Enums"]["part_usage_reason"]
           repair_ticket_id: string
-          requires_admin_approval: boolean
-          reserved_at: string | null
-          stock_movement_id: string | null
-          updated_at: string
-          used_by_role: string
-          used_by_user_id: string
+          unit_purchase_price: number | null
+          unit_sales_price: number | null
         }
         Insert: {
-          approval_note?: string | null
-          approval_status?:
-            | Database["public"]["Enums"]["approval_status"]
-            | null
-          approved_at?: string | null
-          approved_by?: string | null
           created_at?: string
           id?: string
-          note?: string | null
           part_id: string
           quantity?: number
-          reason?: Database["public"]["Enums"]["part_usage_reason"]
           repair_ticket_id: string
-          requires_admin_approval?: boolean
-          reserved_at?: string | null
-          stock_movement_id?: string | null
-          updated_at?: string
-          used_by_role: string
-          used_by_user_id: string
+          unit_purchase_price?: number | null
+          unit_sales_price?: number | null
         }
         Update: {
-          approval_note?: string | null
-          approval_status?:
-            | Database["public"]["Enums"]["approval_status"]
-            | null
-          approved_at?: string | null
-          approved_by?: string | null
           created_at?: string
           id?: string
-          note?: string | null
           part_id?: string
           quantity?: number
-          reason?: Database["public"]["Enums"]["part_usage_reason"]
           repair_ticket_id?: string
-          requires_admin_approval?: boolean
-          reserved_at?: string | null
-          stock_movement_id?: string | null
-          updated_at?: string
-          used_by_role?: string
-          used_by_user_id?: string
+          unit_purchase_price?: number | null
+          unit_sales_price?: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "ticket_part_usage_approved_by_fkey"
-            columns: ["approved_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "ticket_part_usage_part_id_fkey"
             columns: ["part_id"]
@@ -2444,27 +2387,11 @@ export type Database = {
             referencedRelation: "repair_tickets"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "ticket_part_usage_stock_movement_id_fkey"
-            columns: ["stock_movement_id"]
-            isOneToOne: false
-            referencedRelation: "stock_movements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ticket_part_usage_used_by_user_id_fkey"
-            columns: ["used_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       ticket_photos: {
         Row: {
-          b2b_visible: boolean
           category: string | null
-          category_enum: Database["public"]["Enums"]["photo_category"] | null
           created_at: string
           customer_visible: boolean | null
           file_name: string
@@ -2476,9 +2403,7 @@ export type Database = {
           storage_url: string
         }
         Insert: {
-          b2b_visible?: boolean
           category?: string | null
-          category_enum?: Database["public"]["Enums"]["photo_category"] | null
           created_at?: string
           customer_visible?: boolean | null
           file_name: string
@@ -2490,9 +2415,7 @@ export type Database = {
           storage_url: string
         }
         Update: {
-          b2b_visible?: boolean
           category?: string | null
-          category_enum?: Database["public"]["Enums"]["photo_category"] | null
           created_at?: string
           customer_visible?: boolean | null
           file_name?: string
@@ -2566,67 +2489,13 @@ export type Database = {
         }
         Relationships: []
       }
-      workshops: {
-        Row: {
-          address: Json | null
-          code: string | null
-          created_at: string
-          email: string | null
-          id: string
-          is_active: boolean
-          name: string
-          phone: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: Json | null
-          code?: string | null
-          created_at?: string
-          email?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: Json | null
-          code?: string | null
-          created_at?: string
-          email?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      approve_part_usage: {
-        Args: { _approved: boolean; _note?: string; _usage_id: string }
-        Returns: boolean
-      }
-      book_part_usage: {
-        Args: {
-          _note?: string
-          _part_id: string
-          _quantity: number
-          _reason: Database["public"]["Enums"]["part_usage_reason"]
-          _ticket_id: string
-        }
-        Returns: string
-      }
       can_view_location: {
         Args: { _location_id: string; _user_id: string }
-        Returns: boolean
-      }
-      can_view_workshop: {
-        Args: { _user_id: string; _workshop_id: string }
         Returns: boolean
       }
       create_stock_movement: {
@@ -2661,19 +2530,10 @@ export type Database = {
       }
       generate_complaint_number: { Args: never; Returns: string }
       generate_inventory_session_number: { Args: never; Returns: string }
-      generate_order_number:
-        | {
-            Args: { _b2b_partner_id?: string; _location_id: string }
-            Returns: string
-          }
-        | {
-            Args: {
-              _b2b_partner_id?: string
-              _location_id: string
-              _workshop_id?: string
-            }
-            Returns: string
-          }
+      generate_order_number: {
+        Args: { _b2b_partner_id?: string; _location_id: string }
+        Returns: string
+      }
       generate_purchase_order_number: { Args: never; Returns: string }
       generate_shipment_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
@@ -2731,7 +2591,6 @@ export type Database = {
         | "B2B_ADMIN"
         | "B2B_USER"
         | "B2B_INHABER"
-      approval_status: "PENDING" | "APPROVED" | "REJECTED"
       b2b_shipment_status:
         | "ANGELEGT"
         | "GERAETE_UNTERWEGS"
@@ -2780,7 +2639,6 @@ export type Database = {
         | "RUECKFRAGE"
         | "ABGELAUFEN"
       kva_type: "FIXPREIS" | "VARIABEL" | "BIS_ZU"
-      message_type: "internal_note" | "b2b_message" | "customer_message"
       notification_channel: "EMAIL" | "SMS" | "WHATSAPP"
       notification_trigger:
         | "TICKET_CREATED"
@@ -2806,19 +2664,6 @@ export type Database = {
         | "BUTTONS"
         | "VIBRATIONSMOTOR"
         | "SONSTIGES"
-      part_usage_reason:
-        | "REPARATUR"
-        | "TEST"
-        | "AUSTAUSCH"
-        | "FEHLERTEIL"
-        | "SELBSTVERSCHULDEN"
-        | "SONSTIGES"
-      photo_category:
-        | "zustand_eingang"
-        | "schadensbild"
-        | "reparatur_vorher"
-        | "reparatur_nachher"
-        | "sonstiges"
       price_mode: "FIXPREIS" | "KVA" | "NACH_AUFWAND"
       stock_movement_type:
         | "PURCHASE"
@@ -2982,7 +2827,6 @@ export const Constants = {
         "B2B_USER",
         "B2B_INHABER",
       ],
-      approval_status: ["PENDING", "APPROVED", "REJECTED"],
       b2b_shipment_status: [
         "ANGELEGT",
         "GERAETE_UNTERWEGS",
@@ -3037,7 +2881,6 @@ export const Constants = {
         "ABGELAUFEN",
       ],
       kva_type: ["FIXPREIS", "VARIABEL", "BIS_ZU"],
-      message_type: ["internal_note", "b2b_message", "customer_message"],
       notification_channel: ["EMAIL", "SMS", "WHATSAPP"],
       notification_trigger: [
         "TICKET_CREATED",
@@ -3064,21 +2907,6 @@ export const Constants = {
         "BUTTONS",
         "VIBRATIONSMOTOR",
         "SONSTIGES",
-      ],
-      part_usage_reason: [
-        "REPARATUR",
-        "TEST",
-        "AUSTAUSCH",
-        "FEHLERTEIL",
-        "SELBSTVERSCHULDEN",
-        "SONSTIGES",
-      ],
-      photo_category: [
-        "zustand_eingang",
-        "schadensbild",
-        "reparatur_vorher",
-        "reparatur_nachher",
-        "sonstiges",
       ],
       price_mode: ["FIXPREIS", "KVA", "NACH_AUFWAND"],
       stock_movement_type: [

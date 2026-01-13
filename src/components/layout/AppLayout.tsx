@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions, PermissionKey } from '@/hooks/usePermissions';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Ticket, Wrench, Package, Users, MapPin, BarChart3, Settings, LogOut, Menu, X, ChevronDown, UserCog, Building2, Truck, ShieldCheck, Warehouse, FileText, Smartphone, Activity } from 'lucide-react';
+import { LayoutDashboard, Ticket, Wrench, Package, Users, MapPin, BarChart3, Settings, LogOut, Menu, X, ChevronDown, UserCog, Building2, Truck, ShieldCheck, Warehouse, FileText, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -99,11 +99,6 @@ const adminNavigation: NavItem[] = [{
   name: 'Modellanfragen',
   href: '/model-requests',
   icon: Smartphone,
-  permission: 'MANAGE_SETTINGS'
-}, {
-  name: 'Audit-Log',
-  href: '/audit-logs',
-  icon: Activity,
   permission: 'MANAGE_SETTINGS'
 }];
 

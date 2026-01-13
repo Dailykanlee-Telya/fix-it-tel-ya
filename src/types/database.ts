@@ -83,27 +83,12 @@ export interface Device {
   updated_at: string;
 }
 
-export interface Workshop {
-  id: string;
-  name: string;
-  code?: string | null;
-  address?: Record<string, unknown> | null;
-  phone?: string | null;
-  email?: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface RepairTicket {
   id: string;
   ticket_number: string;
   customer_id: string;
   device_id: string;
-  location_id?: string | null;
-  workshop_id?: string | null;
-  is_b2b: boolean;
-  b2b_partner_id?: string | null;
+  location_id: string;
   status: TicketStatus;
   error_description_text?: string;
   error_code?: ErrorCode;
@@ -127,7 +112,6 @@ export interface RepairTicket {
   customer?: Customer;
   device?: Device;
   location?: Location;
-  workshop?: Workshop;
   assigned_technician?: Profile;
 }
 

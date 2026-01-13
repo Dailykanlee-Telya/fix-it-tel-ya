@@ -21,9 +21,7 @@ export interface B2BPartner {
   id: string;
   name: string;
   customer_number: string | null;
-  workshop_id: string | null;
-  /** @deprecated Use workshop_id instead */
-  location_id?: string | null;
+  location_id: string | null;
   street: string | null;
   zip: string | null;
   city: string | null;
@@ -41,18 +39,6 @@ export interface B2BPartner {
   privacy_policy_url: string | null;
   primary_color: string | null;
   secondary_color: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Workshop {
-  id: string;
-  name: string;
-  code: string | null;
-  address: Record<string, unknown> | null;
-  phone: string | null;
-  email: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

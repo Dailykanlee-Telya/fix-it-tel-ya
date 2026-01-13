@@ -23,6 +23,7 @@ import {
   MapPin,
   Clock,
   Wrench,
+  Package,
   MessageSquare,
   History,
   FileText,
@@ -31,6 +32,7 @@ import {
   CheckCircle2,
   Loader2,
   Plus,
+  Trash2,
   ClipboardCheck,
 } from 'lucide-react';
 import {
@@ -52,7 +54,6 @@ import { KvaManager } from '@/components/tickets/KvaManager';
 import PickupReceipt from '@/components/documents/PickupReceipt';
 import TicketPartSelector from '@/components/tickets/TicketPartSelector';
 import CreatePartFromTicketDialog from '@/components/tickets/CreatePartFromTicketDialog';
-import TicketPartsTab from '@/components/tickets/TicketPartsTab';
 
 // Status order for determining forward/backward changes
 const STATUS_ORDER: TicketStatus[] = [
@@ -95,6 +96,8 @@ export default function TicketDetail() {
   const { toast } = useToast();
   const [statusNote, setStatusNote] = useState('');
   const [internalNote, setInternalNote] = useState('');
+  const [partDialogOpen, setPartDialogOpen] = useState(false);
+  const [createPartDialogOpen, setCreatePartDialogOpen] = useState(false);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', id],
@@ -235,7 +238,45 @@ export default function TicketDetail() {
     },
   });
 
-  // Removed: addPartMutation and removePartMutation - now handled by TicketPartsTab component
+  // Removed: addPartMutation - now handled by TicketPartSelector component
+
+  const removePartMutation = useMutation({
+    mutationFn: async (usageId: string) => {
+      const usage = partUsage?.find((u: any) => u.id === usageId);
+      if (!usage) throw new Error('Verwendung nicht gefunden');
+
+      // Restore stock
+      const { error: stockError } = await supabase
+        .from('parts')
+        .update({ stock_quantity: (usage.part?.stock_quantity || 0) + usage.quantity })
+        .eq('id', usage.part_id);
+
+      if (stockError) throw stockError;
+
+      // Remove usage
+      const { error: usageError } = await supabase
+        .from('ticket_part_usage')
+        .delete()
+        .eq('id', usageId);
+
+      if (usageError) throw usageError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket-parts', id] });
+      queryClient.invalidateQueries({ queryKey: ['available-parts'] });
+      toast({
+        title: 'Teil entfernt',
+        description: 'Das Teil wurde vom Auftrag entfernt.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: error.message,
+      });
+    },
+  });
 
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: TicketStatus) => {
@@ -809,12 +850,93 @@ export default function TicketDetail() {
         </TabsContent>
 
         <TabsContent value="parts" className="space-y-4">
-          <TicketPartsTab
-            ticketId={id!}
-            deviceBrand={ticket.device?.brand}
-            deviceModel={ticket.device?.model}
-            deviceType={ticket.device?.device_type}
-          />
+          <Card className="card-elevated">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                Verwendete Teile
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2" 
+                  onClick={() => setCreatePartDialogOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Neues Teil
+                </Button>
+                <Button size="sm" className="gap-2" onClick={() => setPartDialogOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Teil hinzufügen
+                </Button>
+              </div>
+            </CardHeader>
+            <TicketPartSelector
+              ticketId={id!}
+              deviceBrand={ticket.device?.brand}
+              deviceModel={ticket.device?.model}
+              deviceType={ticket.device?.device_type}
+              open={partDialogOpen}
+              onOpenChange={setPartDialogOpen}
+              onCreateNewPart={() => setCreatePartDialogOpen(true)}
+            />
+            <CreatePartFromTicketDialog
+              open={createPartDialogOpen}
+              onOpenChange={setCreatePartDialogOpen}
+              deviceBrand={ticket.device?.brand}
+              deviceModel={ticket.device?.model}
+              deviceType={ticket.device?.device_type}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['context-parts'] });
+              }}
+            />
+            <CardContent>
+              {partUsage?.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Noch keine Teile zugeordnet
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {partUsage?.map((usage: any) => (
+                    <div
+                      key={usage.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                    >
+                      <div>
+                        <p className="font-medium">{usage.part?.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {usage.part?.brand} {usage.part?.model}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-medium">{usage.quantity}x</p>
+                          <p className="text-sm text-muted-foreground">
+                            {((usage.unit_sales_price || 0) * usage.quantity).toFixed(2)} €
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => removePartMutation.mutate(usage.id)}
+                          disabled={removePartMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Separator />
+                  <div className="flex items-center justify-between font-medium">
+                    <span>Gesamt</span>
+                    <span>{totalPartsPrice.toFixed(2)} €</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="communication" className="space-y-4">

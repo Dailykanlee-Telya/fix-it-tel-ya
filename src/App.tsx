@@ -44,8 +44,6 @@ const B2BReturnShipments = lazy(() => import("@/pages/B2BReturnShipments"));
 const B2BReturnShipmentNew = lazy(() => import("@/pages/B2BReturnShipmentNew"));
 const B2BReturnShipmentDetail = lazy(() => import("@/pages/B2BReturnShipmentDetail"));
 const ModelRequests = lazy(() => import("@/pages/admin/ModelRequests"));
-const TechnicalDocumentation = lazy(() => import("@/pages/TechnicalDocumentation"));
-const AuditLogs = lazy(() => import("@/pages/AuditLogs"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Datenschutz = lazy(() => import("@/pages/Datenschutz"));
 const B2BRegister = lazy(() => import("@/pages/B2BRegister"));
@@ -245,11 +243,6 @@ function AppRoutes() {
             <Route path="model-requests" element={
               <PermissionProtectedRoute requiredPermission="MANAGE_SETTINGS">
                 <ModelRequests />
-              </PermissionProtectedRoute>
-            } />
-            <Route path="audit-logs" element={
-              <PermissionProtectedRoute requiredPermission="MANAGE_SETTINGS">
-                <AuditLogs />
               </PermissionProtectedRoute>
             } />
           </Route>

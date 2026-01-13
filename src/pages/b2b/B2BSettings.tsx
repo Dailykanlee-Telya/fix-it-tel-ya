@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Building2, Users, FileText, Save, Plus, Trash2, Mail, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { B2BRole, B2B_ROLE_LABELS, B2B_DOCUMENT_TYPE_LABELS, B2BDocumentTemplate, B2BUserInvitation } from '@/types/b2b';
-import { B2BDocumentTemplateEditor } from '@/components/b2b/B2BDocumentTemplateEditor';
 
 export default function B2BSettings() {
   const { b2bPartner, b2bPartnerId, isB2BInhaber, canManageTemplates, refetchPartner } = useB2BAuth();
@@ -511,9 +510,16 @@ function DocumentTemplatesTab({
   const [editingTemplate, setEditingTemplate] = useState<B2BDocumentTemplate | null>(null);
   const [templateType, setTemplateType] = useState<string>('LIEFERSCHEIN');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    intro: '',
+    conditions: '',
+    footer: '',
+    legal_text: '',
+  });
 
   const saveMutation = useMutation({
-    mutationFn: async (formData: { title: string; intro: string; conditions: string; footer: string; legal_text: string }) => {
+    mutationFn: async () => {
       if (editingTemplate) {
         const { error } = await supabase
           .from('b2b_document_templates')
@@ -539,31 +545,33 @@ function DocumentTemplatesTab({
     onError: () => toast.error('Fehler beim Speichern'),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('b2b_document_templates').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['b2b-templates'] });
-      toast.success('Vorlage gelöscht');
-    },
-    onError: () => toast.error('Fehler beim Löschen'),
-  });
-
   const handleEdit = (template: B2BDocumentTemplate) => {
     setEditingTemplate(template);
+    setFormData({
+      title: template.title,
+      intro: template.intro || '',
+      conditions: template.conditions || '',
+      footer: template.footer || '',
+      legal_text: template.legal_text || '',
+    });
     setDialogOpen(true);
   };
 
   const handleNew = (type: string) => {
     setEditingTemplate(null);
     setTemplateType(type);
+    setFormData({
+      title: B2B_DOCUMENT_TYPE_LABELS[type] || type,
+      intro: '',
+      conditions: '',
+      footer: '',
+      legal_text: '',
+    });
     setDialogOpen(true);
   };
 
   const existingTypes = templates.map(t => t.template_type);
-  const missingTypes = ['LIEFERSCHEIN', 'REPARATURBERICHT', 'KVA_SCHRIFTLICH', 'EINGANGSBELEG'].filter(
+  const missingTypes = ['LIEFERSCHEIN', 'REPARATURBERICHT', 'KVA_SCHRIFTLICH'].filter(
     t => !existingTypes.includes(t as any)
   );
 
@@ -574,8 +582,7 @@ function DocumentTemplatesTab({
           <div>
             <CardTitle>Dokumentvorlagen</CardTitle>
             <CardDescription>
-              Passen Sie Ihre Dokumente mit eigenem Branding und Texten an. 
-              Verwenden Sie Platzhalter wie {'{{auftragsnummer}}'} für dynamische Inhalte.
+              Passen Sie Ihre Dokumente mit Ihrem Branding an
             </CardDescription>
           </div>
           {missingTypes.length > 0 && (
@@ -587,7 +594,7 @@ function DocumentTemplatesTab({
               <SelectContent>
                 {missingTypes.map(type => (
                   <SelectItem key={type} value={type}>
-                    {B2B_DOCUMENT_TYPE_LABELS[type] || type}
+                    {B2B_DOCUMENT_TYPE_LABELS[type]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -605,9 +612,6 @@ function DocumentTemplatesTab({
               <p className="text-muted-foreground mb-4">
                 Noch keine Dokumentvorlagen erstellt
               </p>
-              <p className="text-sm text-muted-foreground">
-                Erstellen Sie Vorlagen, um Ihre Dokumente mit Ihrem Firmenbranding zu versehen.
-              </p>
             </div>
           ) : (
             <Table>
@@ -616,7 +620,7 @@ function DocumentTemplatesTab({
                   <TableHead>Typ</TableHead>
                   <TableHead>Titel</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[120px]"></TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -624,7 +628,7 @@ function DocumentTemplatesTab({
                   <TableRow key={template.id}>
                     <TableCell>
                       <Badge variant="outline">
-                        {B2B_DOCUMENT_TYPE_LABELS[template.template_type] || template.template_type}
+                        {B2B_DOCUMENT_TYPE_LABELS[template.template_type]}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-medium">{template.title}</TableCell>
@@ -634,19 +638,9 @@ function DocumentTemplatesTab({
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(template)}>
-                          Bearbeiten
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={() => deleteMutation.mutate(template.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(template)}>
+                        Bearbeiten
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -656,15 +650,65 @@ function DocumentTemplatesTab({
         </CardContent>
       </Card>
 
-      {/* Enhanced Template Editor Dialog */}
-      <B2BDocumentTemplateEditor
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        template={editingTemplate}
-        templateType={editingTemplate?.template_type || templateType}
-        onSave={(formData) => saveMutation.mutate(formData)}
-        isSaving={saveMutation.isPending}
-      />
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTemplate ? 'Vorlage bearbeiten' : 'Neue Vorlage'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <Label>Titel</Label>
+              <Input
+                value={formData.title}
+                onChange={(e) => setFormData(f => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Einleitung</Label>
+              <Textarea
+                value={formData.intro}
+                onChange={(e) => setFormData(f => ({ ...f, intro: e.target.value }))}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Bedingungen</Label>
+              <Textarea
+                value={formData.conditions}
+                onChange={(e) => setFormData(f => ({ ...f, conditions: e.target.value }))}
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Rechtlicher Text</Label>
+              <Textarea
+                value={formData.legal_text}
+                onChange={(e) => setFormData(f => ({ ...f, legal_text: e.target.value }))}
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Fußzeile</Label>
+              <Textarea
+                value={formData.footer}
+                onChange={(e) => setFormData(f => ({ ...f, footer: e.target.value }))}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
