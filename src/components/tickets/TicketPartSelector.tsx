@@ -261,34 +261,19 @@ export default function TicketPartSelector({
         throw new Error('Kein Lagerort gefunden. Bitte dem Teil einen Lagerort zuweisen.');
       }
 
-      // Add part usage record
-      const { error: usageError } = await supabase
-        .from('ticket_part_usage')
-        .insert({
-          repair_ticket_id: ticketId,
-          part_id: selectedPart.id,
-          quantity: quantity,
-          unit_purchase_price: selectedPart.purchase_price,
-          unit_sales_price: selectedPart.sales_price,
+      // Use the book_part_usage RPC for proper stock tracking
+      const { data: usageId, error: usageError } = await supabase
+        .rpc('book_part_usage', {
+          _ticket_id: ticketId,
+          _part_id: selectedPart.id,
+          _quantity: quantity,
+          _reason: 'REPARATUR',
+          _note: null,
         });
 
       if (usageError) throw usageError;
-
-      // Create stock movement via RPC for revision-proof tracking
-      const { data: movementId, error: movementError } = await supabase
-        .rpc('create_stock_movement', {
-          _part_id: selectedPart.id,
-          _stock_location_id: stockLocationId,
-          _movement_type: 'CONSUMPTION',
-          _quantity: quantity,
-          _repair_ticket_id: ticketId,
-          _unit_price: selectedPart.purchase_price,
-          _notes: `Verbrauch für Auftrag`,
-        });
-
-      if (movementError) throw movementError;
       
-      return movementId;
+      return usageId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ticket-parts', ticketId] });
