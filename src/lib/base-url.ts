@@ -15,17 +15,10 @@ export function getBaseUrl(): string {
     return publicUrl.replace(/\/+$/, '');
   }
   
-  // In browser, check if we're on the production domain
+  // In browser, use current origin (allows staging/preview URLs to work)
   if (typeof window !== 'undefined') {
     const origin = window.location.origin;
-    
-    // Only allow production domain or localhost for development
-    if (origin.includes('telya.repariert.de') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      return origin.replace(/\/+$/, '');
-    }
-    
-    // Any other origin (including preview URLs) - return production domain
-    return PRODUCTION_DOMAIN;
+    return origin.replace(/\/+$/, '');
   }
   
   return PRODUCTION_DOMAIN;
