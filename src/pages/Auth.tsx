@@ -61,6 +61,18 @@ export default function Auth() {
   const [loginPassword, setLoginPassword] = useState('');
   
 
+  // Detect recovery flow SYNCHRONOUSLY on first render to prevent SIGNED_IN redirect
+  const initialRecoveryDetected = useRef(false);
+  if (!initialRecoveryDetected.current && typeof window !== 'undefined') {
+    const hash = window.location.hash;
+    const sp = new URLSearchParams(window.location.search);
+    if (hash && hash.includes('type=recovery')) {
+      initialRecoveryDetected.current = true;
+    } else if (sp.get('type') === 'recovery' || sp.get('token_hash')) {
+      initialRecoveryDetected.current = true;
+    }
+  }
+
   // Check URL params and hash for recovery flow
   useEffect(() => {
     const type = searchParams.get('type');
@@ -85,7 +97,7 @@ export default function Auth() {
       const accessToken = hashParams.get('access_token');
       const hashType = hashParams.get('type');
       
-      if (accessToken && hashType === 'recovery') {
+      if (accessToken && (hashType === 'recovery' || hashType === 'invite')) {
         console.log('Recovery session detected in hash');
         setIsPasswordResetMode(true);
         return;
@@ -93,7 +105,7 @@ export default function Auth() {
     }
 
     // Check if this is a recovery/invite flow from query params
-    if (type === 'recovery' || tokenHash) {
+    if (type === 'recovery' || type === 'invite' || tokenHash) {
       setIsPasswordResetMode(true);
     }
   }, [searchParams, toast]);
