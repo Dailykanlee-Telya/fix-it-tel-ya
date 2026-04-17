@@ -2661,19 +2661,14 @@ export type Database = {
       }
       generate_complaint_number: { Args: never; Returns: string }
       generate_inventory_session_number: { Args: never; Returns: string }
-      generate_order_number:
-        | {
-            Args: { _b2b_partner_id?: string; _location_id: string }
-            Returns: string
-          }
-        | {
-            Args: {
-              _b2b_partner_id?: string
-              _location_id: string
-              _workshop_id?: string
-            }
-            Returns: string
-          }
+      generate_order_number: {
+        Args: {
+          _b2b_partner_id?: string
+          _location_id: string
+          _workshop_id?: string
+        }
+        Returns: string
+      }
       generate_purchase_order_number: { Args: never; Returns: string }
       generate_shipment_number: { Args: never; Returns: string }
       generate_ticket_number: { Args: never; Returns: string }
