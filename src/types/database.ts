@@ -17,7 +17,15 @@ export type ErrorCode =
   | 'TASTATUR' 
   | 'SONSTIGES';
 
-export type PriceMode = 'FIXPREIS' | 'KVA' | 'NACH_AUFWAND';
+export type PriceMode = 'FIXPREIS' | 'KVA' | 'NACH_AUFWAND' | 'GARANTIE' | 'VERSICHERUNG';
+
+export const PRICE_MODE_LABELS: Record<PriceMode, string> = {
+  FIXPREIS: 'Fixpreis',
+  KVA: 'Kostenvoranschlag (KVA)',
+  NACH_AUFWAND: 'Nach Aufwand',
+  GARANTIE: 'Garantie',
+  VERSICHERUNG: 'Versicherung',
+};
 
 export type NotificationChannel = 'EMAIL' | 'SMS' | 'WHATSAPP';
 

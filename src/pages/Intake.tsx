@@ -1048,6 +1048,8 @@ export default function Intake() {
                     <SelectItem value="FIXPREIS">Fixpreis</SelectItem>
                     <SelectItem value="KVA">Kostenvoranschlag (KVA)</SelectItem>
                     <SelectItem value="NACH_AUFWAND">Nach Aufwand</SelectItem>
+                    <SelectItem value="GARANTIE">Garantie</SelectItem>
+                    <SelectItem value="VERSICHERUNG">Versicherung</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

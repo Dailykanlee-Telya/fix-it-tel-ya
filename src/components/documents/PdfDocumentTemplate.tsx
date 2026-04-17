@@ -207,11 +207,14 @@ export const IntakeDocument = ({
   const errorLabel = ERROR_CODE_LABELS[ticket.error_code as ErrorCode] || ticket.error_code || 'Sonstiges';
   const deviceId = getDeviceIdentifier(ticket.device);
   
-  const priceModeLabel = ticket.price_mode === 'FIXPREIS' 
-    ? 'Festpreis' 
-    : ticket.price_mode === 'KVA' 
-      ? 'Kostenvoranschlag (KVA)' 
-      : 'Nach Aufwand';
+  const priceModeLabels: Record<string, string> = {
+    FIXPREIS: 'Festpreis',
+    KVA: 'Kostenvoranschlag (KVA)',
+    NACH_AUFWAND: 'Nach Aufwand',
+    GARANTIE: 'Garantie',
+    VERSICHERUNG: 'Versicherung',
+  };
+  const priceModeLabel = priceModeLabels[ticket.price_mode] || ticket.price_mode;
 
   const conditions = `• Datensicherung: Für Datenverlust während der Reparatur übernehmen wir keine Haftung. Bitte sichern Sie Ihre Daten vorher.
 • Kostenvoranschlag: Bei Nichtdurchführung der Reparatur fällt eine KVA-Gebühr von ${ticket.kva_fee_amount ? ticket.kva_fee_amount.toFixed(2) : '19,90'} € an.
