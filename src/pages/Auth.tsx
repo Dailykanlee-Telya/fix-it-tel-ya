@@ -110,6 +110,13 @@ export default function Auth() {
     }
   }, [searchParams, toast]);
 
+  // Set password reset mode immediately if detected synchronously
+  useEffect(() => {
+    if (initialRecoveryDetected.current) {
+      setIsPasswordResetMode(true);
+    }
+  }, []);
+
   // Check auth state for recovery sessions
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -117,13 +124,12 @@ export default function Auth() {
       
       if (event === 'PASSWORD_RECOVERY') {
         setIsPasswordResetMode(true);
+        return;
       }
       
-      // Only redirect if NOT in password reset mode and user is signed in
-      if (event === 'SIGNED_IN' && !isPasswordResetMode && session?.user) {
-        // Check if this is a recovery session - don't redirect
-        const hash = window.location.hash;
-        if (hash && hash.includes('type=recovery')) {
+      // Block redirect if recovery was detected synchronously OR state is set
+      if (event === 'SIGNED_IN' && session?.user) {
+        if (initialRecoveryDetected.current || isPasswordResetMode) {
           setIsPasswordResetMode(true);
           return;
         }
@@ -135,7 +141,7 @@ export default function Auth() {
   }, [navigate, isPasswordResetMode]);
 
   useEffect(() => {
-    if (user && !authLoading && !isPasswordResetMode) {
+    if (user && !authLoading && !isPasswordResetMode && !initialRecoveryDetected.current) {
       navigate('/dashboard');
     }
   }, [user, authLoading, navigate, isPasswordResetMode]);
