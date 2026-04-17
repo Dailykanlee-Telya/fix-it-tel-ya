@@ -233,8 +233,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate password reset link with redirect to our app
-    const baseUrl = publicAppUrl || req.headers.get('origin') || '';
+    // Generate password reset token and build an app link ourselves.
+    // This avoids one-time verify links being consumed by aggressive email scanners
+    // before the invited user actually opens the email.
+    const baseUrl = (publicAppUrl || req.headers.get('origin') || '').replace(/\/$/, '');
     const redirectUrl = `${baseUrl}/auth`;
     
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
@@ -253,8 +255,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use the Supabase verification link directly - it will redirect to our app with session
-    const frontendUrl = linkData?.properties?.action_link || '';
+    const hashedToken = linkData?.properties?.hashed_token || '';
+    const frontendUrl = hashedToken
+      ? `${redirectUrl}?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`
+      : linkData?.properties?.action_link || '';
     console.log('Invitation URL (Supabase verify link):', frontendUrl);
 
     // Send invitation email

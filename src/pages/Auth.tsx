@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -61,17 +61,37 @@ export default function Auth() {
   const [loginPassword, setLoginPassword] = useState('');
   
 
-  // Detect recovery flow SYNCHRONOUSLY on first render to prevent SIGNED_IN redirect
-  const initialRecoveryDetected = useRef(false);
-  if (!initialRecoveryDetected.current && typeof window !== 'undefined') {
-    const hash = window.location.hash;
-    const sp = new URLSearchParams(window.location.search);
-    if (hash && hash.includes('type=recovery')) {
-      initialRecoveryDetected.current = true;
-    } else if (sp.get('type') === 'recovery' || sp.get('token_hash')) {
-      initialRecoveryDetected.current = true;
+  const authLinkState = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return {
+        hashType: null,
+        hashAccessToken: null,
+        hashError: null,
+        tokenHash: null,
+        type: null,
+      };
     }
-  }
+
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+    return {
+      hashType: hashParams.get('type'),
+      hashAccessToken: hashParams.get('access_token'),
+      hashError: hashParams.get('error'),
+      tokenHash: searchParams.get('token_hash'),
+      type: searchParams.get('type'),
+    };
+  }, [searchParams]);
+
+  const isRecoveryFlow =
+    authLinkState.hashType === 'recovery' ||
+    authLinkState.hashType === 'invite' ||
+    authLinkState.type === 'recovery' ||
+    authLinkState.type === 'invite' ||
+    Boolean(authLinkState.tokenHash);
+
+  const initialRecoveryDetected = useRef(isRecoveryFlow);
+  const recoveryVerificationStarted = useRef(false);
 
   // Check URL params and hash for recovery flow
   useEffect(() => {
@@ -82,6 +102,7 @@ export default function Auth() {
 
     // Handle error from Supabase redirect
     if (error) {
+      void supabase.auth.signOut({ scope: 'local' });
       toast({
         variant: 'destructive',
         title: 'Fehler',
@@ -91,24 +112,51 @@ export default function Auth() {
     }
 
     // Check hash fragment for access_token (Supabase redirects with hash)
-    const hash = window.location.hash;
-    if (hash) {
-      const hashParams = new URLSearchParams(hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const hashType = hashParams.get('type');
-      
-      if (accessToken && (hashType === 'recovery' || hashType === 'invite')) {
+    if (authLinkState.hashAccessToken && (authLinkState.hashType === 'recovery' || authLinkState.hashType === 'invite')) {
         console.log('Recovery session detected in hash');
         setIsPasswordResetMode(true);
         return;
-      }
     }
 
     // Check if this is a recovery/invite flow from query params
     if (type === 'recovery' || type === 'invite' || tokenHash) {
       setIsPasswordResetMode(true);
     }
-  }, [searchParams, toast]);
+  }, [searchParams, toast, authLinkState.hashAccessToken, authLinkState.hashType]);
+
+  useEffect(() => {
+    const tokenHash = authLinkState.tokenHash;
+    const type = authLinkState.type;
+
+    if (!tokenHash || (type !== 'recovery' && type !== 'invite') || recoveryVerificationStarted.current) {
+      return;
+    }
+
+    recoveryVerificationStarted.current = true;
+    setIsPasswordResetMode(true);
+
+    void (async () => {
+      await supabase.auth.signOut({ scope: 'local' });
+
+      const { error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: type === 'invite' ? 'invite' : 'recovery',
+      });
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Link abgelaufen',
+          description: 'Der Einladungslink ist ungültig oder bereits verwendet. Bitte senden Sie die Einladung erneut.',
+        });
+        setIsPasswordResetMode(false);
+        recoveryVerificationStarted.current = false;
+        return;
+      }
+
+      setIsPasswordResetMode(true);
+    })();
+  }, [authLinkState.tokenHash, authLinkState.type, toast]);
 
   // Set password reset mode immediately if detected synchronously
   useEffect(() => {
@@ -128,7 +176,7 @@ export default function Auth() {
       }
       
       // Block redirect if recovery was detected synchronously OR state is set
-      if (event === 'SIGNED_IN' && session?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
         if (initialRecoveryDetected.current || isPasswordResetMode) {
           setIsPasswordResetMode(true);
           return;
