@@ -2814,7 +2814,12 @@ export type Database = {
         | "reparatur_vorher"
         | "reparatur_nachher"
         | "sonstiges"
-      price_mode: "FIXPREIS" | "KVA" | "NACH_AUFWAND"
+      price_mode:
+        | "FIXPREIS"
+        | "KVA"
+        | "NACH_AUFWAND"
+        | "GARANTIE"
+        | "VERSICHERUNG"
       stock_movement_type:
         | "PURCHASE"
         | "CONSUMPTION"
@@ -3075,7 +3080,13 @@ export const Constants = {
         "reparatur_nachher",
         "sonstiges",
       ],
-      price_mode: ["FIXPREIS", "KVA", "NACH_AUFWAND"],
+      price_mode: [
+        "FIXPREIS",
+        "KVA",
+        "NACH_AUFWAND",
+        "GARANTIE",
+        "VERSICHERUNG",
+      ],
       stock_movement_type: [
         "PURCHASE",
         "CONSUMPTION",
