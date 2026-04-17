@@ -236,7 +236,12 @@ Deno.serve(async (req) => {
     // Generate password reset token and build an app link ourselves.
     // This avoids one-time verify links being consumed by aggressive email scanners
     // before the invited user actually opens the email.
-    const baseUrl = (publicAppUrl || req.headers.get('origin') || '').replace(/\/$/, '');
+    // IMPORTANT: Always use an absolute https URL — relative URLs cause email clients
+    // to interpret tokens as hostnames.
+    let baseUrl = (publicAppUrl || req.headers.get('origin') || '').replace(/\/$/, '');
+    if (!baseUrl || !/^https?:\/\//i.test(baseUrl)) {
+      baseUrl = 'https://telya.repariert.de';
+    }
     const redirectUrl = `${baseUrl}/auth`;
     
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
