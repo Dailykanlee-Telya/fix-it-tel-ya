@@ -7,7 +7,6 @@ import { BON_STYLES, generatePdfFilename } from '@/lib/pdf-styles';
 import { DOCUMENT_LOGOS } from '@/lib/document-logo';
 import { LEGAL_TEXTS } from '@/lib/legal-texts';
 import { QRCodeSVG } from 'qrcode.react';
-import { getBaseUrl } from '@/lib/base-url';
 
 interface ThermalReceiptProps {
   ticket: any;
@@ -22,60 +21,111 @@ export default function ThermalReceipt({
 }: ThermalReceiptProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!receiptRef.current) return;
 
     const ticketNumber = ticket.ticket_number || 'Auftrag';
     const pdfFilename = generatePdfFilename('abholschein', ticketNumber);
-
     const originalTitle = document.title;
-    document.title = pdfFilename;
+    const receiptMarkup = receiptRef.current.outerHTML;
 
     const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.style.left = '-9999px';
-    iframe.src = 'about:blank';
-    document.body.appendChild(iframe);
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '1px';
+    iframe.style.height = '1px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.border = '0';
 
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!iframeDoc) {
-      document.title = originalTitle;
-      document.body.removeChild(iframe);
-      return;
-    }
-
+    let cleanedUp = false;
     const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       document.title = originalTitle;
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      window.removeEventListener('afterprint', cleanup);
+      iframe.contentWindow?.removeEventListener('afterprint', cleanup);
+      if (iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
       onPrintComplete?.();
     };
 
-    window.addEventListener('afterprint', cleanup, { once: true });
-    iframe.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
+    try {
+      document.title = pdfFilename;
+      document.body.appendChild(iframe);
 
-    iframeDoc.open();
-    iframeDoc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${pdfFilename}</title>
-          <style>${BON_STYLES}</style>
-        </head>
-        <body>
-          ${receiptRef.current.innerHTML}
-        </body>
-      </html>
-    `);
-    iframeDoc.close();
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      const iframeWin = iframe.contentWindow;
+      if (!iframeDoc || !iframeWin) {
+        cleanup();
+        return;
+      }
 
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      setTimeout(cleanup, 4000);
-    }, 150);
+      iframeDoc.open();
+      iframeDoc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width,initial-scale=1" />
+            <title>${pdfFilename}</title>
+            <style>${BON_STYLES}</style>
+          </head>
+          <body>
+            ${receiptMarkup}
+          </body>
+        </html>
+      `);
+      iframeDoc.close();
+
+      await new Promise<void>((resolve) => {
+        const images = Array.from(iframeDoc.images);
+        if (images.length === 0) {
+          resolve();
+          return;
+        }
+
+        let settled = false;
+        let remaining = images.length;
+        const done = () => {
+          remaining -= 1;
+          if (!settled && remaining <= 0) {
+            settled = true;
+            resolve();
+          }
+        };
+
+        images.forEach((img) => {
+          if (img.complete) {
+            done();
+            return;
+          }
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        });
+
+        window.setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+        }, 1200);
+      });
+
+      window.addEventListener('afterprint', cleanup);
+      iframeWin.addEventListener('afterprint', cleanup);
+
+      window.setTimeout(() => {
+        iframeWin.focus();
+        iframeWin.print();
+        window.setTimeout(cleanup, 4000);
+      }, 150);
+    } catch (error) {
+      console.error('Error printing thermal receipt:', error);
+      cleanup();
+    }
   };
 
   useEffect(() => {
