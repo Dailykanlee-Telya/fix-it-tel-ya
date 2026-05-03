@@ -264,7 +264,12 @@ Deno.serve(async (req) => {
             decision_at: kvaEstimate.decision_at,
             disposal_option: kvaEstimate.disposal_option,
             endcustomer_price: kvaEstimate.endcustomer_price_released ? kvaEstimate.endcustomer_price : null,
-            endcustomer_price_released: kvaEstimate.endcustomer_price_released
+            endcustomer_price_released: kvaEstimate.endcustomer_price_released,
+            items: ticket.is_b2b && !kvaEstimate.endcustomer_price_released ? [] : kvaItems.map(i => ({
+              id: i.id, item_type: i.item_type, title: i.title,
+              quantity: i.quantity, unit_price_gross: i.unit_price_gross,
+              total_gross: i.total_gross,
+            })),
           } : null
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
