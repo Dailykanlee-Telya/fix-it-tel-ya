@@ -634,6 +634,25 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
           {/* Current KVA Details */}
           {currentKva ? (
             <div className="space-y-4">
+              {/* KVA Items */}
+              {currentKvaItems && currentKvaItems.length > 0 && (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">Positionen</div>
+                  {currentKvaItems.map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between px-3 py-2 border-t text-sm">
+                      <div className="flex-1">
+                        <span className="font-medium">{item.title}</span>
+                        <Badge variant="outline" className="ml-2 text-xs">{ITEM_TYPE_LABELS[item.item_type] || item.item_type}</Badge>
+                      </div>
+                      <div className="text-right shrink-0 ml-4">
+                        {item.quantity > 1 && <span className="text-muted-foreground mr-2">{item.quantity}×{Number(item.unit_price_gross).toFixed(2)}</span>}
+                        <span className="font-medium">{Number(item.total_gross).toFixed(2)} €</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Price Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-lg bg-muted/50">
