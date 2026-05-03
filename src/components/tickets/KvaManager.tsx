@@ -797,7 +797,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
 
       {/* Create KVA Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kostenvoranschlag erstellen</DialogTitle>
             <DialogDescription>
@@ -807,6 +807,34 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Price Suggestions */}
+            {priceSuggestions && priceSuggestions.length > 0 && (
+              <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+                <p className="text-sm font-medium flex items-center gap-2 mb-2">
+                  <Lightbulb className="h-4 w-4 text-amber-600" />
+                  Preisvorschläge aus Preisliste
+                </p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {priceSuggestions.slice(0, 8).map((ps: any) => (
+                    <div key={ps.id} className="flex items-center justify-between text-sm py-1">
+                      <span className="truncate mr-2">
+                        {ps.title || `${ps.brand} ${ps.model || ''}`} – {
+                          {DISPLAYBRUCH:'Display', WASSERSCHADEN:'Wasser', AKKU_SCHWACH:'Akku', LADEBUCHSE:'Ladebuchse',
+                           KAMERA:'Kamera', MIKROFON:'Mikrofon', LAUTSPRECHER:'Lautsprecher', TASTATUR:'Tastatur', SONSTIGES:'Sonst.'}[ps.repair_type as string] || ps.repair_type
+                        }
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-medium">{Number(ps.price).toFixed(2)} €</span>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => addPriceSuggestionAsItem(ps)}>
+                          Übernehmen
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* KVA Type */}
             <div className="space-y-2">
               <Label>KVA-Typ</Label>
@@ -822,41 +850,81 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
               </Select>
             </div>
 
-            {/* Price Fields */}
-            {kvaType === 'BIS_ZU' ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Mindestpreis (€)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={minCost}
-                    onChange={(e) => setMinCost(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Maximalpreis (€)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={maxCost}
-                    onChange={(e) => setMaxCost(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
+            {/* KVA Items / Positions */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Positionen</Label>
+                <Button size="sm" variant="outline" onClick={addEmptyItem} className="h-7 gap-1 text-xs">
+                  <Plus className="h-3 w-3" /> Position
+                </Button>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>Reparaturkosten (€)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={repairCost}
-                  onChange={(e) => setRepairCost(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
+              
+              {kvaItems.length > 0 ? (
+                <div className="space-y-2 border rounded-lg p-3">
+                  {kvaItems.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-2">
+                        <Select value={item.item_type} onValueChange={v => updateItem(idx, 'item_type', v)}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(ITEM_TYPE_LABELS).map(([k, v]) => (
+                              <SelectItem key={k} value={k}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-4">
+                        <Input className="h-8 text-sm" placeholder="Bezeichnung" value={item.title}
+                          onChange={e => updateItem(idx, 'title', e.target.value)} />
+                      </div>
+                      <div className="col-span-1">
+                        <Input className="h-8 text-sm text-center" type="number" min={1} value={item.quantity}
+                          onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)} />
+                      </div>
+                      <div className="col-span-2">
+                        <Input className="h-8 text-sm text-right" type="number" step="0.01" placeholder="Preis"
+                          value={item.unit_price_gross || ''} onChange={e => updateItem(idx, 'unit_price_gross', parseFloat(e.target.value) || 0)} />
+                      </div>
+                      <div className="col-span-2 text-right text-sm font-medium pt-1">
+                        {(item.quantity * item.unit_price_gross).toFixed(2)} €
+                      </div>
+                      <div className="col-span-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Separator />
+                  <div className="flex justify-between text-sm font-medium pt-1">
+                    <span>Positionen gesamt</span>
+                    <span>{itemsTotal.toFixed(2)} €</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Keine Positionen — Sie können auch direkt einen Gesamtpreis eingeben.</p>
+              )}
+            </div>
+
+            {/* Price Fields (fallback if no items) */}
+            {kvaItems.length === 0 && (
+              kvaType === 'BIS_ZU' ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Mindestpreis (€)</Label>
+                    <Input type="number" step="0.01" value={minCost} onChange={(e) => setMinCost(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Maximalpreis (€)</Label>
+                    <Input type="number" step="0.01" value={maxCost} onChange={(e) => setMaxCost(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Reparaturkosten (€)</Label>
+                  <Input type="number" step="0.01" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} placeholder="0.00" />
+                </div>
+              )
             )}
 
             {/* Parts Cost (read-only) */}
@@ -867,49 +935,38 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
               </div>
             </div>
 
+            {/* Total */}
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <div className="flex justify-between font-medium">
+                <span>Gesamtbetrag (brutto)</span>
+                <span className="text-lg text-primary">
+                  {((kvaItems.length > 0 ? itemsTotal : (parseFloat(repairCost) || 0)) + totalPartsCost).toFixed(2)} €
+                </span>
+              </div>
+            </div>
+
             {/* KVA Fee */}
             <div className="space-y-2">
               <Label>KVA-Gebühr bei Ablehnung (€)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={kvaFee}
-                onChange={(e) => setKvaFee(e.target.value)}
-                placeholder="35.00"
-              />
+              <Input type="number" step="0.01" value={kvaFee} onChange={(e) => setKvaFee(e.target.value)} placeholder="35.00" />
             </div>
 
             {/* Validity */}
             <div className="space-y-2">
               <Label>Gültigkeit (Tage)</Label>
-              <Input
-                type="number"
-                value={validDays}
-                onChange={(e) => setValidDays(e.target.value)}
-                placeholder="14"
-              />
+              <Input type="number" value={validDays} onChange={(e) => setValidDays(e.target.value)} placeholder="14" />
             </div>
 
             {/* Diagnosis */}
             <div className="space-y-2">
               <Label>Diagnose / Befund</Label>
-              <Textarea
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-                placeholder="Ergebnis der Diagnose..."
-                rows={2}
-              />
+              <Textarea value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Ergebnis der Diagnose..." rows={2} />
             </div>
 
             {/* Repair Description */}
             <div className="space-y-2">
               <Label>Geplante Arbeiten</Label>
-              <Textarea
-                value={repairDescription}
-                onChange={(e) => setRepairDescription(e.target.value)}
-                placeholder="Beschreibung der geplanten Reparatur..."
-                rows={2}
-              />
+              <Textarea value={repairDescription} onChange={(e) => setRepairDescription(e.target.value)} placeholder="Beschreibung der geplanten Reparatur..." rows={2} />
             </div>
           </div>
 
