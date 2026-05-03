@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +32,7 @@ import {
   RefreshCw,
   Trash2,
   Gift,
+  Lightbulb,
 } from 'lucide-react';
 
 // KVA Status labels & colors
@@ -65,6 +66,26 @@ const KVA_TYPE_LABELS: Record<string, string> = {
   BIS_ZU: 'Bis-zu-Preis',
 };
 
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  ARBEIT: 'Arbeit',
+  ERSATZTEIL: 'Ersatzteil',
+  DIENSTLEISTUNG: 'Dienstleistung',
+  RABATT: 'Rabatt',
+  SONSTIGES: 'Sonstiges',
+};
+
+interface KvaItem {
+  id?: string;
+  item_type: string;
+  title: string;
+  quantity: number;
+  unit_price_gross: number;
+  tax_rate: number;
+  sort_order: number;
+  notes?: string;
+  part_id?: string;
+}
+
 interface KvaManagerProps {
   ticketId: string;
   ticket: any;
@@ -92,6 +113,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
   const [diagnosis, setDiagnosis] = useState<string>('');
   const [repairDescription, setRepairDescription] = useState<string>('');
   const [validDays, setValidDays] = useState<string>('14');
+  const [kvaItems, setKvaItems] = useState<KvaItem[]>([]);
   
   // Approval form
   const [approvalChannel, setApprovalChannel] = useState<'ONLINE' | 'TELEFON' | 'VOR_ORT' | 'EMAIL' | 'SMS'>('TELEFON');
