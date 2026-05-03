@@ -327,6 +327,25 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
 
       if (error) throw error;
 
+      // Save KVA items
+      if (kvaItems.length > 0) {
+        const itemsToInsert = kvaItems.filter(i => i.title.trim()).map((item, idx) => ({
+          kva_estimate_id: data.id,
+          item_type: item.item_type as any,
+          title: item.title.trim(),
+          quantity: item.quantity,
+          unit_price_gross: item.unit_price_gross,
+          tax_rate: item.tax_rate,
+          sort_order: idx,
+          notes: item.notes || null,
+          part_id: item.part_id || null,
+        }));
+        if (itemsToInsert.length > 0) {
+          const { error: itemsError } = await supabase.from('kva_estimate_items').insert(itemsToInsert);
+          if (itemsError) console.error('Items save error:', itemsError);
+        }
+      }
+
       // Add KVA history entry
       await supabase.from('kva_history').insert({
         kva_estimate_id: data.id,
