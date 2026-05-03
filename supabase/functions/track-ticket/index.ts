@@ -207,6 +207,17 @@ Deno.serve(async (req) => {
         .eq('is_current', true)
         .maybeSingle();
 
+      // Get KVA items if KVA exists
+      let kvaItems: any[] = [];
+      if (kvaEstimate?.id) {
+        const { data: items } = await supabase
+          .from('kva_estimate_items')
+          .select('id, item_type, title, quantity, unit_price_gross, tax_rate, total_gross, sort_order')
+          .eq('kva_estimate_id', kvaEstimate.id)
+          .order('sort_order');
+        kvaItems = items || [];
+      }
+
       // Filter out internal notes - only show customer-relevant notes
       const filteredHistory = (statusHistory || []).map(entry => ({
         id: entry.id,
@@ -253,7 +264,12 @@ Deno.serve(async (req) => {
             decision_at: kvaEstimate.decision_at,
             disposal_option: kvaEstimate.disposal_option,
             endcustomer_price: kvaEstimate.endcustomer_price_released ? kvaEstimate.endcustomer_price : null,
-            endcustomer_price_released: kvaEstimate.endcustomer_price_released
+            endcustomer_price_released: kvaEstimate.endcustomer_price_released,
+            items: ticket.is_b2b && !kvaEstimate.endcustomer_price_released ? [] : kvaItems.map(i => ({
+              id: i.id, item_type: i.item_type, title: i.title,
+              quantity: i.quantity, unit_price_gross: i.unit_price_gross,
+              total_gross: i.total_gross,
+            })),
           } : null
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +32,7 @@ import {
   RefreshCw,
   Trash2,
   Gift,
+  Lightbulb,
 } from 'lucide-react';
 
 // KVA Status labels & colors
@@ -65,6 +66,26 @@ const KVA_TYPE_LABELS: Record<string, string> = {
   BIS_ZU: 'Bis-zu-Preis',
 };
 
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  ARBEIT: 'Arbeit',
+  ERSATZTEIL: 'Ersatzteil',
+  DIENSTLEISTUNG: 'Dienstleistung',
+  RABATT: 'Rabatt',
+  SONSTIGES: 'Sonstiges',
+};
+
+interface KvaItem {
+  id?: string;
+  item_type: string;
+  title: string;
+  quantity: number;
+  unit_price_gross: number;
+  tax_rate: number;
+  sort_order: number;
+  notes?: string;
+  part_id?: string;
+}
+
 interface KvaManagerProps {
   ticketId: string;
   ticket: any;
@@ -92,6 +113,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
   const [diagnosis, setDiagnosis] = useState<string>('');
   const [repairDescription, setRepairDescription] = useState<string>('');
   const [validDays, setValidDays] = useState<string>('14');
+  const [kvaItems, setKvaItems] = useState<KvaItem[]>([]);
   
   // Approval form
   const [approvalChannel, setApprovalChannel] = useState<'ONLINE' | 'TELEFON' | 'VOR_ORT' | 'EMAIL' | 'SMS'>('TELEFON');
@@ -118,6 +140,55 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
       if (error) throw error;
       return data;
     },
+  });
+
+  // Fetch KVA items for current KVA
+  const { data: currentKvaItems } = useQuery({
+    queryKey: ['kva-items', currentKva?.id],
+    queryFn: async () => {
+      if (!currentKva?.id) return [];
+      const { data, error } = await supabase
+        .from('kva_estimate_items')
+        .select('*')
+        .eq('kva_estimate_id', currentKva.id)
+        .order('sort_order');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentKva?.id,
+  });
+
+  // Fetch price suggestions based on ticket device
+  const { data: priceSuggestions } = useQuery({
+    queryKey: ['price-suggestions', ticket?.device?.brand, ticket?.device?.model, ticket?.device?.device_type],
+    queryFn: async () => {
+      const device = ticket?.device;
+      if (!device) return [];
+      
+      let query = supabase
+        .from('price_list')
+        .select('*')
+        .eq('active', true)
+        .eq('device_type', device.device_type);
+      
+      // Try exact brand match
+      if (device.brand) {
+        query = query.ilike('brand', device.brand);
+      }
+      
+      const { data, error } = await query.order('brand').order('model');
+      if (error) throw error;
+      
+      // Sort: exact model matches first, then brand-only matches
+      return (data || []).sort((a: any, b: any) => {
+        const aModel = a.model && device.model && a.model.toLowerCase() === device.model.toLowerCase();
+        const bModel = b.model && device.model && b.model.toLowerCase() === device.model.toLowerCase();
+        if (aModel && !bModel) return -1;
+        if (!aModel && bModel) return 1;
+        return 0;
+      });
+    },
+    enabled: !!ticket?.device,
   });
 
   // Fetch all KVA versions
@@ -155,16 +226,60 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     enabled: !!currentKva?.id,
   });
 
-  // Calculate parts cost
+  // Calculate parts cost from part usage
   const totalPartsCost = partUsage?.reduce(
     (sum, p) => sum + (p.unit_sales_price || 0) * p.quantity,
     0
   ) || 0;
 
+  // Calculate items total
+  const itemsTotal = kvaItems.reduce((sum, item) => sum + item.quantity * item.unit_price_gross, 0);
+
+  // Helper to add a price suggestion as an item
+  const addPriceSuggestionAsItem = (price: any) => {
+    const repairTypeLabels: Record<string, string> = {
+      DISPLAYBRUCH: 'Displayreparatur', WASSERSCHADEN: 'Wasserschadenreparatur',
+      AKKU_SCHWACH: 'Akkutausch', LADEBUCHSE: 'Ladebuchse', KAMERA: 'Kamerareparatur',
+      MIKROFON: 'Mikrofonreparatur', LAUTSPRECHER: 'Lautsprecherreparatur',
+      TASTATUR: 'Tastaturreparatur', SONSTIGES: 'Sonstige Reparatur',
+    };
+    const newItem: KvaItem = {
+      item_type: 'ARBEIT',
+      title: price.title || `${repairTypeLabels[price.repair_type] || price.repair_type} ${price.brand} ${price.model || ''}`.trim(),
+      quantity: 1,
+      unit_price_gross: Number(price.price),
+      tax_rate: Number(price.tax_rate) || 19,
+      sort_order: kvaItems.length,
+    };
+    setKvaItems(prev => [...prev, newItem]);
+    // Also set repair cost for backward compatibility
+    setRepairCost(String(Number(price.price)));
+    toast.success('Preis übernommen');
+  };
+
+  const addEmptyItem = () => {
+    setKvaItems(prev => [...prev, {
+      item_type: 'ARBEIT',
+      title: '',
+      quantity: 1,
+      unit_price_gross: 0,
+      tax_rate: 19,
+      sort_order: prev.length,
+    }]);
+  };
+
+  const updateItem = (index: number, field: keyof KvaItem, value: any) => {
+    setKvaItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const removeItem = (index: number) => {
+    setKvaItems(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Create KVA mutation
   const createKvaMutation = useMutation({
     mutationFn: async () => {
-      const parsedRepairCost = parseFloat(repairCost) || 0;
+      const parsedRepairCost = kvaItems.length > 0 ? itemsTotal : (parseFloat(repairCost) || 0);
       const parsedMinCost = parseFloat(minCost) || null;
       const parsedMaxCost = parseFloat(maxCost) || null;
       const parsedKvaFee = parseFloat(kvaFee) || 35;
@@ -212,6 +327,25 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
 
       if (error) throw error;
 
+      // Save KVA items
+      if (kvaItems.length > 0) {
+        const itemsToInsert = kvaItems.filter(i => i.title.trim()).map((item, idx) => ({
+          kva_estimate_id: data.id,
+          item_type: item.item_type as any,
+          title: item.title.trim(),
+          quantity: item.quantity,
+          unit_price_gross: item.unit_price_gross,
+          tax_rate: item.tax_rate,
+          sort_order: idx,
+          notes: item.notes || null,
+          part_id: item.part_id || null,
+        }));
+        if (itemsToInsert.length > 0) {
+          const { error: itemsError } = await supabase.from('kva_estimate_items').insert(itemsToInsert);
+          if (itemsError) console.error('Items save error:', itemsError);
+        }
+      }
+
       // Add KVA history entry
       await supabase.from('kva_history').insert({
         kva_estimate_id: data.id,
@@ -250,6 +384,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['kva-all', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['kva-items'] });
       queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
       setCreateDialogOpen(false);
@@ -456,6 +591,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     setDiagnosis('');
     setRepairDescription('');
     setValidDays('14');
+    setKvaItems([]);
   };
 
   const canCreateNew = !currentKva || ['ABGELEHNT', 'ABGELAUFEN', 'RUECKFRAGE'].includes(currentKva.status);
@@ -498,6 +634,25 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
           {/* Current KVA Details */}
           {currentKva ? (
             <div className="space-y-4">
+              {/* KVA Items */}
+              {currentKvaItems && currentKvaItems.length > 0 && (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">Positionen</div>
+                  {currentKvaItems.map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between px-3 py-2 border-t text-sm">
+                      <div className="flex-1">
+                        <span className="font-medium">{item.title}</span>
+                        <Badge variant="outline" className="ml-2 text-xs">{ITEM_TYPE_LABELS[item.item_type] || item.item_type}</Badge>
+                      </div>
+                      <div className="text-right shrink-0 ml-4">
+                        {item.quantity > 1 && <span className="text-muted-foreground mr-2">{item.quantity}×{Number(item.unit_price_gross).toFixed(2)}</span>}
+                        <span className="font-medium">{Number(item.total_gross).toFixed(2)} €</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Price Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-lg bg-muted/50">
@@ -661,7 +816,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
 
       {/* Create KVA Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kostenvoranschlag erstellen</DialogTitle>
             <DialogDescription>
@@ -671,6 +826,34 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Price Suggestions */}
+            {priceSuggestions && priceSuggestions.length > 0 && (
+              <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+                <p className="text-sm font-medium flex items-center gap-2 mb-2">
+                  <Lightbulb className="h-4 w-4 text-amber-600" />
+                  Preisvorschläge aus Preisliste
+                </p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {priceSuggestions.slice(0, 8).map((ps: any) => (
+                    <div key={ps.id} className="flex items-center justify-between text-sm py-1">
+                      <span className="truncate mr-2">
+                        {ps.title || `${ps.brand} ${ps.model || ''}`} – {
+                          {DISPLAYBRUCH:'Display', WASSERSCHADEN:'Wasser', AKKU_SCHWACH:'Akku', LADEBUCHSE:'Ladebuchse',
+                           KAMERA:'Kamera', MIKROFON:'Mikrofon', LAUTSPRECHER:'Lautsprecher', TASTATUR:'Tastatur', SONSTIGES:'Sonst.'}[ps.repair_type as string] || ps.repair_type
+                        }
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-medium">{Number(ps.price).toFixed(2)} €</span>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => addPriceSuggestionAsItem(ps)}>
+                          Übernehmen
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* KVA Type */}
             <div className="space-y-2">
               <Label>KVA-Typ</Label>
@@ -686,41 +869,81 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
               </Select>
             </div>
 
-            {/* Price Fields */}
-            {kvaType === 'BIS_ZU' ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Mindestpreis (€)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={minCost}
-                    onChange={(e) => setMinCost(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Maximalpreis (€)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={maxCost}
-                    onChange={(e) => setMaxCost(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
+            {/* KVA Items / Positions */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Positionen</Label>
+                <Button size="sm" variant="outline" onClick={addEmptyItem} className="h-7 gap-1 text-xs">
+                  <Plus className="h-3 w-3" /> Position
+                </Button>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>Reparaturkosten (€)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={repairCost}
-                  onChange={(e) => setRepairCost(e.target.value)}
-                  placeholder="0.00"
-                />
-              </div>
+              
+              {kvaItems.length > 0 ? (
+                <div className="space-y-2 border rounded-lg p-3">
+                  {kvaItems.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-2">
+                        <Select value={item.item_type} onValueChange={v => updateItem(idx, 'item_type', v)}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(ITEM_TYPE_LABELS).map(([k, v]) => (
+                              <SelectItem key={k} value={k}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-4">
+                        <Input className="h-8 text-sm" placeholder="Bezeichnung" value={item.title}
+                          onChange={e => updateItem(idx, 'title', e.target.value)} />
+                      </div>
+                      <div className="col-span-1">
+                        <Input className="h-8 text-sm text-center" type="number" min={1} value={item.quantity}
+                          onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 1)} />
+                      </div>
+                      <div className="col-span-2">
+                        <Input className="h-8 text-sm text-right" type="number" step="0.01" placeholder="Preis"
+                          value={item.unit_price_gross || ''} onChange={e => updateItem(idx, 'unit_price_gross', parseFloat(e.target.value) || 0)} />
+                      </div>
+                      <div className="col-span-2 text-right text-sm font-medium pt-1">
+                        {(item.quantity * item.unit_price_gross).toFixed(2)} €
+                      </div>
+                      <div className="col-span-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Separator />
+                  <div className="flex justify-between text-sm font-medium pt-1">
+                    <span>Positionen gesamt</span>
+                    <span>{itemsTotal.toFixed(2)} €</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Keine Positionen — Sie können auch direkt einen Gesamtpreis eingeben.</p>
+              )}
+            </div>
+
+            {/* Price Fields (fallback if no items) */}
+            {kvaItems.length === 0 && (
+              kvaType === 'BIS_ZU' ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Mindestpreis (€)</Label>
+                    <Input type="number" step="0.01" value={minCost} onChange={(e) => setMinCost(e.target.value)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Maximalpreis (€)</Label>
+                    <Input type="number" step="0.01" value={maxCost} onChange={(e) => setMaxCost(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Reparaturkosten (€)</Label>
+                  <Input type="number" step="0.01" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} placeholder="0.00" />
+                </div>
+              )
             )}
 
             {/* Parts Cost (read-only) */}
@@ -731,49 +954,38 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
               </div>
             </div>
 
+            {/* Total */}
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <div className="flex justify-between font-medium">
+                <span>Gesamtbetrag (brutto)</span>
+                <span className="text-lg text-primary">
+                  {((kvaItems.length > 0 ? itemsTotal : (parseFloat(repairCost) || 0)) + totalPartsCost).toFixed(2)} €
+                </span>
+              </div>
+            </div>
+
             {/* KVA Fee */}
             <div className="space-y-2">
               <Label>KVA-Gebühr bei Ablehnung (€)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={kvaFee}
-                onChange={(e) => setKvaFee(e.target.value)}
-                placeholder="35.00"
-              />
+              <Input type="number" step="0.01" value={kvaFee} onChange={(e) => setKvaFee(e.target.value)} placeholder="35.00" />
             </div>
 
             {/* Validity */}
             <div className="space-y-2">
               <Label>Gültigkeit (Tage)</Label>
-              <Input
-                type="number"
-                value={validDays}
-                onChange={(e) => setValidDays(e.target.value)}
-                placeholder="14"
-              />
+              <Input type="number" value={validDays} onChange={(e) => setValidDays(e.target.value)} placeholder="14" />
             </div>
 
             {/* Diagnosis */}
             <div className="space-y-2">
               <Label>Diagnose / Befund</Label>
-              <Textarea
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-                placeholder="Ergebnis der Diagnose..."
-                rows={2}
-              />
+              <Textarea value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="Ergebnis der Diagnose..." rows={2} />
             </div>
 
             {/* Repair Description */}
             <div className="space-y-2">
               <Label>Geplante Arbeiten</Label>
-              <Textarea
-                value={repairDescription}
-                onChange={(e) => setRepairDescription(e.target.value)}
-                placeholder="Beschreibung der geplanten Reparatur..."
-                rows={2}
-              />
+              <Textarea value={repairDescription} onChange={(e) => setRepairDescription(e.target.value)} placeholder="Beschreibung der geplanten Reparatur..." rows={2} />
             </div>
           </div>
 
