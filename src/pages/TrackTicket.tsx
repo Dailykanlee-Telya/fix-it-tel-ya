@@ -561,6 +561,18 @@ export default function TrackTicket() {
                         </div>
                       )}
 
+                      {/* KVA Items */}
+                      {kva?.items && kva.items.length > 0 && (
+                        <div className="border rounded-lg overflow-hidden">
+                          {kva.items.map((item) => (
+                            <div key={item.id} className="flex justify-between px-3 py-2 border-b last:border-b-0 text-sm">
+                              <span>{item.title}{item.quantity > 1 ? ` (${item.quantity}×)` : ''}</span>
+                              <span className="font-medium">{Number(item.total_gross).toFixed(2)} €</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-center">
                         <p className="text-sm text-muted-foreground">Geschätzte Kosten</p>
                         <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">
