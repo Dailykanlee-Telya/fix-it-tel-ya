@@ -226,11 +226,55 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     enabled: !!currentKva?.id,
   });
 
-  // Calculate parts cost
+  // Calculate parts cost from part usage
   const totalPartsCost = partUsage?.reduce(
     (sum, p) => sum + (p.unit_sales_price || 0) * p.quantity,
     0
   ) || 0;
+
+  // Calculate items total
+  const itemsTotal = kvaItems.reduce((sum, item) => sum + item.quantity * item.unit_price_gross, 0);
+
+  // Helper to add a price suggestion as an item
+  const addPriceSuggestionAsItem = (price: any) => {
+    const repairTypeLabels: Record<string, string> = {
+      DISPLAYBRUCH: 'Displayreparatur', WASSERSCHADEN: 'Wasserschadenreparatur',
+      AKKU_SCHWACH: 'Akkutausch', LADEBUCHSE: 'Ladebuchse', KAMERA: 'Kamerareparatur',
+      MIKROFON: 'Mikrofonreparatur', LAUTSPRECHER: 'Lautsprecherreparatur',
+      TASTATUR: 'Tastaturreparatur', SONSTIGES: 'Sonstige Reparatur',
+    };
+    const newItem: KvaItem = {
+      item_type: 'ARBEIT',
+      title: price.title || `${repairTypeLabels[price.repair_type] || price.repair_type} ${price.brand} ${price.model || ''}`.trim(),
+      quantity: 1,
+      unit_price_gross: Number(price.price),
+      tax_rate: Number(price.tax_rate) || 19,
+      sort_order: kvaItems.length,
+    };
+    setKvaItems(prev => [...prev, newItem]);
+    // Also set repair cost for backward compatibility
+    setRepairCost(String(Number(price.price)));
+    toast.success('Preis übernommen');
+  };
+
+  const addEmptyItem = () => {
+    setKvaItems(prev => [...prev, {
+      item_type: 'ARBEIT',
+      title: '',
+      quantity: 1,
+      unit_price_gross: 0,
+      tax_rate: 19,
+      sort_order: prev.length,
+    }]);
+  };
+
+  const updateItem = (index: number, field: keyof KvaItem, value: any) => {
+    setKvaItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const removeItem = (index: number) => {
+    setKvaItems(prev => prev.filter((_, i) => i !== index));
+  };
 
   // Create KVA mutation
   const createKvaMutation = useMutation({
