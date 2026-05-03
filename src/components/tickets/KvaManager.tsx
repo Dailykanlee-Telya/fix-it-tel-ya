@@ -590,6 +590,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     setDiagnosis('');
     setRepairDescription('');
     setValidDays('14');
+    setKvaItems([]);
   };
 
   const canCreateNew = !currentKva || ['ABGELEHNT', 'ABGELAUFEN', 'RUECKFRAGE'].includes(currentKva.status);
