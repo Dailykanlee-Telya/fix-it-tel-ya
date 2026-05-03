@@ -279,7 +279,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
   // Create KVA mutation
   const createKvaMutation = useMutation({
     mutationFn: async () => {
-      const parsedRepairCost = parseFloat(repairCost) || 0;
+      const parsedRepairCost = kvaItems.length > 0 ? itemsTotal : (parseFloat(repairCost) || 0);
       const parsedMinCost = parseFloat(minCost) || null;
       const parsedMaxCost = parseFloat(maxCost) || null;
       const parsedKvaFee = parseFloat(kvaFee) || 35;
