@@ -247,6 +247,11 @@ function AppRoutes() {
                 <ModelRequests />
               </PermissionProtectedRoute>
             } />
+            <Route path="price-list" element={
+              <PermissionProtectedRoute requiredPermission="MANAGE_SETTINGS">
+                <PriceList />
+              </PermissionProtectedRoute>
+            } />
             <Route path="audit-index" element={
               <PermissionProtectedRoute requiredPermission="MANAGE_SETTINGS">
                 <AuditIndex />
