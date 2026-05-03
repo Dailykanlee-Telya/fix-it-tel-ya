@@ -28,6 +28,15 @@ import { STATUS_LABELS, TicketStatus } from '@/types/database';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
+interface KvaItem {
+  id: string;
+  item_type: string;
+  title: string;
+  quantity: number;
+  unit_price_gross: number;
+  total_gross: number;
+}
+
 interface KvaData {
   id: string;
   version: number;
@@ -47,6 +56,7 @@ interface KvaData {
   disposal_option: string | null;
   endcustomer_price: number | null;
   endcustomer_price_released: boolean;
+  items?: KvaItem[];
 }
 
 interface TicketData {
