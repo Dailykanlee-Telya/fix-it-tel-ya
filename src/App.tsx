@@ -44,6 +44,7 @@ const B2BReturnShipments = lazy(() => import("@/pages/B2BReturnShipments"));
 const B2BReturnShipmentNew = lazy(() => import("@/pages/B2BReturnShipmentNew"));
 const B2BReturnShipmentDetail = lazy(() => import("@/pages/B2BReturnShipmentDetail"));
 const ModelRequests = lazy(() => import("@/pages/admin/ModelRequests"));
+const PriceList = lazy(() => import("@/pages/PriceList"));
 const AuditIndex = lazy(() => import("@/pages/AuditIndex"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Datenschutz = lazy(() => import("@/pages/Datenschutz"));
