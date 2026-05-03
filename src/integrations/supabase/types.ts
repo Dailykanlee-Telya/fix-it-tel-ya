@@ -927,6 +927,69 @@ export type Database = {
           },
         ]
       }
+      kva_estimate_items: {
+        Row: {
+          created_at: string
+          id: string
+          item_type: Database["public"]["Enums"]["kva_item_type"]
+          kva_estimate_id: string
+          notes: string | null
+          part_id: string | null
+          quantity: number
+          sort_order: number
+          tax_rate: number
+          title: string
+          total_gross: number | null
+          unit_price_gross: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_type?: Database["public"]["Enums"]["kva_item_type"]
+          kva_estimate_id: string
+          notes?: string | null
+          part_id?: string | null
+          quantity?: number
+          sort_order?: number
+          tax_rate?: number
+          title: string
+          total_gross?: number | null
+          unit_price_gross?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_type?: Database["public"]["Enums"]["kva_item_type"]
+          kva_estimate_id?: string
+          notes?: string | null
+          part_id?: string | null
+          quantity?: number
+          sort_order?: number
+          tax_rate?: number
+          title?: string
+          total_gross?: number | null
+          unit_price_gross?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kva_estimate_items_kva_estimate_id_fkey"
+            columns: ["kva_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "kva_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kva_estimate_items_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kva_estimates: {
         Row: {
           created_at: string
@@ -1515,33 +1578,48 @@ export type Database = {
           active: boolean
           brand: string
           created_at: string
+          description: string | null
           device_type: Database["public"]["Enums"]["device_type"]
+          estimated_duration_minutes: number | null
           id: string
           model: string | null
+          net_price: number | null
           price: number
           repair_type: Database["public"]["Enums"]["error_code"]
+          tax_rate: number
+          title: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
           brand: string
           created_at?: string
+          description?: string | null
           device_type: Database["public"]["Enums"]["device_type"]
+          estimated_duration_minutes?: number | null
           id?: string
           model?: string | null
+          net_price?: number | null
           price: number
           repair_type: Database["public"]["Enums"]["error_code"]
+          tax_rate?: number
+          title?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
           brand?: string
           created_at?: string
+          description?: string | null
           device_type?: Database["public"]["Enums"]["device_type"]
+          estimated_duration_minutes?: number | null
           id?: string
           model?: string | null
+          net_price?: number | null
           price?: number
           repair_type?: Database["public"]["Enums"]["error_code"]
+          tax_rate?: number
+          title?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -2764,6 +2842,12 @@ export type Database = {
         | "APPROVED"
         | "REJECTED"
       kva_approval_channel: "ONLINE" | "TELEFON" | "VOR_ORT" | "EMAIL" | "SMS"
+      kva_item_type:
+        | "ARBEIT"
+        | "ERSATZTEIL"
+        | "DIENSTLEISTUNG"
+        | "RABATT"
+        | "SONSTIGES"
       kva_status:
         | "ENTWURF"
         | "ERSTELLT"
@@ -3025,6 +3109,13 @@ export const Constants = {
         "REJECTED",
       ],
       kva_approval_channel: ["ONLINE", "TELEFON", "VOR_ORT", "EMAIL", "SMS"],
+      kva_item_type: [
+        "ARBEIT",
+        "ERSATZTEIL",
+        "DIENSTLEISTUNG",
+        "RABATT",
+        "SONSTIGES",
+      ],
       kva_status: [
         "ENTWURF",
         "ERSTELLT",
