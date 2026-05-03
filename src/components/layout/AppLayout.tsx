@@ -100,6 +100,11 @@ const adminNavigation: NavItem[] = [{
   href: '/model-requests',
   icon: Smartphone,
   permission: 'MANAGE_SETTINGS'
+}, {
+  name: 'Preisliste',
+  href: '/price-list',
+  icon: Euro,
+  permission: 'MANAGE_SETTINGS'
 }];
 
 export default function AppLayout() {
