@@ -142,6 +142,55 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     },
   });
 
+  // Fetch KVA items for current KVA
+  const { data: currentKvaItems } = useQuery({
+    queryKey: ['kva-items', currentKva?.id],
+    queryFn: async () => {
+      if (!currentKva?.id) return [];
+      const { data, error } = await supabase
+        .from('kva_estimate_items')
+        .select('*')
+        .eq('kva_estimate_id', currentKva.id)
+        .order('sort_order');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentKva?.id,
+  });
+
+  // Fetch price suggestions based on ticket device
+  const { data: priceSuggestions } = useQuery({
+    queryKey: ['price-suggestions', ticket?.device?.brand, ticket?.device?.model, ticket?.device?.device_type],
+    queryFn: async () => {
+      const device = ticket?.device;
+      if (!device) return [];
+      
+      let query = supabase
+        .from('price_list')
+        .select('*')
+        .eq('active', true)
+        .eq('device_type', device.device_type);
+      
+      // Try exact brand match
+      if (device.brand) {
+        query = query.ilike('brand', device.brand);
+      }
+      
+      const { data, error } = await query.order('brand').order('model');
+      if (error) throw error;
+      
+      // Sort: exact model matches first, then brand-only matches
+      return (data || []).sort((a: any, b: any) => {
+        const aModel = a.model && device.model && a.model.toLowerCase() === device.model.toLowerCase();
+        const bModel = b.model && device.model && b.model.toLowerCase() === device.model.toLowerCase();
+        if (aModel && !bModel) return -1;
+        if (!aModel && bModel) return 1;
+        return 0;
+      });
+    },
+    enabled: !!ticket?.device,
+  });
+
   // Fetch all KVA versions
   const { data: allKvas } = useQuery({
     queryKey: ['kva-all', ticketId],
