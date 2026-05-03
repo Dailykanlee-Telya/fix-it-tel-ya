@@ -384,6 +384,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['kva-all', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['kva-items'] });
       queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
       setCreateDialogOpen(false);
