@@ -207,6 +207,17 @@ Deno.serve(async (req) => {
         .eq('is_current', true)
         .maybeSingle();
 
+      // Get KVA items if KVA exists
+      let kvaItems: any[] = [];
+      if (kvaEstimate?.id) {
+        const { data: items } = await supabase
+          .from('kva_estimate_items')
+          .select('id, item_type, title, quantity, unit_price_gross, tax_rate, total_gross, sort_order')
+          .eq('kva_estimate_id', kvaEstimate.id)
+          .order('sort_order');
+        kvaItems = items || [];
+      }
+
       // Filter out internal notes - only show customer-relevant notes
       const filteredHistory = (statusHistory || []).map(entry => ({
         id: entry.id,
