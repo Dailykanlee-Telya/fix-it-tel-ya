@@ -79,6 +79,7 @@ export default function CustomerEditDialog({
           phone: data.phone,
           email: data.email || null,
           address: data.address || null,
+          company_name: data.company_name || null,
           marketing_consent: data.marketing_consent,
           // Update timestamp only if consent changed from false to true
           ...(newConsent && !previousConsent ? { marketing_consent_at: new Date().toISOString() } : {}),
