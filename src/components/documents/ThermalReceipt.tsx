@@ -216,6 +216,12 @@ export default function ThermalReceipt({
           {/* Customer Section */}
           <div className="bon-section">
             <div className="bon-section-title">Kunde</div>
+            {ticket.customer?.company_name && (
+              <div className="bon-row">
+                <span className="bon-label">Firma:</span>
+                <span className="bon-value">{ticket.customer.company_name}</span>
+              </div>
+            )}
             <div className="bon-row">
               <span className="bon-label">Name:</span>
               <span className="bon-value">{ticket.customer?.first_name} {ticket.customer?.last_name}</span>

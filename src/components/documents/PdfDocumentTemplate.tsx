@@ -28,6 +28,7 @@ interface TicketData {
     phone: string;
     email?: string;
     address?: string;
+    company_name?: string;
   };
   device?: {
     brand: string;
@@ -234,6 +235,7 @@ export const IntakeDocument = ({
       <div className="pdf-grid">
         {/* A) Kundendaten */}
         <PdfBox title="A) Kundendaten">
+          {ticket.customer?.company_name && <PdfDataRow label="Firma" value={ticket.customer.company_name} />}
           <PdfDataRow label="Name" value={`${ticket.customer?.first_name} ${ticket.customer?.last_name}`} />
           {ticket.customer?.address && <PdfDataRow label="Adresse" value={ticket.customer.address} />}
           <PdfDataRow label="Telefon" value={ticket.customer?.phone} />
@@ -360,6 +362,7 @@ Mit der Freigabe stimme ich der Durchführung der Reparatur zu den oben genannte
 
       <div className="pdf-grid">
         <PdfBox title="Kunde">
+          {ticket.customer?.company_name && <PdfDataRow label="Firma" value={ticket.customer.company_name} />}
           <PdfDataRow label="Name" value={`${ticket.customer?.first_name} ${ticket.customer?.last_name}`} />
           <PdfDataRow label="Telefon" value={ticket.customer?.phone} />
           {ticket.customer?.email && <PdfDataRow label="E-Mail" value={ticket.customer.email} />}
@@ -458,6 +461,7 @@ export const RepairReportDocument = ({
 
       <div className="pdf-grid">
         <PdfBox title="Kunde">
+          {ticket.customer?.company_name && <PdfDataRow label="Firma" value={ticket.customer.company_name} />}
           <PdfDataRow label="Name" value={`${ticket.customer?.first_name} ${ticket.customer?.last_name}`} />
           <PdfDataRow label="Telefon" value={ticket.customer?.phone} />
           {ticket.customer?.email && <PdfDataRow label="E-Mail" value={ticket.customer.email} />}
@@ -553,6 +557,7 @@ Eventuelle Transportschäden sind sofort beim Zusteller zu reklamieren.`;
 
       <div className="pdf-grid">
         <PdfBox title="Empfänger">
+          {ticket.customer?.company_name && <PdfDataRow label="Firma" value={ticket.customer.company_name} />}
           <PdfDataRow label="Name" value={`${ticket.customer?.first_name} ${ticket.customer?.last_name}`} />
           {ticket.customer?.address && <PdfDataRow label="Adresse" value={ticket.customer.address} />}
           <PdfDataRow label="Telefon" value={ticket.customer?.phone} />

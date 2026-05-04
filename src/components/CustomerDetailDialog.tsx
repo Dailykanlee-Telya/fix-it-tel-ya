@@ -118,6 +118,9 @@ export function CustomerDetailDialog({ customerId, open, onOpenChange }: Custome
                       <User className="h-6 w-6 text-primary" />
                     </div>
                     <div>
+                      {customer.company_name && (
+                        <p className="text-sm font-medium text-muted-foreground">{customer.company_name}</p>
+                      )}
                       <h3 className="font-semibold text-lg">
                         {customer.first_name} {customer.last_name}
                       </h3>

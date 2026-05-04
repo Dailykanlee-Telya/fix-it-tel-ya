@@ -126,9 +126,14 @@ export default function Customers() {
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                           <User className="h-5 w-5 text-primary" />
                         </div>
-                        <span className="font-medium">
-                          {customer.first_name} {customer.last_name}
-                        </span>
+                        <div>
+                          <span className="font-medium">
+                            {customer.first_name} {customer.last_name}
+                          </span>
+                          {customer.company_name && (
+                            <p className="text-xs text-muted-foreground">{customer.company_name}</p>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
