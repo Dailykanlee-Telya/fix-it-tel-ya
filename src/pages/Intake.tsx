@@ -384,6 +384,15 @@ export default function Intake() {
       return;
     }
 
+    if (showNewCustomer && isBusinessCustomer && !newCustomer.company_name.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Bitte geben Sie den Firmennamen ein.',
+      });
+      return;
+    }
+
     if (!locationId) {
       toast({
         variant: 'destructive',
