@@ -632,6 +632,28 @@ export default function Intake() {
                     Abbrechen
                   </Button>
                 </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_business_customer"
+                    checked={isBusinessCustomer}
+                    onCheckedChange={(checked) => setIsBusinessCustomer(checked === true)}
+                  />
+                  <Label htmlFor="is_business_customer" className="text-sm font-normal cursor-pointer">
+                    Firmenkunde
+                  </Label>
+                </div>
+
+                {isBusinessCustomer && (
+                  <div className="space-y-2">
+                    <Label>Firmenname *</Label>
+                    <Input
+                      placeholder="z.B. Musterfirma GmbH"
+                      value={newCustomer.company_name}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, company_name: e.target.value })}
+                    />
+                  </div>
+                )}
                 
                 {/* Smart name input field */}
                 <div className="space-y-2">
