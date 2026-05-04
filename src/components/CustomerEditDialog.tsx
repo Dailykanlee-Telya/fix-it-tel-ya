@@ -116,6 +116,17 @@ export default function CustomerEditDialog({
           <DialogTitle>Kunde bearbeiten</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="company_name">Firmenname</Label>
+            <Input
+              id="company_name"
+              value={formData.company_name}
+              onChange={(e) =>
+                setFormData({ ...formData, company_name: e.target.value })
+              }
+              placeholder="Nur bei Firmenkunden"
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="first_name">Vorname *</Label>
