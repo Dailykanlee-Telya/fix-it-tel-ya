@@ -22,6 +22,7 @@ interface Customer {
   phone: string;
   email: string | null;
   address: string | null;
+  company_name?: string | null;
   marketing_consent?: boolean;
   marketing_consent_at?: string | null;
 }
@@ -46,6 +47,7 @@ export default function CustomerEditDialog({
     phone: '',
     email: '',
     address: '',
+    company_name: '',
     marketing_consent: false,
   });
 
@@ -57,6 +59,7 @@ export default function CustomerEditDialog({
         phone: customer.phone || '',
         email: customer.email || '',
         address: customer.address || '',
+        company_name: customer.company_name || '',
         marketing_consent: customer.marketing_consent || false,
       });
     }
@@ -76,6 +79,7 @@ export default function CustomerEditDialog({
           phone: data.phone,
           email: data.email || null,
           address: data.address || null,
+          company_name: data.company_name || null,
           marketing_consent: data.marketing_consent,
           // Update timestamp only if consent changed from false to true
           ...(newConsent && !previousConsent ? { marketing_consent_at: new Date().toISOString() } : {}),
@@ -112,6 +116,17 @@ export default function CustomerEditDialog({
           <DialogTitle>Kunde bearbeiten</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="company_name">Firmenname</Label>
+            <Input
+              id="company_name"
+              value={formData.company_name}
+              onChange={(e) =>
+                setFormData({ ...formData, company_name: e.target.value })
+              }
+              placeholder="Nur bei Firmenkunden"
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="first_name">Vorname *</Label>

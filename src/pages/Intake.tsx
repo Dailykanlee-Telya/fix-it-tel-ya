@@ -67,12 +67,14 @@ export default function Intake() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState(''); // Combined name field for smart splitting
+  const [isBusinessCustomer, setIsBusinessCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     first_name: '',
     last_name: '',
     phone: '',
     email: '',
     address: '',
+    company_name: '',
     marketing_consent: false,
   });
   
@@ -149,7 +151,7 @@ export default function Intake() {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .or(`first_name.ilike.%${escapedSearch}%,last_name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%`)
+        .or(`first_name.ilike.%${escapedSearch}%,last_name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%,company_name.ilike.%${escapedSearch}%`)
         .limit(10);
       
       if (error) throw error;
@@ -187,6 +189,7 @@ export default function Intake() {
             phone: newCustomer.phone,
             email: newCustomer.email || null,
             address: newCustomer.address || null,
+            company_name: isBusinessCustomer ? (newCustomer.company_name || null) : null,
             marketing_consent: newCustomer.marketing_consent,
             marketing_consent_at: newCustomer.marketing_consent ? new Date().toISOString() : null,
           })
@@ -377,6 +380,15 @@ export default function Intake() {
         variant: 'destructive',
         title: 'Fehler',
         description: 'Bitte wählen Sie einen Kunden aus oder erstellen Sie einen neuen.',
+      });
+      return;
+    }
+
+    if (showNewCustomer && isBusinessCustomer && !newCustomer.company_name.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Fehler',
+        description: 'Bitte geben Sie den Firmennamen ein.',
       });
       return;
     }
@@ -586,8 +598,14 @@ export default function Intake() {
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium">{customer.first_name} {customer.last_name}</p>
-                            <p className="text-sm text-muted-foreground">{customer.phone} • {customer.email}</p>
+                            <p className="font-medium">
+                              {customer.company_name && <span className="text-xs bg-muted px-1.5 py-0.5 rounded mr-1.5">Firma</span>}
+                              {customer.first_name} {customer.last_name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {customer.company_name && <>{customer.company_name} • </>}
+                              {customer.phone} • {customer.email}
+                            </p>
                           </div>
                           {selectedCustomer?.id === customer.id && (
                             <Check className="h-5 w-5 text-primary" />
@@ -623,6 +641,28 @@ export default function Intake() {
                     Abbrechen
                   </Button>
                 </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_business_customer"
+                    checked={isBusinessCustomer}
+                    onCheckedChange={(checked) => setIsBusinessCustomer(checked === true)}
+                  />
+                  <Label htmlFor="is_business_customer" className="text-sm font-normal cursor-pointer">
+                    Firmenkunde
+                  </Label>
+                </div>
+
+                {isBusinessCustomer && (
+                  <div className="space-y-2">
+                    <Label>Firmenname *</Label>
+                    <Input
+                      placeholder="z.B. Musterfirma GmbH"
+                      value={newCustomer.company_name}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, company_name: e.target.value })}
+                    />
+                  </div>
+                )}
                 
                 {/* Smart name input field */}
                 <div className="space-y-2">
