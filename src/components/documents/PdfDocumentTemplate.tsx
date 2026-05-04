@@ -28,6 +28,7 @@ interface TicketData {
     phone: string;
     email?: string;
     address?: string;
+    company_name?: string;
   };
   device?: {
     brand: string;
