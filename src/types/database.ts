@@ -75,6 +75,7 @@ export interface Customer {
   phone: string;
   email?: string;
   address?: string;
+  company_name?: string;
   created_at: string;
   updated_at: string;
 }

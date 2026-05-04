@@ -67,12 +67,14 @@ export default function Intake() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState(''); // Combined name field for smart splitting
+  const [isBusinessCustomer, setIsBusinessCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     first_name: '',
     last_name: '',
     phone: '',
     email: '',
     address: '',
+    company_name: '',
     marketing_consent: false,
   });
   
