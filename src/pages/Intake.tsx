@@ -589,8 +589,14 @@ export default function Intake() {
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium">{customer.first_name} {customer.last_name}</p>
-                            <p className="text-sm text-muted-foreground">{customer.phone} • {customer.email}</p>
+                            <p className="font-medium">
+                              {customer.company_name && <span className="text-xs bg-muted px-1.5 py-0.5 rounded mr-1.5">Firma</span>}
+                              {customer.first_name} {customer.last_name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {customer.company_name && <>{customer.company_name} • </>}
+                              {customer.phone} • {customer.email}
+                            </p>
                           </div>
                           {selectedCustomer?.id === customer.id && (
                             <Check className="h-5 w-5 text-primary" />
