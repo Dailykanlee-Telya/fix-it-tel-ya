@@ -1,0 +1,1 @@
+ALTER TABLE public.customers ADD COLUMN company_name text;
