@@ -151,7 +151,7 @@ export default function Intake() {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .or(`first_name.ilike.%${escapedSearch}%,last_name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%`)
+        .or(`first_name.ilike.%${escapedSearch}%,last_name.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%,company_name.ilike.%${escapedSearch}%`)
         .limit(10);
       
       if (error) throw error;
@@ -189,6 +189,7 @@ export default function Intake() {
             phone: newCustomer.phone,
             email: newCustomer.email || null,
             address: newCustomer.address || null,
+            company_name: isBusinessCustomer ? (newCustomer.company_name || null) : null,
             marketing_consent: newCustomer.marketing_consent,
             marketing_consent_at: newCustomer.marketing_consent ? new Date().toISOString() : null,
           })
