@@ -22,6 +22,7 @@ interface Customer {
   phone: string;
   email: string | null;
   address: string | null;
+  company_name?: string | null;
   marketing_consent?: boolean;
   marketing_consent_at?: string | null;
 }
@@ -46,6 +47,7 @@ export default function CustomerEditDialog({
     phone: '',
     email: '',
     address: '',
+    company_name: '',
     marketing_consent: false,
   });
 
@@ -57,6 +59,7 @@ export default function CustomerEditDialog({
         phone: customer.phone || '',
         email: customer.email || '',
         address: customer.address || '',
+        company_name: customer.company_name || '',
         marketing_consent: customer.marketing_consent || false,
       });
     }
