@@ -475,8 +475,8 @@ export const RepairReportDocument = ({
 
         <PdfBox title="Durchgeführte Arbeiten" className="pdf-grid-full">
           <PdfDataRow label="Reparaturart" value={errorLabel} />
-          <div className="pdf-text-block" style={{ marginTop: '2mm' }}>
-            {ticket.error_description_text || 'Reparatur erfolgreich abgeschlossen'}
+          <div className="pdf-text-block" style={{ marginTop: '2mm', whiteSpace: 'pre-wrap' }}>
+            {(ticket as any).work_performed || ticket.error_description_text || 'Reparatur erfolgreich abgeschlossen'}
           </div>
         </PdfBox>
 
