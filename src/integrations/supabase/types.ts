@@ -1853,6 +1853,7 @@ export type Database = {
           status: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at: string
+          work_performed: string | null
           workshop_id: string | null
         }
         Insert: {
@@ -1905,6 +1906,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number: string
           updated_at?: string
+          work_performed?: string | null
           workshop_id?: string | null
         }
         Update: {
@@ -1957,6 +1959,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ticket_status"]
           ticket_number?: string
           updated_at?: string
+          work_performed?: string | null
           workshop_id?: string | null
         }
         Relationships: [
