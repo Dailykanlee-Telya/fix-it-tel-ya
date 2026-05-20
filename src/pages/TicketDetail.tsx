@@ -612,6 +612,37 @@ export default function TicketDetail() {
               </CardContent>
             </Card>
 
+            {/* Durchgeführte Arbeiten */}
+            <Card className="card-elevated lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-primary" />
+                  Durchgeführte Arbeiten
+                </CardTitle>
+                <CardDescription>
+                  Wird auf dem Reparaturbericht ausgedruckt.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  value={workPerformed}
+                  onChange={(e) => setWorkPerformed(e.target.value)}
+                  placeholder="z. B. Display getauscht, Funktionstest erfolgreich, Software aktualisiert ..."
+                  rows={4}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => updateWorkPerformedMutation.mutate()}
+                    disabled={updateWorkPerformedMutation.isPending || workPerformed === ((ticket as any)?.work_performed || '')}
+                  >
+                    Speichern
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+
             {/* Pricing & KVA */}
             <Card className="card-elevated">
               <CardHeader>
