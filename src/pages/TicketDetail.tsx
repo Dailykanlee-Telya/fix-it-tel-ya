@@ -394,6 +394,31 @@ export default function TicketDetail() {
     },
   });
 
+  useEffect(() => {
+    if ((ticket as any)?.work_performed !== undefined) {
+      setWorkPerformed((ticket as any).work_performed || '');
+    }
+  }, [(ticket as any)?.work_performed]);
+
+  const updateWorkPerformedMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('repair_tickets')
+        .update({ work_performed: workPerformed } as any)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] });
+      toast({ title: 'Gespeichert', description: 'Durchgeführte Arbeiten gespeichert.' });
+    },
+    onError: (error: any) => {
+      toast({ variant: 'destructive', title: 'Fehler', description: error.message });
+    },
+  });
+
+
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
