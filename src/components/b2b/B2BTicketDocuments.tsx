@@ -257,7 +257,7 @@ function generateB2BDocument(
         <div class="pdf-box pdf-grid-full">
           <div class="pdf-box-header">Durchgeführte Arbeiten</div>
           <div class="pdf-data-row"><span class="pdf-data-label">Reparaturart:</span><span class="pdf-data-value">${errorLabel}</span></div>
-          <div class="pdf-text-block" style="margin-top: 2mm;">${ticket.error_description_text || 'Reparatur abgeschlossen'}</div>
+          <div class="pdf-text-block" style="margin-top: 2mm; white-space: pre-wrap;">${(ticket as any).work_performed || ticket.error_description_text || 'Reparatur abgeschlossen'}</div>
         </div>
         ${partUsage && partUsage.length > 0 ? `
           <div class="pdf-box pdf-grid-full">

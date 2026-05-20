@@ -1,0 +1,1 @@
+ALTER TABLE public.repair_tickets ADD COLUMN IF NOT EXISTS work_performed TEXT;

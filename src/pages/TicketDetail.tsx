@@ -96,6 +96,7 @@ export default function TicketDetail() {
   const { toast } = useToast();
   const [statusNote, setStatusNote] = useState('');
   const [internalNote, setInternalNote] = useState('');
+  const [workPerformed, setWorkPerformed] = useState('');
   const [partDialogOpen, setPartDialogOpen] = useState(false);
   const [createPartDialogOpen, setCreatePartDialogOpen] = useState(false);
 
@@ -393,6 +394,31 @@ export default function TicketDetail() {
     },
   });
 
+  useEffect(() => {
+    if ((ticket as any)?.work_performed !== undefined) {
+      setWorkPerformed((ticket as any).work_performed || '');
+    }
+  }, [(ticket as any)?.work_performed]);
+
+  const updateWorkPerformedMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('repair_tickets')
+        .update({ work_performed: workPerformed } as any)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] });
+      toast({ title: 'Gespeichert', description: 'Durchgeführte Arbeiten gespeichert.' });
+    },
+    onError: (error: any) => {
+      toast({ variant: 'destructive', title: 'Fehler', description: error.message });
+    },
+  });
+
+
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -585,6 +611,37 @@ export default function TicketDetail() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Durchgeführte Arbeiten */}
+            <Card className="card-elevated lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-primary" />
+                  Durchgeführte Arbeiten
+                </CardTitle>
+                <CardDescription>
+                  Wird auf dem Reparaturbericht ausgedruckt.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  value={workPerformed}
+                  onChange={(e) => setWorkPerformed(e.target.value)}
+                  placeholder="z. B. Display getauscht, Funktionstest erfolgreich, Software aktualisiert ..."
+                  rows={4}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => updateWorkPerformedMutation.mutate()}
+                    disabled={updateWorkPerformedMutation.isPending || workPerformed === ((ticket as any)?.work_performed || '')}
+                  >
+                    Speichern
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
 
             {/* Pricing & KVA */}
             <Card className="card-elevated">
