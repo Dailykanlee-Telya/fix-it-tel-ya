@@ -96,8 +96,32 @@ export default function TicketDetail() {
   const { toast } = useToast();
   const [statusNote, setStatusNote] = useState('');
   const [internalNote, setInternalNote] = useState('');
+  const [workPerformed, setWorkPerformed] = useState('');
   const [partDialogOpen, setPartDialogOpen] = useState(false);
   const [createPartDialogOpen, setCreatePartDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if ((ticket as any)?.work_performed !== undefined) {
+      setWorkPerformed((ticket as any).work_performed || '');
+    }
+  }, [(ticket as any)?.work_performed]);
+
+  const updateWorkPerformedMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('repair_tickets')
+        .update({ work_performed: workPerformed } as any)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] });
+      toast({ title: 'Gespeichert', description: 'Durchgeführte Arbeiten gespeichert.' });
+    },
+    onError: (error: any) => {
+      toast({ variant: 'destructive', title: 'Fehler', description: error.message });
+    },
+  });
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', id],
