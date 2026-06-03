@@ -218,7 +218,7 @@ export const IntakeDocument = ({
   const priceModeLabel = priceModeLabels[ticket.price_mode] || ticket.price_mode;
 
   const conditions = `• Datensicherung: Für Datenverlust während der Reparatur übernehmen wir keine Haftung. Bitte sichern Sie Ihre Daten vorher.
-• Kostenvoranschlag: Bei Nichtdurchführung der Reparatur fällt eine KVA-Gebühr von ${ticket.kva_fee_amount ? ticket.kva_fee_amount.toFixed(2) : '19,90'} € an.
+• Kostenvoranschlag: Bei Nichtdurchführung der Reparatur fällt eine KVA-Gebühr von ${ticket.kva_fee_amount ? ticket.kva_fee_amount.toFixed(2) : '35,00'} € an.
 • Reparaturdauer: Die voraussichtliche Reparaturdauer hängt von der Art des Defekts und der Verfügbarkeit von Ersatzteilen ab.
 • Garantie: Auf verbaute Ersatzteile gewähren wir 6 Monate Garantie gemäß unseren AGB.
 • Abholung: Nicht abgeholte Geräte werden nach 8 Wochen als Auftragsreparatur behandelt.
@@ -290,7 +290,7 @@ export const IntakeDocument = ({
                 {ticket.kva_fee_applicable && (
                   <PdfDataRow 
                     label="KVA-Gebühr bei Nicht-Reparatur" 
-                    value={`${(ticket.kva_fee_amount || 19.90).toFixed(2)} €`} 
+                    value={`${(ticket.kva_fee_amount || 35).toFixed(2)} €`} 
                   />
                 )}
                 <PdfDataRow label="Kostenlose Entsorgung" value="Optional möglich" />
@@ -337,7 +337,7 @@ export const KvaDocument = ({
     ? 'Freigegeben' 
     : 'Ausstehend';
 
-  const kvaFee = (ticket.kva_fee_amount || 19.90).toFixed(2);
+  const kvaFee = (ticket.kva_fee_amount || 35).toFixed(2);
 
   const conditions = `Dieser Kostenvoranschlag ist 14 Tage gültig. Preise inkl. MwSt.
 
