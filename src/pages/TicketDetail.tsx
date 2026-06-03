@@ -121,6 +121,20 @@ export default function TicketDetail() {
     },
   });
 
+  const { data: passcode } = useQuery({
+    queryKey: ['ticket-passcode', id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('ticket_passcodes')
+        .select('*')
+        .eq('repair_ticket_id', id)
+        .maybeSingle();
+      if (error && error.code !== 'PGRST116') return null;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   const { data: statusHistory } = useQuery({
     queryKey: ['ticket-history', id],
     queryFn: async () => {
