@@ -617,10 +617,10 @@ export default function TicketDetail() {
                     <p className="text-sm text-muted-foreground">{ticket.accessories}</p>
                   </div>
                 )}
-                {ticket.passcode_info && (
+                {passcode?.passcode_info && (
                   <div>
                     <p className="text-sm font-medium mb-1">Passcode:</p>
-                    <p className="text-sm text-muted-foreground">{ticket.passcode_info}</p>
+                    <p className="text-sm text-muted-foreground">{passcode.passcode_info}</p>
                   </div>
                 )}
               </CardContent>
