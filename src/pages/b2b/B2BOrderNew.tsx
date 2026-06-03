@@ -172,14 +172,20 @@ export default function B2BOrderNew() {
           legal_notes_ack: true,
           device_condition_at_intake: deviceConditions,
           device_condition_remarks: deviceConditionRemarks || null,
-          passcode_type: passcodeType || null,
-          passcode_pin: passcodeType === 'pin' ? passcodePin : null,
-          passcode_pattern: passcodeType === 'pattern' ? passcodePattern : null,
         })
         .select('id, ticket_number')
         .single();
 
       if (ticketError) throw ticketError;
+
+      if (passcodeType) {
+        await (supabase as any).from('ticket_passcodes').insert({
+          repair_ticket_id: ticket.id,
+          passcode_type: passcodeType,
+          passcode_pin: passcodeType === 'pin' ? passcodePin : null,
+          passcode_pattern: passcodeType === 'pattern' ? passcodePattern : null,
+        });
+      }
 
       return ticket;
     },
