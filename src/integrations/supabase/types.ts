@@ -1841,10 +1841,6 @@ export type Database = {
           kva_token: string | null
           legal_notes_ack: boolean
           location_id: string | null
-          passcode_info: string | null
-          passcode_pattern: Json | null
-          passcode_pin: string | null
-          passcode_type: string | null
           price_mode: Database["public"]["Enums"]["price_mode"]
           priority: string | null
           return_to_endcustomer: boolean | null
@@ -1894,10 +1890,6 @@ export type Database = {
           kva_token?: string | null
           legal_notes_ack?: boolean
           location_id?: string | null
-          passcode_info?: string | null
-          passcode_pattern?: Json | null
-          passcode_pin?: string | null
-          passcode_type?: string | null
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
           return_to_endcustomer?: boolean | null
@@ -1947,10 +1939,6 @@ export type Database = {
           kva_token?: string | null
           legal_notes_ack?: boolean
           location_id?: string | null
-          passcode_info?: string | null
-          passcode_pattern?: Json | null
-          passcode_pin?: string | null
-          passcode_type?: string | null
           price_mode?: Database["public"]["Enums"]["price_mode"]
           priority?: string | null
           return_to_endcustomer?: boolean | null
@@ -2540,6 +2528,44 @@ export type Database = {
             columns: ["used_by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_passcodes: {
+        Row: {
+          created_at: string
+          passcode_info: string | null
+          passcode_pattern: Json | null
+          passcode_pin: string | null
+          passcode_type: string | null
+          repair_ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          passcode_info?: string | null
+          passcode_pattern?: Json | null
+          passcode_pin?: string | null
+          passcode_type?: string | null
+          repair_ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          passcode_info?: string | null
+          passcode_pattern?: Json | null
+          passcode_pin?: string | null
+          passcode_type?: string | null
+          repair_ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_passcodes_repair_ticket_id_fkey"
+            columns: ["repair_ticket_id"]
+            isOneToOne: true
+            referencedRelation: "repair_tickets"
             referencedColumns: ["id"]
           },
         ]
