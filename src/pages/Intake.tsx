@@ -276,7 +276,7 @@ export default function Intake() {
       if (ticketError) throw ticketError;
 
       // Store passcode in separate, access-restricted table
-      if ((passcodeType && passcodeType !== '') || repair.passcode_info) {
+      if (passcodeType || repair.passcode_info) {
         await supabase.from('ticket_passcodes' as any).insert({
           repair_ticket_id: ticketData.id,
           passcode_type: passcodeType || null,
