@@ -337,7 +337,7 @@ export const KvaDocument = ({
     ? 'Freigegeben' 
     : 'Ausstehend';
 
-  const kvaFee = (ticket.kva_fee_amount || 19.90).toFixed(2);
+  const kvaFee = (ticket.kva_fee_amount || 35).toFixed(2);
 
   const conditions = `Dieser Kostenvoranschlag ist 14 Tage gültig. Preise inkl. MwSt.
 
