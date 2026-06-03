@@ -290,7 +290,7 @@ export const IntakeDocument = ({
                 {ticket.kva_fee_applicable && (
                   <PdfDataRow 
                     label="KVA-Gebühr bei Nicht-Reparatur" 
-                    value={`${(ticket.kva_fee_amount || 19.90).toFixed(2)} €`} 
+                    value={`${(ticket.kva_fee_amount || 35).toFixed(2)} €`} 
                   />
                 )}
                 <PdfDataRow label="Kostenlose Entsorgung" value="Optional möglich" />
