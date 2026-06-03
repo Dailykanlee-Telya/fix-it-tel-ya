@@ -27,7 +27,7 @@ export default function ThermalReceipt({
     const ticketNumber = ticket.ticket_number || 'Auftrag';
     const pdfFilename = generatePdfFilename('abholschein', ticketNumber);
     const originalTitle = document.title;
-    const receiptMarkup = receiptRef.current.outerHTML;
+    const receiptMarkup = receiptRef.current.innerHTML;
 
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
