@@ -258,7 +258,6 @@ export default function Intake() {
           status: 'NEU_EINGEGANGEN',
           error_code: repair.error_code,
           error_description_text: repair.error_description_text || null,
-          passcode_info: repair.passcode_info || null,
           price_mode: repair.price_mode,
           estimated_price: repair.estimated_price ? parseFloat(repair.estimated_price) : null,
           priority: repair.priority,
@@ -268,18 +267,24 @@ export default function Intake() {
           kva_token: kvaToken,
           email_opt_in: emailOptIn,
           sms_opt_in: smsOptIn,
-          // New fields: Device condition at intake
           device_condition_at_intake: deviceConditions,
           device_condition_remarks: deviceConditionRemarks || null,
-          // New fields: Passcode / Pattern
-          passcode_type: passcodeType || null,
-          passcode_pin: passcodeType === 'pin' ? passcodePin : null,
-          passcode_pattern: passcodeType === 'pattern' ? passcodePattern : null,
         })
         .select()
         .single();
 
       if (ticketError) throw ticketError;
+
+      // Store passcode in separate, access-restricted table
+      if ((passcodeType && passcodeType !== '') || repair.passcode_info) {
+        await supabase.from('ticket_passcodes' as any).insert({
+          repair_ticket_id: ticketData.id,
+          passcode_type: passcodeType || null,
+          passcode_pin: passcodeType === 'pin' ? passcodePin : null,
+          passcode_pattern: passcodeType === 'pattern' ? passcodePattern : null,
+          passcode_info: repair.passcode_info || null,
+        });
+      }
 
       // Create status history entry
       await supabase.from('status_history').insert({
