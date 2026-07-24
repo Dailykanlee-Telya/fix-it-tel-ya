@@ -100,6 +100,8 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
   
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingKvaId, setEditingKvaId] = useState<string | null>(null);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [waiveFeeDialogOpen, setWaiveFeeDialogOpen] = useState(false);
