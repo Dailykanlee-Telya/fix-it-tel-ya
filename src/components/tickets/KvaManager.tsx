@@ -1131,15 +1131,17 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+            <Button variant="outline" onClick={() => handleDialogOpenChange(false)}>
               Abbrechen
             </Button>
-            <Button 
-              onClick={() => createKvaMutation.mutate()} 
-              disabled={createKvaMutation.isPending}
+            <Button
+              onClick={() => (isEditMode ? updateKvaMutation.mutate() : createKvaMutation.mutate())}
+              disabled={isEditMode ? updateKvaMutation.isPending : createKvaMutation.isPending}
             >
-              {createKvaMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              KVA erstellen
+              {(isEditMode ? updateKvaMutation.isPending : createKvaMutation.isPending) && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {isEditMode ? 'Änderungen speichern' : 'KVA erstellen'}
             </Button>
           </DialogFooter>
         </DialogContent>
