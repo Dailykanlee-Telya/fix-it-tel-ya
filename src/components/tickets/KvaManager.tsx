@@ -945,7 +945,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
               <p className="text-muted-foreground mb-4">
                 Noch kein Kostenvoranschlag erstellt
               </p>
-              <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+              <Button onClick={() => { resetForm(); setCreateDialogOpen(true); }} className="gap-2">
                 <Plus className="h-4 w-4" />
                 KVA erstellen
               </Button>
@@ -954,14 +954,15 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
         </CardContent>
       </Card>
 
-      {/* Create KVA Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+      {/* Create / Edit KVA Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Kostenvoranschlag erstellen</DialogTitle>
+            <DialogTitle>{isEditMode ? 'Kostenvoranschlag bearbeiten' : 'Kostenvoranschlag erstellen'}</DialogTitle>
             <DialogDescription>
-              Erstellen Sie einen neuen KVA für diesen Auftrag.
-              {currentKva && ` (Version ${currentKva.version + 1})`}
+              {isEditMode
+                ? `Änderungen am bestehenden KVA (Version ${currentKva?.version}) speichern.`
+                : `Erstellen Sie einen neuen KVA für diesen Auftrag.${currentKva ? ` (Version ${currentKva.version + 1})` : ''}`}
             </DialogDescription>
           </DialogHeader>
 
