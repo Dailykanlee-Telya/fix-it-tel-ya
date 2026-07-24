@@ -918,8 +918,15 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
                   </Button>
                 )}
 
+                {canEdit && (
+                  <Button variant="outline" onClick={openEditDialog} className="gap-2">
+                    <Pencil className="h-4 w-4" />
+                    KVA bearbeiten
+                  </Button>
+                )}
+
                 {canCreateNew && (
-                  <Button variant="outline" onClick={() => setCreateDialogOpen(true)} className="gap-2">
+                  <Button variant="outline" onClick={() => { resetForm(); setCreateDialogOpen(true); }} className="gap-2">
                     <RefreshCw className="h-4 w-4" />
                     Neuen KVA erstellen
                   </Button>
