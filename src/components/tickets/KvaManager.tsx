@@ -33,6 +33,7 @@ import {
   Trash2,
   Gift,
   Lightbulb,
+  Pencil,
 } from 'lucide-react';
 
 // KVA Status labels & colors
