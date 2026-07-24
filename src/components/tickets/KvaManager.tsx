@@ -595,9 +595,139 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
     setRepairDescription('');
     setValidDays('14');
     setKvaItems([]);
+    setIsEditMode(false);
+    setEditingKvaId(null);
   };
 
+  const openEditDialog = () => {
+    if (!currentKva) return;
+    setIsEditMode(true);
+    setEditingKvaId(currentKva.id);
+    setKvaType(currentKva.kva_type || 'VARIABEL');
+    setRepairCost(currentKva.repair_cost != null ? String(currentKva.repair_cost) : '');
+    setMinCost(currentKva.min_cost != null ? String(currentKva.min_cost) : '');
+    setMaxCost(currentKva.max_cost != null ? String(currentKva.max_cost) : '');
+    setKvaFee(currentKva.kva_fee_amount != null ? String(currentKva.kva_fee_amount) : '35.00');
+    setDiagnosis(currentKva.diagnosis || '');
+    setRepairDescription(currentKva.repair_description || '');
+    if (currentKva.valid_until) {
+      const days = Math.max(1, Math.ceil((new Date(currentKva.valid_until).getTime() - Date.now()) / 86400000));
+      setValidDays(String(days));
+    } else {
+      setValidDays('14');
+    }
+    setKvaItems(
+      (currentKvaItems || []).map((it: any, idx: number) => ({
+        id: it.id,
+        item_type: it.item_type,
+        title: it.title || '',
+        quantity: Number(it.quantity) || 1,
+        unit_price_gross: Number(it.unit_price_gross) || 0,
+        tax_rate: Number(it.tax_rate) || 19,
+        sort_order: it.sort_order ?? idx,
+        notes: it.notes || undefined,
+        part_id: it.part_id || undefined,
+      }))
+    );
+    setCreateDialogOpen(true);
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setCreateDialogOpen(open);
+    if (!open) resetForm();
+  };
+
+  // Update existing KVA mutation
+  const updateKvaMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingKvaId) throw new Error('Keine KVA-ID zum Bearbeiten');
+      const parsedRepairCost = kvaItems.length > 0 ? itemsTotal : (parseFloat(repairCost) || 0);
+      const parsedMinCost = parseFloat(minCost) || null;
+      const parsedMaxCost = parseFloat(maxCost) || null;
+      const parsedKvaFee = parseFloat(kvaFee) || 35;
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + (parseInt(validDays) || 14));
+
+      let totalCost = parsedRepairCost + totalPartsCost;
+      if (kvaType === 'BIS_ZU' && parsedMaxCost) totalCost = parsedMaxCost;
+
+      const { error: updErr } = await supabase
+        .from('kva_estimates')
+        .update({
+          kva_type: kvaType as 'FIXPREIS' | 'VARIABEL' | 'BIS_ZU',
+          repair_cost: parsedRepairCost,
+          parts_cost: totalPartsCost,
+          total_cost: totalCost,
+          min_cost: parsedMinCost,
+          max_cost: parsedMaxCost,
+          kva_fee_amount: parsedKvaFee,
+          valid_until: validUntil.toISOString(),
+          diagnosis,
+          repair_description: repairDescription,
+          updated_by: profile?.id,
+          internal_price: ticket.is_b2b ? totalCost : null,
+        })
+        .eq('id', editingKvaId);
+      if (updErr) throw updErr;
+
+      // Replace items: delete existing then insert current
+      const { error: delErr } = await supabase
+        .from('kva_estimate_items')
+        .delete()
+        .eq('kva_estimate_id', editingKvaId);
+      if (delErr) throw delErr;
+
+      const itemsToInsert = kvaItems
+        .filter(i => i.title.trim())
+        .map((item, idx) => ({
+          kva_estimate_id: editingKvaId,
+          item_type: item.item_type as any,
+          title: item.title.trim(),
+          quantity: item.quantity,
+          unit_price_gross: item.unit_price_gross,
+          tax_rate: item.tax_rate,
+          sort_order: idx,
+          notes: item.notes || null,
+          part_id: item.part_id || null,
+        }));
+      if (itemsToInsert.length > 0) {
+        const { error: insErr } = await supabase.from('kva_estimate_items').insert(itemsToInsert);
+        if (insErr) throw insErr;
+      }
+
+      // Update ticket estimated price
+      await supabase
+        .from('repair_tickets')
+        .update({ estimated_price: totalCost })
+        .eq('id', ticketId);
+
+      // History entry
+      await supabase.from('kva_history').insert({
+        kva_estimate_id: editingKvaId,
+        action: 'BEARBEITET',
+        new_values: { kva_type: kvaType, total_cost: totalCost } as any,
+        user_id: profile?.id,
+        note: `KVA bearbeitet`,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['kva-all', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['kva-items'] });
+      queryClient.invalidateQueries({ queryKey: ['kva-history'] });
+      queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
+      setCreateDialogOpen(false);
+      resetForm();
+      toast.success('KVA gespeichert');
+      onStatusChange?.();
+    },
+    onError: (error: any) => {
+      toast.error('Fehler beim Speichern: ' + error.message);
+    },
+  });
+
   const canCreateNew = !currentKva || ['ABGELEHNT', 'ABGELAUFEN', 'RUECKFRAGE'].includes(currentKva.status);
+  const canEdit = !!currentKva && ['ENTWURF', 'ERSTELLT', 'GESENDET', 'WARTET_AUF_ANTWORT', 'RUECKFRAGE'].includes(currentKva.status) && !currentKva.decision_at;
   const canSend = currentKva && currentKva.status === 'ERSTELLT';
   const canApproveManually = currentKva && ['GESENDET', 'WARTET_AUF_ANTWORT'].includes(currentKva.status);
   const canWaiveFee = currentKva && !currentKva.kva_fee_waived && currentKva.status === 'ABGELEHNT';
