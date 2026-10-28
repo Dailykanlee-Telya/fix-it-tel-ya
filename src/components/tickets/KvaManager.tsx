@@ -651,7 +651,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
       let totalCost = parsedRepairCost + totalPartsCost;
       if (kvaType === 'BIS_ZU' && parsedMaxCost) totalCost = parsedMaxCost;
 
-      const { error: updErr } = await supabase
+      const { data: updated, error: updErr } = await supabase
         .from('kva_estimates')
         .update({
           kva_type: kvaType as 'FIXPREIS' | 'VARIABEL' | 'BIS_ZU',
@@ -667,8 +667,12 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
           updated_by: profile?.id,
           internal_price: ticket.is_b2b ? totalCost : null,
         })
-        .eq('id', editingKvaId);
+        .eq('id', editingKvaId)
+        .select('id');
       if (updErr) throw updErr;
+      if (!updated || updated.length === 0) {
+        throw new Error('KVA konnte nicht gespeichert werden – keine Berechtigung für diesen Auftrag oder KVA nicht gefunden.');
+      }
 
       // Replace items: delete existing then insert current
       const { error: delErr } = await supabase
