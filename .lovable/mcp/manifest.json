@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "sdk_version": "3.3.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://ymxnrnaptbwecjeqrdxp.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "telya-repariert-de",
+      "version": "0.1.0",
+      "title": "telya.repariert.de"
+    },
+    "tools": [
+      {
+        "name": "list_tickets",
+        "title": "Aufträge auflisten",
+        "description": "List recent repair orders (Aufträge) the signed-in user may see, optionally filtered by status or order number.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Optional ticket status, e.g. NEU_EINGANG."
+            },
+            "search": {
+              "type": "string",
+              "description": "Optional partial order number."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Max rows (default 25)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_ticket",
+        "title": "Auftrag anzeigen",
+        "description": "Get details of one repair order by its order number, if the signed-in user may see it.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "ticket_number": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Order number, e.g. TEREA260111."
+            }
+          },
+          "required": [
+            "ticket_number"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
