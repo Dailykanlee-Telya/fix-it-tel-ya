@@ -16,6 +16,7 @@ const B2BLayout = lazy(() => import("@/components/layout/B2BLayout"));
 // Eager loaded pages (critical path)
 import Auth from "@/pages/Auth";
 import TrackTicket from "@/pages/TrackTicket";
+import OAuthConsent from "@/pages/OAuthConsent";
 
 // Loading fallback component
 const PageLoader = () => (
@@ -138,6 +139,7 @@ function AppRoutes() {
         <Routes>
           {/* Public routes */}
           <Route path="/auth" element={<Auth />} />
+          <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
           <Route path="/track" element={<TrackTicket />} />
           <Route path="/datenschutz" element={<Datenschutz />} />
           <Route path="/b2b-register" element={<B2BRegister />} />

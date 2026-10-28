@@ -1,3 +1,4 @@
+import { oauthReturnPath } from '@/lib/oauth-return-path';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +30,7 @@ const passwordSchema = z.object({
 
 export default function Auth() {
   const navigate = useNavigate();
+  const oauthNext = (() => { const n = new URLSearchParams(window.location.search).get('next'); const v = n ? oauthReturnPath(n) : '/'; return v !== '/' ? v : null; })();
   const [searchParams] = useSearchParams();
   const {
     user,
@@ -181,7 +183,7 @@ export default function Auth() {
           setIsPasswordResetMode(true);
           return;
         }
-        navigate('/dashboard');
+        navigate(oauthNext ?? '/dashboard');
       }
     });
 
@@ -190,7 +192,7 @@ export default function Auth() {
 
   useEffect(() => {
     if (user && !authLoading && !isPasswordResetMode && !initialRecoveryDetected.current) {
-      navigate('/dashboard');
+      navigate(oauthNext ?? '/dashboard');
     }
   }, [user, authLoading, navigate, isPasswordResetMode]);
   const handleLogin = async (e: React.FormEvent) => {
@@ -242,7 +244,9 @@ export default function Auth() {
           description: 'Sie wurden erfolgreich angemeldet.'
         });
         // Navigate based on login type
-        if (loginType === 'b2b') {
+        if (oauthNext) {
+          navigate(oauthNext);
+        } else if (loginType === 'b2b') {
           navigate('/b2b/dashboard');
         } else {
           navigate('/dashboard');
