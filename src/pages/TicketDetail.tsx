@@ -168,6 +168,25 @@ export default function TicketDetail() {
     },
   });
 
+  // Current KVA positions for the repair report document
+  const { data: kvaItems } = useQuery({
+    queryKey: ['ticket-kva-items', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('kva_estimates')
+        .select('kva_estimate_items(*)')
+        .eq('repair_ticket_id', id)
+        .eq('is_current', true)
+        .maybeSingle();
+
+      if (error) throw error;
+      return ((data?.kva_estimate_items as any[]) ?? []).sort(
+        (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      );
+    },
+  });
+
   // Removed: availableParts query - now handled by TicketPartSelector with context-based filtering
 
   // Fetch checklist templates and items
@@ -1038,7 +1057,7 @@ export default function TicketDetail() {
         </TabsContent>
 
         <TabsContent value="documents">
-          <TicketDocuments ticket={ticket} partUsage={partUsage} />
+          <TicketDocuments ticket={ticket} partUsage={partUsage} kvaItems={kvaItems} />
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
