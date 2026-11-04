@@ -59,6 +59,22 @@ interface PartUsage {
   };
 }
 
+export interface KvaItem {
+  id: string;
+  item_type: string;
+  title: string;
+  quantity?: number;
+  unit_price_gross?: number;
+}
+
+const KVA_ITEM_TYPE_LABELS: Record<string, string> = {
+  ERSATZTEIL: 'Ersatzteil',
+  ARBEIT: 'Arbeit',
+  MATERIAL: 'Material',
+  SONSTIGES: 'Sonstiges',
+  GEBUEHR: 'Gebühr',
+};
+
 // Company info from TELYA_ADDRESS
 const COMPANY = {
   name: TELYA_ADDRESS.name,
@@ -428,10 +444,12 @@ Mit der Freigabe stimme ich der Durchführung der Reparatur zu den oben genannte
 
 export const RepairReportDocument = ({ 
   ticket, 
-  partUsage 
+  partUsage,
+  kvaItems
 }: { 
   ticket: TicketData; 
   partUsage?: PartUsage[];
+  kvaItems?: KvaItem[];
 }) => {
   const today = format(new Date(), 'dd.MM.yyyy', { locale: de });
   const deviceType = DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType] || ticket.device?.device_type;
@@ -479,6 +497,31 @@ export const RepairReportDocument = ({
             {(ticket as any).work_performed || ticket.error_description_text || 'Reparatur erfolgreich abgeschlossen'}
           </div>
         </PdfBox>
+
+        {kvaItems && kvaItems.length > 0 && (
+          <PdfBox title="Reparaturpositionen (KVA)" className="pdf-grid-full">
+            <table className="pdf-price-table">
+              <thead>
+                <tr>
+                  <th>Position</th>
+                  <th style={{ width: '22mm', textAlign: 'center' }}>Art</th>
+                  <th style={{ width: '15mm', textAlign: 'center' }}>Menge</th>
+                  <th style={{ width: '25mm' }}>Preis</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kvaItems.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.title}</td>
+                    <td style={{ textAlign: 'center' }}>{KVA_ITEM_TYPE_LABELS[item.item_type] || item.item_type}</td>
+                    <td style={{ textAlign: 'center' }}>{item.quantity ?? 1}</td>
+                    <td style={{ textAlign: 'right' }}>{((item.unit_price_gross || 0) * (item.quantity ?? 1)).toFixed(2)} €</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </PdfBox>
+        )}
 
         {partUsage && partUsage.length > 0 && (
           <PdfBox title="Verwendete Ersatzteile" className="pdf-grid-full">
