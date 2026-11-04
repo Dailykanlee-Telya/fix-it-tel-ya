@@ -21,6 +21,40 @@ interface B2BTicketDocumentsProps {
  */
 export default function B2BTicketDocuments({ ticket, partUsage }: B2BTicketDocumentsProps) {
   const { b2bPartner } = useB2BAuth();
+
+  // Logged spare part usage (real parts taken from stock)
+  const { data: fetchedPartUsage } = useQuery({
+    queryKey: ['b2b-doc-part-usage', ticket?.id],
+    enabled: !!ticket?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ticket_part_usage')
+        .select('*, part:parts(name)')
+        .eq('repair_ticket_id', ticket.id);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // KVA line items (positions) of the current KVA
+  const { data: kvaItems } = useQuery({
+    queryKey: ['b2b-doc-kva-items', ticket?.id],
+    enabled: !!ticket?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('kva_estimates')
+        .select('kva_estimate_items(*)')
+        .eq('repair_ticket_id', ticket.id)
+        .eq('is_current', true)
+        .maybeSingle();
+      if (error) throw error;
+      return ((data?.kva_estimate_items as any[]) ?? []).sort(
+        (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      );
+    },
+  });
+
+  const effectivePartUsage = partUsage ?? fetchedPartUsage ?? [];
   
   // Print via dedicated iframe with partner branding
   const handlePrint = (docType: 'eingangsbeleg' | 'reparaturbericht' | 'lieferschein') => {
@@ -57,7 +91,7 @@ export default function B2BTicketDocuments({ ticket, partUsage }: B2BTicketDocum
     iframe.contentWindow?.addEventListener('afterprint', cleanup, { once: true });
 
     // Generate document HTML with partner branding
-    const documentHtml = generateB2BDocument(ticket, docType, b2bPartner, partUsage);
+    const documentHtml = generateB2BDocument(ticket, docType, b2bPartner, effectivePartUsage, kvaItems);
 
     iframeDoc.open();
     iframeDoc.write(`
@@ -129,7 +163,8 @@ function generateB2BDocument(
   ticket: any, 
   docType: 'eingangsbeleg' | 'reparaturbericht' | 'lieferschein',
   partner: any,
-  partUsage?: any[]
+  partUsage?: any[],
+  kvaItems?: any[]
 ): string {
   const partnerName = partner?.name || 'Partner';
   const partnerSlogan = partner?.company_slogan || '';
@@ -259,6 +294,17 @@ function generateB2BDocument(
           <div class="pdf-data-row"><span class="pdf-data-label">Reparaturart:</span><span class="pdf-data-value">${errorLabel}</span></div>
           <div class="pdf-text-block" style="margin-top: 2mm; white-space: pre-wrap;">${(ticket as any).work_performed || ticket.error_description_text || 'Reparatur abgeschlossen'}</div>
         </div>
+        ${kvaItems && kvaItems.length > 0 ? `
+          <div class="pdf-box pdf-grid-full">
+            <div class="pdf-box-header">Reparaturpositionen (KVA)</div>
+            <table class="pdf-price-table">
+              <thead><tr><th>Position</th><th style="width:22mm;text-align:center;">Art</th><th style="width:15mm;text-align:center;">Menge</th><th style="width:25mm;">Preis</th></tr></thead>
+              <tbody>
+                ${kvaItems.map((i: any) => `<tr><td>${i.title}</td><td style="text-align:center;">${i.item_type === 'ERSATZTEIL' ? 'Ersatzteil' : i.item_type === 'ARBEIT' ? 'Arbeit' : i.item_type}</td><td style="text-align:center;">${i.quantity ?? 1}</td><td style="text-align:right;">${((i.unit_price_gross || 0) * (i.quantity ?? 1)).toFixed(2)} €</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : ''}
         ${partUsage && partUsage.length > 0 ? `
           <div class="pdf-box pdf-grid-full">
             <div class="pdf-box-header">Verwendete Ersatzteile</div>

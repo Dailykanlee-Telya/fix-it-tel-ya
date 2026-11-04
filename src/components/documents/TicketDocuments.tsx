@@ -15,9 +15,10 @@ import ThermalReceipt from './ThermalReceipt';
 interface TicketDocumentsProps {
   ticket: any;
   partUsage?: any[];
+  kvaItems?: any[];
 }
 
-export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsProps) {
+export default function TicketDocuments({ ticket, partUsage, kvaItems }: TicketDocumentsProps) {
   const intakeRef = useRef<HTMLDivElement>(null);
   const kvaRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -155,7 +156,7 @@ export default function TicketDocuments({ ticket, partUsage }: TicketDocumentsPr
         </CardHeader>
         <CardContent>
           <div ref={reportRef} className="bg-white p-4 rounded-lg border overflow-auto max-h-[500px]">
-            <RepairReportDocument ticket={ticket} partUsage={partUsage} />
+            <RepairReportDocument ticket={ticket} partUsage={partUsage} kvaItems={kvaItems} />
           </div>
         </CardContent>
       </Card>
