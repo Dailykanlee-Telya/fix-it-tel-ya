@@ -16,9 +16,11 @@ interface TicketDocumentsProps {
   ticket: any;
   partUsage?: any[];
   kvaItems?: any[];
+  kvaItemsLoading?: boolean;
+  kvaItemsError?: boolean;
 }
 
-export default function TicketDocuments({ ticket, partUsage, kvaItems }: TicketDocumentsProps) {
+export default function TicketDocuments({ ticket, partUsage, kvaItems, kvaItemsLoading, kvaItemsError }: TicketDocumentsProps) {
   const intakeRef = useRef<HTMLDivElement>(null);
   const kvaRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export default function TicketDocuments({ ticket, partUsage, kvaItems }: TicketD
           <style>${PDF_STYLES}</style>
         </head>
         <body>
-          ${ref.current.outerHTML}
+          ${ref.current.innerHTML}
         </body>
       </html>
     `);
@@ -130,14 +132,14 @@ export default function TicketDocuments({ ticket, partUsage, kvaItems }: TicketD
             <FileText className="h-5 w-5 text-primary" />
             Kostenvoranschlag (KVA)
           </CardTitle>
-          <Button size="sm" variant="outline" onClick={() => handlePrint(kvaRef, 'kva')}>
+          <Button size="sm" variant="outline" disabled={kvaItemsLoading || kvaItemsError} onClick={() => handlePrint(kvaRef, 'kva')}>
             <Printer className="h-4 w-4 mr-2" />
             PDF drucken
           </Button>
         </CardHeader>
         <CardContent>
           <div ref={kvaRef} className="bg-white p-4 rounded-lg border overflow-auto max-h-[500px]">
-            <KvaDocument ticket={ticket} partUsage={partUsage} />
+            {kvaItemsError ? <p role="alert">KVA-Positionen konnten nicht geladen werden. Bitte die Seite erneut laden.</p> : kvaItemsLoading ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : <KvaDocument ticket={ticket} partUsage={partUsage} kvaItems={kvaItems} />}
           </div>
         </CardContent>
       </Card>

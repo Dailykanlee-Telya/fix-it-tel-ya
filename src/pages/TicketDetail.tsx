@@ -168,8 +168,8 @@ export default function TicketDetail() {
     },
   });
 
-  // Current KVA positions for the repair report document
-  const { data: kvaItems } = useQuery({
+  // Current KVA positions for estimate and repair report documents
+  const { data: kvaItems, isLoading: kvaItemsLoading, isError: kvaItemsError } = useQuery({
     queryKey: ['ticket-kva-items', id],
     enabled: !!id,
     queryFn: async () => {
@@ -1057,7 +1057,7 @@ export default function TicketDetail() {
         </TabsContent>
 
         <TabsContent value="documents">
-          <TicketDocuments ticket={ticket} partUsage={partUsage} kvaItems={kvaItems} />
+          <TicketDocuments ticket={ticket} partUsage={partUsage} kvaItems={kvaItems} kvaItemsLoading={kvaItemsLoading} kvaItemsError={kvaItemsError} />
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">

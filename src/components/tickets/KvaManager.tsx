@@ -388,6 +388,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
       queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['kva-all', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['kva-items'] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-kva-items', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
       setCreateDialogOpen(false);
@@ -718,6 +719,7 @@ export function KvaManager({ ticketId, ticket, partUsage, onStatusChange }: KvaM
       queryClient.invalidateQueries({ queryKey: ['kva-current', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['kva-all', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['kva-items'] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-kva-items', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['kva-history'] });
       queryClient.invalidateQueries({ queryKey: ['ticket', ticketId] });
       setCreateDialogOpen(false);

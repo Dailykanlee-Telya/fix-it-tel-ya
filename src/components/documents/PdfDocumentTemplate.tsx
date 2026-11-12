@@ -4,6 +4,7 @@ import { de } from 'date-fns/locale';
 import { TELYA_ADDRESS } from '@/types/b2b';
 import { STATUS_LABELS, TicketStatus, DEVICE_TYPE_LABELS, DeviceType, ERROR_CODE_LABELS, ErrorCode } from '@/types/database';
 import { DOCUMENT_LOGOS } from '@/lib/document-logo';
+import { getKvaItemsTotal } from '@/lib/kva-document-costs';
 
 interface TicketData {
   ticket_number: string;
@@ -331,10 +332,12 @@ export const IntakeDocument = ({
 
 export const KvaDocument = ({ 
   ticket, 
-  partUsage 
+  partUsage,
+  kvaItems = []
 }: { 
   ticket: TicketData; 
   partUsage?: PartUsage[];
+  kvaItems?: KvaItem[];
 }) => {
   const today = format(new Date(), 'dd.MM.yyyy', { locale: de });
   const deviceType = DEVICE_TYPE_LABELS[ticket.device?.device_type as DeviceType] || ticket.device?.device_type;
@@ -342,7 +345,7 @@ export const KvaDocument = ({
   const deviceId = getDeviceIdentifier(ticket.device);
   
   const totalPartsPrice = partUsage?.reduce((sum, p) => sum + (p.unit_sales_price || 0) * p.quantity, 0) || 0;
-  const repairPrice = ticket.estimated_price || 0;
+  const repairPrice = kvaItems.length > 0 ? getKvaItemsTotal(kvaItems) : (ticket.estimated_price || 0);
   const totalPrice = repairPrice + totalPartsPrice;
 
   const statusBadge = ticket.kva_approved === true 
@@ -390,9 +393,9 @@ Mit der Freigabe stimme ich der Durchführung der Reparatur zu den oben genannte
           <PdfDataRow label={deviceId.label} value={deviceId.value} mono={!deviceId.unreadable} />
         </PdfBox>
 
-        <PdfBox title="Diagnose / Geplante Arbeiten" className="pdf-grid-full">
+        <PdfBox title="Fehlerbeschreibung / Geplante Arbeiten" className="pdf-grid-full">
           <PdfDataRow label="Fehler" value={errorLabel} />
-          <div className="pdf-text-block" style={{ marginTop: '2mm' }}>
+          <div className="pdf-text-block" style={{ marginTop: '2mm', whiteSpace: 'pre-wrap' }}>
             {ticket.error_description_text || 'Diagnose abgeschlossen'}
           </div>
         </PdfBox>
@@ -408,12 +411,19 @@ Mit der Freigabe stimme ich der Durchführung der Reparatur zu den oben genannte
               </tr>
             </thead>
             <tbody>
-              <tr>
+              {kvaItems.length > 0 ? kvaItems.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.title}</td>
+                  <td style={{ textAlign: 'center' }}>{item.quantity ?? 1}</td>
+                  <td style={{ textAlign: 'right' }}>{(item.unit_price_gross ?? 0).toFixed(2)} €</td>
+                  <td style={{ textAlign: 'right' }}>{getKvaItemsTotal([item]).toFixed(2)} €</td>
+                </tr>
+              )) : <tr>
                 <td>Reparaturarbeiten ({errorLabel})</td>
                 <td style={{ textAlign: 'center' }}>1</td>
                 <td style={{ textAlign: 'right' }}>{repairPrice.toFixed(2)} €</td>
                 <td style={{ textAlign: 'right' }}>{repairPrice.toFixed(2)} €</td>
-              </tr>
+              </tr>}
               {partUsage && partUsage.length > 0 && partUsage.map((usage) => (
                 <tr key={usage.id}>
                   <td>{usage.part?.name || 'Ersatzteil'}</td>
